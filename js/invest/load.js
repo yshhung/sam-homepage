@@ -23,10 +23,29 @@ async function readJson(path) {
   }
 }
 
+// 市場分頁：每份報告各自的檔（還沒跑過的報告就沒有，讀不到當作空的）
+const REPORTS = ['早報', '晚報', '週回顧'];
+const MARKET_FILES = ['mk_tiles', 'mk_notes', 'fin_news', 'inv_brief', 'cc_ref'];
+async function listNames(path) {
+  try {
+    const r = await graph(`/me/drive/root:/${enc(path)}:/children?$select=name&$top=500`);
+    return (r.value || []).map((x) => x.name);
+  } catch (e) {
+    if (e instanceof GraphError && e.status === 404) return [];
+    throw e;
+  }
+}
+function readReports() {
+  return Promise.all(REPORTS.map(async (r) => {
+    const have = new Set(await listNames(`${BASE}/市場/${r}`)); // 只讀這份報告真的寫過的檔
+    const v = await Promise.all(MARKET_FILES.map((n) => (have.has(`${n}.json`) ? readJson(`${BASE}/市場/${r}/${n}.json`) : null)));
+    return Object.fromEntries(MARKET_FILES.map((n, i) => [n, v[i]]));
+  }));
+}
+
 // 總資產歷史：一個舊資料總檔＋每月一個檔，全部讀進來
 async function readHistory() {
-  const r = await graph(`/me/drive/root:/${enc(`${BASE}/history`)}:/children?$select=name&$top=500`);
-  const names = (r.value || []).map((x) => x.name).filter((n) => n.endsWith('.json')).sort();
+  const names = (await listNames(`${BASE}/history`)).filter((n) => n.endsWith('.json')).sort();
   return Promise.all(names.map((n) => readJson(`${BASE}/history/${n}`)));
 }
 
@@ -55,14 +74,16 @@ async function start() {
   }
   try {
     const keys = Object.keys(FILES);
-    const [values, history, invest] = await Promise.all([
+    const [values, history, invest, reports] = await Promise.all([
       Promise.all(keys.map((k) => readJson(`${BASE}/${FILES[k]}`))),
       readHistory(),
       readJson('Sam Homepage/invest.json'),
+      readReports(),
     ]);
     const f = Object.fromEntries(keys.map((k, i) => [k, values[i]]));
     f.history = history;
     f.invest = invest;
+    f.reports = reports;
     if (!f.holdings) { banner('OneDrive 的「投資資料/holdings.json」讀不到。'); return; }
     const cfg = f.config || {};
     window.dash.__load(buildDatasets(f), {

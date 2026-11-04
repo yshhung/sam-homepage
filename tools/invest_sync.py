@@ -203,13 +203,25 @@ def summary(holdings, daily, fx, now, stale):
     }
 
 
-def update_state(state, holdings, out, keep=70):
+def update_state(state, holdings, out, keep=70, watch=None):
     prices = {key_of(h): [h.get('price'), h.get('prev_price'), h.get('price_date')]
               for h in holdings if h['code'] not in CASH_CODES and h.get('price') is not None}
     row = {'date': out['updated'][:10], 'total': out['totalTwd'], 'tw': out['cathayTwd'], 'us': out['schwabUsd'], 'fx': out['fx']}
     daily = [d for d in state.get('daily', []) if d['date'] != row['date']] + [row]
     daily.sort(key=lambda d: d['date'])
-    return {'updated': out['updated'], 'prices': prices, 'daily': daily[-keep:]}
+    new = {'updated': out['updated'], 'prices': prices, 'daily': daily[-keep:]}
+    # 追蹤清單的價格（投資頁的追蹤雷達、計畫價距離用）；這次沒讀追蹤清單就沿用上次的
+    w = watch if watch is not None else state.get('watch')
+    if w:
+        new['watch'] = w
+    return new
+
+
+def watch_items(watchlist):
+    """追蹤清單轉成跟持股一樣的格式，才能用同一套方式抓價（未上市的 price 是 null，抓不到就略過）"""
+    return [{'code': w['code'], 'currency': 'TWD' if w.get('market') == '台股' else 'USD', 'shares': 0,
+             'price': w.get('price'), 'prev_price': w.get('prev_price'), 'price_date': w.get('price_date')}
+            for w in watchlist or [] if w.get('code')]
 
 
 # ---------- 讀寫檔 ----------
@@ -249,8 +261,15 @@ def run(base, expect=None, dry=False):
     holdings = load_json(os.path.join(data_dir, 'holdings.json'))
     state = load_json(state_path, {'prices': {}, 'daily': []})
     apply_state_prices(holdings, state)
+    wl = load_json(os.path.join(data_dir, 'watchlist.json'))  # 可以沒有（每日同步只抄持股與 state）
+    wl_items = watch_items(wl) if wl else []
+    for w in wl_items:
+        p = (state.get('watch') or {}).get(w['code'])
+        if p and (not w.get('price_date') or p[2] >= w['price_date']):
+            w['price'], w['prev_price'], w['price_date'] = p
+    held = {key_of(h) for h in holdings}
     errors = []
-    quotes = fetch_quotes(holdings, now[:10], errors)
+    quotes = fetch_quotes(holdings + [w for w in wl_items if w['code'] not in held], now[:10], errors)
     fx = usd_twd()
     if fx is None:
         fx = state['daily'][-1]['fx'] if state.get('daily') else None
@@ -263,7 +282,11 @@ def run(base, expect=None, dry=False):
     out = summary(holdings, state.get('daily', []), fx, now, stale)
     if errors:
         out['errors'] = errors
-    new_state = update_state(state, holdings, out)
+    watch = None
+    if wl_items:
+        apply_quotes(wl_items, quotes)
+        watch = {w['code']: [w['price'], w['prev_price'], w['price_date']] for w in wl_items if w.get('price') is not None}
+    new_state = update_state(state, holdings, out, watch=watch)
     if dry:
         print(dumps(out))
         return
@@ -311,6 +334,10 @@ def selftest():
     h2 = [{'code': 'AAA', 'currency': 'TWD', 'shares': 1, 'price': 1, 'price_date': '2026-01-01'}]
     apply_state_prices(h2, st)
     check('持股檔的舊價格會被 state 的新價格蓋過', h2[0]['price'] == 12 and h2[0]['price_date'] == '2026-01-05')
+    wi = watch_items([{'code': 'CCC', 'market': '美股', 'price': None}, {'code': 'DDD', 'market': '台股', 'price': 5, 'price_date': '2026-01-02'}])
+    check('追蹤清單轉成持股格式', wi[0]['currency'] == 'USD' and wi[1]['currency'] == 'TWD' and wi[1]['shares'] == 0)
+    st2 = update_state({'watch': {'DDD': [5, 4, '2026-01-02']}}, hs, s)
+    check('這次沒讀追蹤清單就沿用上次的價格', st2['watch']['DDD'][0] == 5)
     print('PASS' if ok else 'FAIL')
     return ok
 

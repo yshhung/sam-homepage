@@ -40,18 +40,69 @@ export function lastUpdateRows(invest) {
   return [{ label: `${invest.updated.replace(/-/g, '').replace(':', '')} 每日同步`, at: invest.updated, by: '每日同步' }];
 }
 
+// 追蹤清單的現價：每日同步記在 state.json 的 watch
+export function applyWatch(watchlist, state) {
+  const w = state?.watch || {};
+  return (watchlist || []).map((x) => {
+    const p = w[x.code];
+    if (!p || (x.price_date && p[2] < x.price_date)) return { ...x };
+    return { ...x, price: p[0], prev_price: p[1], price_date: p[2] };
+  });
+}
+
+// 市場分頁：早報、晚報、週回顧各寫自己的檔（投資資料/市場/<報別>/），舊資料在 投資資料/市場/ 本身。
+// 每個指數群組、每個筆記區塊，用「最新寫入的那一份」；財經新聞留 48 小時、30 秒重點留 7 天
+const ms = (at) => { const t = Date.parse(at || ''); return Number.isNaN(t) ? 0 : t; };
+const newest = (rows) => Math.max(0, ...rows.map((r) => ms(r.at)));
+
+function latestBy(sources, key) {
+  const best = new Map(); // 群組 → { t, rows }
+  for (const rows of sources) {
+    const groups = new Map();
+    for (const r of rows || []) {
+      const k = r[key] ?? '';
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(r);
+    }
+    for (const [k, g] of groups) {
+      const t = newest(g);
+      if (!best.has(k) || t > best.get(k).t) best.set(k, { t, rows: g });
+    }
+  }
+  return [...best.values()].flatMap((x) => x.rows);
+}
+
+export function mergeMarket(sources, now = Date.now()) {
+  const all = (name) => sources.map((s) => (Array.isArray(s?.[name]) ? s[name] : []));
+  const recent = (rows, hours) => rows.filter((r) => now - ms(r.at) <= hours * 3600e3);
+  const news = new Map();
+  for (const r of recent(all('fin_news').flat(), 48).sort((a, b) => ms(b.at) - ms(a.at))) if (!news.has(r.title)) news.set(r.title, r);
+  const cc = all('cc_ref').filter((x) => x.length).sort((a, b) => newest(b) - newest(a))[0] || [];
+  return {
+    mk_tiles: latestBy(all('mk_tiles'), 'group'),
+    mk_notes: latestBy(all('mk_notes'), 'section'),
+    fin_news: [...news.values()],
+    inv_brief: recent(all('inv_brief').flat(), 24 * 7),
+    cc_ref: cc,
+  };
+}
+
 // 全部組起來：名稱跟舊儀表板的資料表一樣
 export function buildDatasets(f) {
   const arr = (v) => (Array.isArray(v) ? v : []);
+  const market = mergeMarket([
+    { mk_tiles: f.mk_tiles, mk_notes: f.mk_notes, fin_news: f.fin_news, inv_brief: f.inv_brief, cc_ref: f.cc_ref },
+    ...(f.reports || []),
+  ], f.now);
   return {
+    ...market,
     holdings: applyPrices(arr(f.holdings), f.state),
     fx: fxRows(f.invest, f.state),
     lastupdate: lastUpdateRows(f.invest),
     history: historyRows(f.history),
-    changes: arr(f.changes), plans: arr(f.plans), options: arr(f.options), watchlist: arr(f.watchlist),
+    changes: arr(f.changes), plans: arr(f.plans), options: arr(f.options), watchlist: applyWatch(arr(f.watchlist), f.state),
     events: arr(f.events), sectors: arr(f.sectors), goals: arr(f.goals), rules: arr(f.rules),
     realized: arr(f.realized), schwab_flows: arr(f.schwab_flows),
-    mk_tiles: arr(f.mk_tiles), mk_notes: arr(f.mk_notes), fin_news: arr(f.fin_news), inv_brief: arr(f.inv_brief), cc_ref: arr(f.cc_ref),
     cathay_bal: arr(f.cathay_bal), schwab_bal: arr(f.schwab_bal), fx_hist: arr(f.fx_hist),
   };
 }
