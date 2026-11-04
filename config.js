@@ -11,6 +11,10 @@ export const CONFIG = {
   companyStatsPath: 'Sam Homepage/company_stats.json',
   // TickTick 待辦：Claude 改完 TickTick 會更新，每天 07:30 排程備援
   tickTickPath: 'Sam Homepage/ticktick.json',
+  // 投資彙總（總資產、國泰、嘉信、變動 %）：每天 07:30 排程用 tools/invest_sync.py 更新，沒有持股明細
+  investPath: 'Sam Homepage/invest.json',
+  // 旅行：行程確定或改變時由 Claude 更新
+  lifePath: 'Sam Homepage/life.json',
 
   weather: { name: '土城', lat: 24.972, lon: 121.443 },
 
@@ -26,13 +30,11 @@ export const CONFIG = {
   // 需回覆信件：收件匣裡「已加旗標」的信，加上最近幾天「未讀且重要性高」的信
   mail: { importantDays: 3 },
 
-  // 細節頁先連回現在的 Homepage，之後各領域做好再換掉
+  // 細節頁：舊的 claude.ai 儀表板之後不用了，投資、生活已經不連過去（生活改連下一趟旅行的頁面）
   detailLinks: {
     工作: 'https://claude.ai/artifact/VdqsDF6LADCfMum6mdSSDe#work',
     沁耘: 'https://claude.ai/artifact/VdqsDF6LADCfMum6mdSSDe#work',
     和果: 'https://claude.ai/artifact/VdqsDF6LADCfMum6mdSSDe#work',
-    投資: 'https://claude.ai/artifact/KTcFLaXCUaee7FW3Uhr1Ra',
-    生活: 'https://claude.ai/artifact/VdqsDF6LADCfMum6mdSSDe#life',
   },
 
   // 預設門檻（可在 Excel「設定」表裡改）
@@ -44,5 +46,6 @@ export const CONFIG = {
     提前提醒天數: 3,
     出席率門檻: 85, // %
     員工請假門檻: 2, // 人
+    投資變動門檻: 2, // %，總資產單日或本月
   },
 };

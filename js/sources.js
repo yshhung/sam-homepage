@@ -1,7 +1,7 @@
 // 即時資料：Outlook 行事曆、天氣、匯率。每個來源只抓一次，再分給各區塊用。
 import { CONFIG } from '../config.js';
 import { graph, GraphError } from './auth.js';
-import { addDays, dateStr } from './util.js';
+import { addDays, dateStr, diffDays, relDay, shortDate } from './util.js';
 
 export async function getCalendar() {
   const today = dateStr();
@@ -208,6 +208,96 @@ export function demoCompany() {
     website: { domain: 'qinyunhealth.com', month: dateStr().slice(0, 7), views: 120, visitors: 48, posts: 1, prevViews: 436, prevVisitors: 129, views14d: 90, posts14d: 1 },
     social: { igFollowers: 66, igReach7d: 0, igContent14d: 0, fbFollowers: 103, fbViews7d: 8, fbContent14d: 2, gbpReach7d: null, gbpClicks7d: null },
   };
+}
+
+// ---------- 投資（只有彙總數字） ----------
+// 每天 07:30 排程跑 tools/invest_sync.py 寫的；首頁拿不到股數、代號或帳號
+
+export function getInvest() {
+  return oneDriveJson(CONFIG.investPath);
+}
+
+export function demoInvest() {
+  // 明顯是假的數字
+  return {
+    updated: `${dateStr()} 07:30`, asOf: { tw: addDays(dateStr(), -1), us: addDays(dateStr(), -1) },
+    totalTwd: 1234567, cathayTwd: 234567, schwabUsd: 33333.33, schwabTwd: 1000000, fx: 30,
+    dayPct: -2.5, cathayDayPct: -1.1, schwabDayPct: -3.0, monthPct: 1.2, monthBase: addDays(dateStr(), -10), stalePrices: 0,
+  };
+}
+
+const signed = (v) => (v === null || v === undefined ? '—' : `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(2)}%`);
+const wan = (twd) => `${(twd / 10000).toLocaleString('zh-TW', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} 萬`;
+
+// 投資卡片的數字、說明，以及要列進今日重點的事
+export function investView(inv, today, threshold) {
+  if (!inv?.totalTwd) return null;
+  const asOf = [inv.asOf?.tw, inv.asOf?.us].filter(Boolean).sort().pop() || inv.updated?.slice(0, 10);
+  const text = [
+    `國泰 ${wan(inv.cathayTwd)}・嘉信 US$${Math.round(inv.schwabUsd).toLocaleString('en-US')}`,
+    `今日 ${signed(inv.dayPct)}、本月 ${signed(inv.monthPct)}`,
+  ].join('；') + (asOf ? `（收盤價 ${shortDate(asOf)}）` : '');
+  const alerts = [];
+  const big = (v) => v !== null && v !== undefined && Math.abs(v) >= threshold;
+  if (big(inv.dayPct)) {
+    alerts.push({ type: 'day', title: `總資產單日 ${signed(inv.dayPct)}`, level: 'warn',
+      meta: `國泰 ${signed(inv.cathayDayPct)}、嘉信 ${signed(inv.schwabDayPct)} · 超過你設的 ${threshold}% 門檻` });
+  }
+  if (big(inv.monthPct)) {
+    alerts.push({ type: 'month', title: `總資產本月 ${signed(inv.monthPct)}`, level: 'info',
+      meta: `跟 ${inv.monthBase ? shortDate(inv.monthBase) : '上月底'} 比，含入金出金 · 超過 ${threshold}% 門檻` });
+  }
+  const age = inv.updated ? diffDays(today, inv.updated.slice(0, 10)) : 99;
+  if (age >= 3) alerts.push({ type: 'stale', title: `投資數字 ${age} 天沒更新`, level: 'info', meta: '辦公室電腦的 Claude 開著時，每天 07:30 的排程才會更新' });
+  else if (inv.stalePrices > 0) alerts.push({ type: 'prices', title: `投資有 ${inv.stalePrices} 檔價格沒抓到`, level: 'info', meta: '沿用上一次的價格，總資產可能有落差' });
+  return { num: wan(inv.totalTwd), text, alerts };
+}
+
+// ---------- 生活：旅行倒數＋TickTick 生活清單 ----------
+
+export const LIFE_LISTS = ['🏠我的家庭', '🏃我的生活', '📦生活瑣事'];
+const BILL = /扣款|扣繳|繳費|繳納|帳單|卡費|繳/;
+
+export function getLife() {
+  return oneDriveJson(CONFIG.lifePath);
+}
+
+export function demoLife() {
+  return { updated: `${dateStr()} 08:00`, trips: [{ name: '示範旅行', start: addDays(dateStr(), 18), end: addDays(dateStr(), 20), place: '某地', status: 'confirmed', url: '' }] };
+}
+
+export function lifeView(life, ticktick, today) {
+  const trips = (life?.trips || []).filter((t) => t.start && (t.end || t.start) >= today).sort((a, b) => a.start.localeCompare(b.start));
+  const trip = trips.find((t) => t.status !== 'planning') || trips[0] || null;
+  const tasks = (ticktick?.tasks || []).filter((t) => LIFE_LISTS.includes(t.list) && t.due)
+    .sort((a, b) => a.due.localeCompare(b.due) || (a.time || '99').localeCompare(b.time || '99'));
+  if (!trip && !tasks.length) return null;
+
+  const parts = [];
+  let num = '—';
+  if (trip) {
+    const n = diffDays(trip.start, today);
+    num = n <= 0 ? '旅行中' : `${n} 天`;
+    parts.push(`${n <= 0 ? '' : '距離'}${trip.name}（${shortDate(trip.start)}${trip.status === 'planning' ? '，規劃中' : ''}）`);
+  }
+  const bills = tasks.filter((t) => BILL.test(t.title));
+  const others = tasks.filter((t) => !BILL.test(t.title));
+  if (bills.length) parts.push(`扣款／帳單：${bills.slice(0, 2).map((t) => `${t.title.split('：')[0]}（${relDay(t.due, today)}）`).join('、')}`);
+  if (tasks.length) {
+    const next = others[0] || tasks[0];
+    parts.push(`生活待辦 ${tasks.length} 件${next ? `，下一件：${next.title}（${relDay(next.due, today)}）` : ''}`);
+  }
+
+  const alerts = [];
+  for (const t of trips) {
+    const n = diffDays(t.start, today);
+    if (t.status === 'planning' && n >= 0 && n <= 21) {
+      alerts.push({ type: `plan:${t.start}`, title: `${t.name}（${shortDate(t.start)}）還沒確定`, meta: t.note || '訂好後告訴 Claude，首頁會改成確定的倒數', level: 'info', link: t.url });
+    } else if (t.status !== 'planning' && n >= 0 && n <= 7) {
+      alerts.push({ type: `trip:${t.start}`, title: n === 0 ? `今天出發：${t.name}` : `${n} 天後出發：${t.name}`, meta: t.note || t.place || '', level: n <= 1 ? 'warn' : 'info', link: t.url });
+    }
+  }
+  return { num, text: parts.join('；'), link: trip?.url || '', alerts };
 }
 
 const WX = {

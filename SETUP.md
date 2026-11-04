@@ -13,6 +13,11 @@
   - 沁耘卡片顯示網站本月瀏覽、訪客、文章數，以及 IG、FB 追蹤人數。
   - 網站兩週沒有新文章、IG 或 FB 兩週沒發文、數字超過 3 天沒更新，都會列進重點。
   - 排程只在辦公室電腦的 Claude 開著時跑；關著的話，下次打開會補跑。
+- **投資**：同一個 07:30 排程執行 `tools/invest_sync.py`（排程資料夾裡有一份同樣的副本），用公開收盤價（證交所、櫃買中心 OpenAPI、Yahoo Finance、currency-api，都不用登入）更新 OneDrive `投資資料/` 裡的持股檔，再把總資產、國泰、嘉信、今日與本月變動寫進 `Sam Homepage/invest.json`。首頁只讀這個彙總檔，看不到股數、代號或帳號；持股檔不在 GitHub。
+  - 總資產單日或本月變動超過「投資變動門檻」（Excel「設定」表，預設 2%）、數字超過 3 天沒更新、有價格沒抓到，都會列進重點。
+  - 買賣或入金出金後，在 Claude App 告訴 Claude，由「首頁投資與旅行」技能改持股檔；隔天 07:30 首頁就會更新。
+- **生活**：大數字是距離下一趟旅行的天數（`Sam Homepage/life.json`，行程確定或改變時由 Claude 更新；還在規劃中的旅行 3 週內會提醒還沒確定）。說明列出 TickTick「🏠我的家庭」「🏃我的生活」「📦生活瑣事」近 7 天的扣款、帳單與下一件事，直接用 ticktick.json，沒有另外一份資料。
+
 資料存在你 OneDrive 的 `Sam Homepage/SamHomepage.xlsx`，第一次登入時會自動建立。
 
 沒設定之前，首頁是**示範模式**：可以操作，但資料只存在那台裝置的瀏覽器。
@@ -122,8 +127,10 @@ powershell -ExecutionPolicy Bypass -File tools/serve.ps1
 提醒類（和果、天氣、匯率、社群）沒有「完成」按鈕：情況解除了就會自動消失。
 
 **同步檔**（都在 OneDrive 的 Sam Homepage 資料夾，首頁只讀）：
-- 	icktick.json：TickTick 逾期與 7 天內到期的待辦，只有標題、清單、日期時間、優先順序，不含備註
+- ticktick.json：TickTick 逾期與 7 天內到期的待辦，只有標題、清單、日期時間、優先順序，不含備註
 - company_stats.json：沁耘網站與社群數字
+- invest.json：投資彙總（總資產、國泰、嘉信、變動 %），沒有持股明細
+- life.json：旅行（名稱、日期、地點、確定或規劃中、一句提醒）
 - SamHomepage.xlsx：卡片說明與門檻
 
 **「待辦行程分流」技能**要上傳新版才會在改完 TickTick 後同步首頁：claude.ai → 設定 → Capabilities（功能）→ Skills → 找到 task-schedule-router → 上傳新版 zip。
@@ -136,3 +143,4 @@ powershell -ExecutionPolicy Bypass -File tools/serve.ps1
 | `template/SamHomepage.xlsx` | 第一次登入時上傳到 OneDrive 的空白資料表 |
 | `tools/serve.ps1` | 本機測試用伺服器 |
 | `tools/make-template.ps1`、`tools/make-icons.ps1` | 重新產生 Excel 範本與圖示 |
+| `tools/invest_sync.py` | 每天更新投資彙總（`--selftest` 只跑計算測試，`--dry-run` 只印結果不寫檔） |

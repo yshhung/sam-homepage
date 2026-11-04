@@ -6,10 +6,10 @@
   <style>body { font: 14px system-ui; background: #000; color: #e6edf3; padding: 16px; } .ok { color: #2fd47a; } .bad { color: #f87171; }</style>
 </head>
 <body>
-<h1>和果資料解析測試</h1>
+<h1>和果、投資、生活資料解析測試</h1>
 <ul id="out"></ul>
 <script type="module">
-import { hechoSummary, parseCsv } from '../js/sources.js';
+import { hechoSummary, investView, lifeView, parseCsv } from '../js/sources.js';
 
 const out = document.getElementById('out');
 let failed = 0;
@@ -39,6 +39,37 @@ const csv = '﻿年,月,計算到,資料狀態,出席率,每日平均出席,服�
 const rows = parseCsv(csv);
 check('CSV 列數', rows.length === 2, JSON.stringify(rows));
 check('CSV 去掉 BOM、讀欄位', rows[0].年 === '2026' && rows[1].出席率 === '0.9' && rows[1].每日平均出席 === '33.5');
+
+// 投資：只有彙總數字（假的數字）
+const inv = { updated: '2026-01-05 07:30', asOf: { tw: '2026-01-02', us: '2026-01-02' }, totalTwd: 1234567, cathayTwd: 234567, schwabUsd: 33333.33, dayPct: -2.5, cathayDayPct: -1, schwabDayPct: -3, monthPct: 1.2, monthBase: '2025-12-31', stalePrices: 0 };
+let v = investView(inv, '2026-01-05', 2);
+check('投資卡大數字用萬', v.num === '123.5 萬', v.num);
+check('投資說明有國泰、嘉信與變動', v.text.includes('國泰 23.5 萬') && v.text.includes('US$33,333') && v.text.includes('−2.50%') && v.text.includes('+1.20%'), v.text);
+check('單日超過門檻列進重點，本月沒超過不列', v.alerts.length === 1 && v.alerts[0].type === 'day', JSON.stringify(v.alerts));
+check('門檻可以調', investView(inv, '2026-01-05', 1).alerts.length === 2);
+check('超過 3 天沒更新要提醒', investView(inv, '2026-01-08', 5).alerts.some((a) => a.type === 'stale'));
+check('沒有資料不顯示', investView(null, '2026-01-05', 2) === null && investView({}, '2026-01-05', 2) === null);
+
+// 生活：下一趟旅行優先用確定的，規劃中的提醒還沒訂
+const tt = { tasks: [
+  { id: 'a', title: '某銀行自動扣繳：明天扣款', list: '📦生活瑣事', due: '2026-01-07', time: '09:00' },
+  { id: 'b', title: '家庭聚餐', list: '🏠我的家庭', due: '2026-01-06', time: null },
+  { id: 'c', title: '公司的事', list: '💼公司營運', due: '2026-01-05', time: null },
+] };
+const life = { trips: [
+  { name: '已經回來', start: '2025-12-20', end: '2025-12-22', status: 'confirmed' },
+  { name: '規劃中旅行', start: '2026-01-15', end: '2026-01-17', status: 'planning', url: 'https://example.test/a' },
+  { name: '確定的旅行', start: '2026-02-01', end: '2026-02-03', status: 'confirmed', url: 'https://example.test/b' },
+] };
+let lv = lifeView(life, tt, '2026-01-05');
+check('倒數用下一趟確定的旅行', lv.num === '27 天' && lv.text.includes('確定的旅行') && lv.link === 'https://example.test/b', lv.text);
+check('列出扣款與生活待辦，不算其他清單', lv.text.includes('扣款／帳單：某銀行自動扣繳（後天）') && lv.text.includes('生活待辦 2 件') && lv.text.includes('下一件：家庭聚餐（明天）'), lv.text);
+check('規劃中的旅行 3 週內要提醒', lv.alerts.length === 1 && lv.alerts[0].title.includes('規劃中旅行'), JSON.stringify(lv.alerts));
+lv = lifeView({ trips: [life.trips[1]] }, null, '2026-01-05');
+check('只有規劃中的旅行也顯示倒數', lv.num === '10 天' && lv.text.includes('規劃中'), lv.text);
+lv = lifeView({ trips: [{ name: '出門', start: '2026-01-04', end: '2026-01-06', status: 'confirmed' }] }, null, '2026-01-05');
+check('旅行途中', lv.num === '旅行中', lv.num);
+check('沒有資料不顯示', lifeView(null, null, '2026-01-05') === null);
 
 document.title = failed ? `FAIL ${failed}` : 'PASS';
 </script>

@@ -4,8 +4,9 @@ import { CONFIG } from '../config.js';
 import { getAccount, initAuth, isConfigured, login, logout } from './auth.js';
 import { DemoStore, ExcelStore } from './store.js';
 import {
-  demoCalendar, demoCompany, demoHecho, demoMail, demoTickTick,
-  getCalendar, getCompany, getFx, getHecho, getMail, getTickTick, getWeather, hechoSummary,
+  demoCalendar, demoCompany, demoHecho, demoInvest, demoLife, demoMail, demoTickTick,
+  getCalendar, getCompany, getFx, getHecho, getInvest, getLife, getMail, getTickTick, getWeather, hechoSummary,
+  investView, lifeView,
 } from './sources.js';
 import { dateStr, diffDays, el, relDay, shortDate, timeStr } from './util.js';
 
@@ -13,7 +14,7 @@ const $ = (id) => document.getElementById(id);
 
 const DOMAINS = ['工作', '沁耘', '和果', '投資', '生活'];
 // 沁耘是公司（網站、曝光、課程），和果是日照中心
-const DOMAIN_OF = { 和果: '和果', 沁耘: '沁耘', 網站: '沁耘', 社群: '沁耘', 課程: '沁耘', 信件: '工作', 行程: '工作', 投資: '投資', 天氣: '生活' };
+const DOMAIN_OF = { 和果: '和果', 沁耘: '沁耘', 網站: '沁耘', 社群: '沁耘', 課程: '沁耘', 信件: '工作', 行程: '工作', 投資: '投資', 天氣: '生活', 旅行: '生活' };
 // TickTick 清單 → 卡片（清單定義見「待辦行程分流」技能）
 const LIST_DOMAIN = { '💼公司營運': '沁耘', '🦄未來拓展': '沁耘', '🏫社區長照營運': '和果', '🏠我的家庭': '生活', '🏃我的生活': '生活', '📦生活瑣事': '生活' };
 const TICKTICK_WEB = 'https://ticktick.com/webapp/';
@@ -21,7 +22,7 @@ const TICKTICK_WEB = 'https://ticktick.com/webapp/';
 const state = {
   store: null,
   cards: [], settings: { ...CONFIG.defaults },
-  events: [], weather: null, fx: null, mail: [], hecho: null, company: null, ticktick: null,
+  events: [], weather: null, fx: null, mail: [], hecho: null, company: null, ticktick: null, invest: null, life: null,
   errors: {}, syncedAt: null, loading: false,
   showUpcoming: false,
 };
@@ -105,6 +106,14 @@ function autoEntries(today) {
 
   out.push(...hechoEntries(today));
   out.push(...companyEntries(today));
+
+  // 投資：總資產變動超過門檻、數字太久沒更新
+  const inv = investView(state.invest, today, s.投資變動門檻);
+  for (const a of inv?.alerts || []) out.push({ key: `invest:${a.type}`, cat: '投資', domain: '投資', title: a.title, meta: a.meta, level: a.level, sort: a.type === 'day' ? 0.4 : 0.88 });
+
+  // 生活：旅行快到了、規劃中的旅行還沒訂
+  const life = lifeView(state.life, state.ticktick, today);
+  for (const a of life?.alerts || []) out.push({ key: `life:${a.type}`, cat: '旅行', domain: '生活', title: a.title, meta: a.meta, level: a.level, link: a.link || undefined, linkLabel: '打開行程', sort: 0.95 });
   return out;
 }
 
@@ -272,6 +281,7 @@ function renderDomains(focus) {
     const c = state.cards.find((x) => x.領域 === d) || { 領域: d, 數字: '—', 說明: '' };
     const n = focus.filter((e) => domainOf(e) === d).length;
     const auto = autoCard(d);
+    const link = auto?.link || CONFIG.detailLinks[d];
     return el('article', { class: 'domain' },
       el('div', { class: 'd-head' }, el('h2', {}, d)),
       el('div', { class: 'd-num' }, auto?.num || c.數字 || '—'),
@@ -280,7 +290,7 @@ function renderDomains(focus) {
       d === '和果' && state.hecho ? el('button', { class: 'act d-ask', type: 'button', title: '複製最近的數字（沒有姓名），打開 Claude', onclick: askHecho }, '問 AI') : null,
       el('div', { class: 'd-foot' },
         el('span', { class: n ? 'pill on' : 'pill' }, n ? `${n} 件重點` : '沒有重點'),
-        el('a', { href: CONFIG.detailLinks[d], target: '_blank', rel: 'noopener' }, '詳細 ↗')));
+        link ? el('a', { href: link, target: '_blank', rel: 'noopener' }, '詳細 ↗') : null));
   });
   $('domains').replaceChildren(...cards);
 }
@@ -298,6 +308,14 @@ function autoCard(domain) {
     const parts = [`和果 ${month.label} 出席率 · 每日平均 ${month.avg} 人`];
     if (latest?.expected) parts.push(`${shortDate(latest.date)} 實到 ${latest.present ?? '未點名'}／${latest.expected}`);
     return { num: `${Math.round(month.rate * 100)}%`, text: parts.join('；') };
+  }
+  if (domain === '投資') {
+    const v = investView(state.invest, dateStr(), state.settings.投資變動門檻);
+    if (v) return { num: v.num, text: v.text };
+  }
+  if (domain === '生活') {
+    const v = lifeView(state.life, state.ticktick, dateStr());
+    if (v) return { num: v.num, text: v.text, link: v.link };
   }
   if (domain === '工作' && state.mail.length) {
     const flagged = state.mail.filter((m) => m.flagged).length;
@@ -384,6 +402,7 @@ async function settle(name, p) {
     state.errors[name] = {
       data: `卡片與門檻：${err.message}`, calendar: '行事曆抓不到', weather: '天氣抓不到', fx: '匯率抓不到',
       mail: '信件抓不到', hecho: `和果資料抓不到（${err.message}）`, company: '網站與社群數字抓不到', ticktick: 'TickTick 同步檔抓不到',
+      invest: '投資數字抓不到', life: '旅行資料抓不到',
     }[name];
     return undefined;
   }
@@ -396,7 +415,7 @@ async function refresh() {
   lastRefresh = Date.now();
   renderStatus();
   const live = state.store.mode === 'live';
-  const [db, events, weather, fx, mail, hecho, company, ticktick] = await Promise.all([
+  const [db, events, weather, fx, mail, hecho, company, ticktick, invest, life] = await Promise.all([
     settle('data', state.store.load()),
     live ? settle('calendar', getCalendar()) : Promise.resolve(demoCalendar()),
     settle('weather', getWeather()),
@@ -405,6 +424,8 @@ async function refresh() {
     live ? settle('hecho', getHecho()) : Promise.resolve(demoHecho()),
     live ? settle('company', getCompany()) : Promise.resolve(demoCompany()),
     live ? settle('ticktick', getTickTick()) : Promise.resolve(demoTickTick()),
+    live ? settle('invest', getInvest()) : Promise.resolve(demoInvest()),
+    live ? settle('life', getLife()) : Promise.resolve(demoLife()),
   ]);
   if (db) Object.assign(state, db);
   if (events) state.events = events;
@@ -414,6 +435,8 @@ async function refresh() {
   if (hecho) state.hecho = hecho;
   if (company !== undefined) state.company = company;
   if (ticktick !== undefined) state.ticktick = ticktick;
+  if (invest !== undefined) state.invest = invest;
+  if (life !== undefined) state.life = life;
   state.syncedAt = timeStr();
   state.loading = false;
   render();
