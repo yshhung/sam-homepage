@@ -52,17 +52,15 @@ powershell -ExecutionPolicy Bypass -File tools/serve.ps1
 打開 <http://localhost:5173/> → 右上角 **登入** → 選裕勝的帳號。
 登入後狀態會變成綠燈「已同步」，OneDrive 裡會多一個 `Sam Homepage` 資料夾。
 
-## 步驟四：上線（讓 MacBook 和 iPhone 也能用）
+## 步驟四：上線（已完成）
 
-最簡單的方式是 Netlify 的拖放上傳（免費）：
+- 正式網址：<https://yshhung.github.io/sam-homepage/>
+- 程式放在 GitHub：<https://github.com/yshhung/sam-homepage>（公開，GitHub Pages 自動發佈）
+- Entra 的重新導向 URI 已加上 `https://yshhung.github.io/sam-homepage/`
 
-1. 到 <https://app.netlify.com/drop>，註冊或登入
-2. 把整個專案資料夾拖進去，幾秒後會拿到一個 `https://xxxx.netlify.app` 網址
-3. 回到 Entra 的 App 註冊 → **驗證** → 單頁應用程式的重新導向 URI → **新增 URI**，填 `https://xxxx.netlify.app/`（結尾要有 `/`）→ 儲存
+之後改了程式，commit 並 push 到 `main`，大約一分鐘後網站就會更新。
 
-之後改了程式，再拖一次到同一個 Netlify 網站就會更新。
-
-> 網站上只有程式，沒有你的資料。資料都在你的 OneDrive，要用你的帳號登入才讀得到。
+> 網站上只有程式，沒有你的資料。資料都在你的 OneDrive，要用沁耘帳號登入才讀得到。
 
 ## 步驟五：裝到各裝置
 
