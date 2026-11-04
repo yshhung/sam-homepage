@@ -1,7 +1,7 @@
 import { CONFIG } from '../config.js';
 import { getAccount, initAuth, isConfigured, login, logout } from './auth.js';
 import { DemoStore, ExcelStore } from './store.js';
-import { demoCalendar, demoCompany, demoHecho, demoMail, getCalendar, getCompany, getFx, getHecho, getMail, getWeather } from './sources.js';
+import { demoCalendar, demoCompany, demoHecho, demoMail, getCalendar, getCompany, getFx, getHecho, getMail, getWeather, hechoSummary } from './sources.js';
 import { addDays, dateStr, diffDays, el, nextMonday, nowStamp, relDay, shortDate, timeStr, uid } from './util.js';
 
 const $ = (id) => document.getElementById(id);
@@ -288,6 +288,7 @@ function renderDomains(focus) {
       el('div', { class: 'd-num' }, auto?.num || c.數字 || '—'),
       auto ? el('p', { class: 'd-text auto' }, auto.text) : null,
       c.說明 ? el('p', { class: 'd-text' }, c.說明) : null,
+      d === '和果' && state.hecho ? el('button', { class: 'act d-ask', type: 'button', title: '複製最近的數字（沒有姓名），打開 Claude', onclick: askHecho }, '問 AI') : null,
       el('div', { class: 'd-foot' },
         el('span', { class: n ? 'pill on' : 'pill' }, n ? `${n} 件重點` : '沒有重點'),
         el('a', { href: CONFIG.detailLinks[d], target: '_blank', rel: 'noopener' }, '詳細 ↗')));
@@ -373,17 +374,55 @@ $('snooze-dialog').addEventListener('close', () => {
     () => state.store.updateItem(item.ID, patch), `延後到 ${shortDate(to)}`);
 });
 
-async function toClaude(e) {
+function toClaude(e) {
   const lines = [`請幫我處理這件事：${e.title}`, `類別：${e.cat}`];
   if (e.meta) lines.push(`補充：${e.meta}`);
   if (e.item?.到期日) lines.push(`期限：${e.item.到期日}`);
-  try {
-    await navigator.clipboard.writeText(lines.join('\n'));
-    toast('已複製，到 Claude 貼上就好');
-  } catch {
-    toast('無法複製，請手動告訴 Claude');
+  if (e.cat === '和果' && state.hecho) lines.push('', '和果最近的數字（只有統計）：', hechoSummary(state.hecho));
+  copyAndOpenClaude(lines.join('\n'));
+}
+
+// 和果卡片的「問 AI」：把最近的交班數字（沒有任何姓名）複製起來，打開 Claude 貼上就能問
+function askHecho() {
+  copyAndOpenClaude([
+    '以下是土城和果日照最近的營運數字（只有統計，沒有個案或員工姓名）。',
+    '請幫我看有沒有需要注意的地方，並列出我該追的事。',
+    '',
+    hechoSummary(state.hecho),
+  ].join('\n'));
+}
+
+const UA = navigator.userAgent;
+const IS_IOS = /iPhone|iPad|iPod/.test(UA) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const IS_ANDROID = /Android/.test(UA);
+const CLAUDE_WEB = 'https://claude.ai/new';
+
+// 複製要在按下的當下就開始（iPhone 規定），不能等打開 Claude 之後
+function copyAndOpenClaude(text) {
+  const copied = navigator.clipboard ? navigator.clipboard.writeText(text).then(() => true, () => false) : Promise.resolve(false);
+  copied.then((ok) => toast(ok ? '已複製，到 Claude 貼上就好' : '無法複製，請手動告訴 Claude'));
+  openClaude();
+}
+
+// 盡量直接打開 Claude App（已經登入），不要開在不共用登入的小瀏覽器裡
+function openClaude() {
+  if (IS_ANDROID) {
+    // 有裝 Claude App 就打開 App，沒裝才開網頁
+    location.href = `intent://claude.ai/new#Intent;scheme=https;package=com.anthropic.claude;S.browser_fallback_url=${encodeURIComponent(CLAUDE_WEB)};end`;
+    return;
   }
-  window.open('https://claude.ai/new', '_blank', 'noopener');
+  if (IS_IOS) {
+    // iPhone 主畫面 App 裡的一般連結會開在小瀏覽器；claude:// 會直接叫出 Claude App。
+    // 1.5 秒後畫面還在（沒裝 App）才改開網頁
+    const fallback = setTimeout(() => {
+      if (document.visibilityState === 'visible' && !window.open(CLAUDE_WEB, '_blank', 'noopener')) toast('請打開 Claude App 貼上');
+    }, 1500);
+    document.addEventListener('visibilitychange', () => clearTimeout(fallback), { once: true });
+    location.href = 'claude://claude.ai/new';
+    return;
+  }
+  // 電腦：瀏覽器分頁跟 claude.ai 共用登入，直接開新分頁
+  window.open(CLAUDE_WEB, '_blank', 'noopener');
 }
 
 // 新增 / 編輯

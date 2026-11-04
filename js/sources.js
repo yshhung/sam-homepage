@@ -101,36 +101,15 @@ export function parseCsv(text) {
   return data.map((r) => Object.fromEntries(header.map((h, i) => [h.replace(/^﻿/, ''), r[i] ?? ''])));
 }
 
-// 交班紀錄的「統計」欄是一段文字；這裡只取數字，不取任何姓名
-export function parseHandoverStats(stats = '') {
-  const num = (re) => {
-    const m = stats.match(re);
-    return m && /^\d+$/.test(m[1]) ? Number(m[1]) : null;
-  };
-  return {
-    expected: num(/應到(\d+)人/),
-    present: num(/實到(\d+)人/),
-    clientLeave: num(/實到\d+人、請假(\d+)人/),
-    staffOn: num(/上班人數(\d+)人/),
-    staffLeave: num(/請假人數(\d+)人/),
-    incidents: num(/異常事件人數(\w+)人/),
-  };
-}
-
-// 優先讀「只有數字」的統計檔；還沒有這個檔時，才退回讀完整交班檔（裡面有長輩的照護紀錄）
+// 只讀「只有數字」的交班統計檔；完整交班檔（有長輩的照護紀錄）首頁一律不下載
 async function handoverStats() {
   try {
     const r = await (await hechoFile(CONFIG.hecho.stats)).json();
-    return { exported: r.exported || '', rows: r.rows || [], source: 'stats' };
+    return { exported: r.exported || '', rows: r.rows || [] };
   } catch (e) {
-    if (!(e instanceof GraphError) || e.status !== 404) throw e;
+    if (e instanceof GraphError && e.status === 404) throw new Error('還沒有交班數字檔');
+    throw e;
   }
-  const r = await (await hechoFile(CONFIG.hecho.handover)).json();
-  return {
-    exported: r.exported || '',
-    rows: (r.rows || []).map((row) => ({ date: row.date, ...parseHandoverStats(row.stats) })),
-    source: 'handover',
-  };
 }
 
 export async function getHecho() {
@@ -138,12 +117,13 @@ export async function getHecho() {
     handoverStats(),
     hechoFile(CONFIG.hecho.monthly).then((r) => r.text()).then(parseCsv),
   ]);
-  const latest = [...handover.rows].sort((a, b) => b.date.localeCompare(a.date))[0];
+  const sorted = [...handover.rows].sort((a, b) => b.date.localeCompare(a.date));
+  const latest = sorted[0];
   const month = monthly[monthly.length - 1];
   return {
     exported: handover.exported,
-    source: handover.source,
     latest: latest || null,
+    recent: sorted.slice(0, 7), // 最近 7 筆，給「問 AI」的摘要用（只有數字）
     month: month ? {
       label: `${month.年}/${month.月}`,
       rate: Number(month.出席率),
@@ -154,11 +134,32 @@ export async function getHecho() {
   };
 }
 
+// 給「問 AI」貼上用的和果摘要：只放日期和數字，沒有任何姓名
+export function hechoSummary(h) {
+  if (!h) return '（和果資料還沒讀到）';
+  const n = (v) => (v === null || v === undefined ? '—' : v);
+  const lines = [];
+  if (h.month) {
+    lines.push(`本月（${h.month.label}，算到 ${h.month.upTo}）：出席率 ${Math.round(h.month.rate * 100)}%，每日平均出席 ${h.month.avg} 人，服務 ${h.month.days} 天`);
+  }
+  lines.push('最近幾天交班（日期｜應到｜實到｜個案請假｜員工上班｜員工請假｜異常事件）：');
+  for (const r of h.recent || (h.latest ? [h.latest] : [])) {
+    const present = r.present === null || r.present === undefined ? '還沒點名' : r.present;
+    lines.push(`${r.date}｜${n(r.expected)}｜${present}｜${n(r.clientLeave)}｜${n(r.staffOn)}｜${n(r.staffLeave)}｜${n(r.incidents)}`);
+  }
+  if (h.exported) lines.push(`資料匯出時間：${h.exported}`);
+  return lines.join('\n');
+}
+
 export function demoHecho() {
   const t = dateStr();
   return {
     exported: `${t} 13:30`,
     latest: { date: t, expected: 38, present: 31, clientLeave: 7, staffOn: 7, staffLeave: 2, incidents: 1 },
+    recent: [
+      { date: t, expected: 38, present: 31, clientLeave: 7, staffOn: 7, staffLeave: 2, incidents: 1 },
+      { date: addDays(t, -1), expected: 39, present: 36, clientLeave: 3, staffOn: 8, staffLeave: 1, incidents: 0 },
+    ],
     month: { label: `${t.slice(0, 4)}/${Number(t.slice(5, 7))}`, rate: 0.91, avg: 34.2, days: 3, upTo: t },
   };
 }

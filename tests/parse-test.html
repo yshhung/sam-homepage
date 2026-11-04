@@ -9,7 +9,7 @@
 <h1>和果資料解析測試</h1>
 <ul id="out"></ul>
 <script type="module">
-import { parseCsv, parseHandoverStats } from '../js/sources.js';
+import { hechoSummary, parseCsv } from '../js/sources.js';
 
 const out = document.getElementById('out');
 let failed = 0;
@@ -21,17 +21,19 @@ function check(name, cond, detail = '') {
   out.append(li);
 }
 
-// 跟交班紀錄「統計」欄同樣格式的假資料（姓名用 甲乙丙 代替）
-const stats = '個案出席：應到39人、實到35人、請假4人（一般請假：甲、乙、丙；臨時請假：丁）\n'
-  + '員工出勤：今日上班人數8人（護理師1人、社工0人、照顧服務員6人、清潔人員1人）；請假人數1人(戊病假)；遲到人數0人；早退人數0人；加班人數0人\n'
-  + '營運統計：今日參觀人數1人；今日簽約人數0人；今日開案人數0人；今日異常事件人數2人';
-const s = parseHandoverStats(stats);
-check('應到／實到', s.expected === 39 && s.present === 35, JSON.stringify(s));
-check('個案請假', s.clientLeave === 4);
-check('員工上班／請假', s.staffOn === 8 && s.staffLeave === 1);
-check('異常事件', s.incidents === 2);
-check('異常事件填 X 時當作沒有', parseHandoverStats('今日異常事件人數X人').incidents === null);
-check('空字串不會壞', parseHandoverStats('').expected === null);
+// 「問 AI」的摘要：只能有日期和數字
+const sum = hechoSummary({
+  exported: '2026-11-04 16:40',
+  month: { label: '2026/11', rate: 0.912, avg: 33.5, days: 3, upTo: '2026-11-04' },
+  recent: [
+    { date: '2026-11-04', expected: 38, present: null, clientLeave: 2, staffOn: 7, staffLeave: 1, incidents: 0 },
+    { date: '2026-11-03', expected: 39, present: 35, clientLeave: 4, staffOn: 8, staffLeave: 2, incidents: 1 },
+  ],
+});
+check('摘要有月出席率', sum.includes('91%') && sum.includes('33.5'), sum);
+check('還沒點名寫清楚', sum.includes('還沒點名'));
+check('摘要只有數字、日期與固定用語', !/[甲乙丙丁戊]|○/.test(sum));
+check('沒有資料也不會壞', typeof hechoSummary(null) === 'string');
 
 const csv = '﻿年,月,計算到,資料狀態,出席率,每日平均出席,服務日數\r\n2026,10,2026-10-31,完整,0.931,34.1,22\r\n2026,11,2026-11-03,進行中,"0.9",33.5,2\r\n';
 const rows = parseCsv(csv);

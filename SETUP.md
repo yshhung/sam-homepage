@@ -85,7 +85,7 @@ powershell -ExecutionPolicy Bypass -File tools/serve.ps1
 | 權限最小化：信件只用 `Mail.Read`（首頁不能改、不能刪信），已撤銷 `Mail.ReadWrite` | ✅ |
 | 登入程式放在本站：`vendor/msal-browser-3.28.1.min.js`，已比對與 npm 官方套件 `@azure/msal-browser@3.28.1` 完全相同 | ✅ |
 | 內容安全政策（CSP）：程式只能從本站載入；只能連到微軟、天氣、匯率這幾個網址 | ✅ |
-| 和果只讀數字：有 `hechotc_handover_stats.json` 就只讀它；沒有時才退回讀完整交班檔 | ⚠️ 等匯出程式產生 stats 檔 |
+| 和果只讀數字：只讀 `hechotc_handover_stats.json`，完整交班檔（有照護紀錄）一律不下載 | ✅ 2026-11-04 |
 | GitHub 兩步驟驗證 | ⚠️ 請自己確認（見下方） |
 
 **確認 GitHub 兩步驟驗證**：登入 GitHub → 右上角頭像 → Settings → **Password and authentication**，「Two-factor authentication」要顯示 Enabled。沒有的話按 **Enable two-factor authentication**，用 Microsoft Authenticator 或 Google Authenticator 掃 QR code，並把復原碼存好。

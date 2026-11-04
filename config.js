@@ -18,8 +18,6 @@ export const CONFIG = {
     folder: '常備資料區/土城和果儀表板資料',
     // 只有數字的交班統計：[{date, expected, present, clientLeave, staffOn, staffLeave, incidents}]
     stats: 'hechotc_handover_stats.json',
-    // 還沒有 stats 檔時才讀這個完整交班檔
-    handover: 'hechotc_handover_live.json',
     monthly: 'hechotc_ops_monthly.csv',
   },
 
