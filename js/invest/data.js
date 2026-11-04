@@ -55,7 +55,9 @@ export function applyWatch(watchlist, state) {
 const ms = (at) => { const t = Date.parse(at || ''); return Number.isNaN(t) ? 0 : t; };
 const newest = (rows) => Math.max(0, ...rows.map((r) => ms(r.at)));
 
-function latestBy(sources, key) {
+// 10 天沒有任何報告更新的群組就不再顯示（舊儀表板留下、現在沒有報告會寫的區塊）；週回顧每 7 天換新，不受影響
+const STALE_DAYS = 10;
+function latestBy(sources, key, now) {
   const best = new Map(); // 群組 → { t, rows }
   for (const rows of sources) {
     const groups = new Map();
@@ -69,7 +71,7 @@ function latestBy(sources, key) {
       if (!best.has(k) || t > best.get(k).t) best.set(k, { t, rows: g });
     }
   }
-  return [...best.values()].flatMap((x) => x.rows);
+  return [...best.values()].filter((x) => now - x.t <= STALE_DAYS * 86400e3).flatMap((x) => x.rows);
 }
 
 export function mergeMarket(sources, now = Date.now()) {
@@ -79,8 +81,8 @@ export function mergeMarket(sources, now = Date.now()) {
   for (const r of recent(all('fin_news').flat(), 48).sort((a, b) => ms(b.at) - ms(a.at))) if (!news.has(r.title)) news.set(r.title, r);
   const cc = all('cc_ref').filter((x) => x.length).sort((a, b) => newest(b) - newest(a))[0] || [];
   return {
-    mk_tiles: latestBy(all('mk_tiles'), 'group'),
-    mk_notes: latestBy(all('mk_notes'), 'section'),
+    mk_tiles: latestBy(all('mk_tiles'), 'group', now),
+    mk_notes: latestBy(all('mk_notes'), 'section', now),
     fin_news: [...news.values()],
     inv_brief: recent(all('inv_brief').flat(), 24 * 7),
     cc_ref: cc,

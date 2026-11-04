@@ -63,6 +63,8 @@ check('同一個筆記區塊用最新那份、其他區塊保留', m.mk_notes.fi
 check('財經新聞只留 48 小時、同標題留新的', m.fin_news.length === 2 && m.fin_news.every((r) => r.at.startsWith('2026-01-05')), JSON.stringify(m.fin_news));
 check('30 秒重點留 7 天', m.inv_brief.length === 2);
 check('Cover Call 用最新有資料的那份', m.cc_ref.length === 1 && m.cc_ref[0].code === 'Z');
+const m2 = mergeMarket([{ mk_tiles: [{ group: '舊群組', name: 'Q', at: '2025-12-20T08:50:00+08:00' }] }, zao], now);
+check('10 天沒更新的群組不再顯示', !m2.mk_tiles.some((r) => r.group === '舊群組') && m2.mk_tiles.some((r) => r.group === '美股收盤'));
 const wl = applyWatch([{ code: 'CCC', price: 1, price_date: '2026-01-01' }, { code: 'DDD', price: null }], { watch: { CCC: [3, 2, '2026-01-05'] } });
 check('追蹤清單套上最新價格', wl[0].price === 3 && wl[0].prev_price === 2 && wl[1].price === null);
 
