@@ -70,7 +70,7 @@ export function demoMail() {
   ];
 }
 
-// ---------- 沁耘／和果營運 ----------
+// ---------- 和果日照營運 ----------
 
 function hechoFile(name) {
   const { driveId, folder } = CONFIG.hecho;

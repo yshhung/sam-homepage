@@ -26,7 +26,7 @@ export const CONFIG = {
   // 細節頁先連回現在的 Homepage，之後各領域做好再換掉
   detailLinks: {
     工作: 'https://claude.ai/artifact/VdqsDF6LADCfMum6mdSSDe#work',
-    沁耘: 'https://claude.ai/artifact/VdqsDF6LADCfMum6mdSSDe#work',
+    和果: 'https://claude.ai/artifact/VdqsDF6LADCfMum6mdSSDe#work',
     投資: 'https://claude.ai/artifact/KTcFLaXCUaee7FW3Uhr1Ra',
     生活: 'https://claude.ai/artifact/VdqsDF6LADCfMum6mdSSDe#life',
   },

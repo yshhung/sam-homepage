@@ -6,8 +6,9 @@ import { addDays, dateStr, diffDays, el, nextMonday, nowStamp, relDay, shortDate
 
 const $ = (id) => document.getElementById(id);
 
-const DOMAINS = ['工作', '沁耘', '投資', '生活'];
-const DOMAIN_OF = { 沁耘: '沁耘', 待辦: '工作', 信件: '工作', 行程: '工作', 投資: '投資', 帳單: '生活', 旅行: '生活', 天氣: '生活', 其他: '生活' };
+const DOMAINS = ['工作', '和果', '投資', '生活'];
+// 沁耘是公司（歸工作），和果是日照中心
+const DOMAIN_OF = { 和果: '和果', 沁耘: '工作', 待辦: '工作', 信件: '工作', 行程: '工作', 投資: '投資', 帳單: '生活', 旅行: '生活', 天氣: '生活', 其他: '生活' };
 const CLOSED = new Set(['完成', '已處理']);
 
 const state = {
@@ -116,7 +117,7 @@ function hechoEntries(today) {
   const age = diffDays(today, L.date);
   const label = age === 0 ? '今天' : shortDate(L.date);
   const hk = (type, title, meta, level, sort) =>
-    ({ key: `hecho:${L.date}:${type}`, kind: 'auto', cat: '沁耘', title, meta, level, sort });
+    ({ key: `hecho:${L.date}:${type}`, kind: 'auto', cat: '和果', title, meta, level, sort });
 
   if (age <= 3) {
     if (L.incidents > 0) out.push(hk('incident', `和果${label}有 ${L.incidents} 件異常事件`, '請看交班紀錄的特殊事項', 'bad', -1));
@@ -133,7 +134,7 @@ function hechoEntries(today) {
   // 平日 18:00 後還沒有今天的交班紀錄
   const dow = new Date(`${today}T12:00:00+08:00`).getUTCDay();
   if (dow >= 1 && dow <= 5 && timeStr() >= '18:00' && L.date < today) {
-    out.push({ key: `hecho:${today}:missing`, kind: 'auto', cat: '沁耘', title: '和果今天的交班紀錄還沒匯出', meta: `最新一筆是 ${shortDate(L.date)}`, level: 'warn', sort: 0.3 });
+    out.push({ key: `hecho:${today}:missing`, kind: 'auto', cat: '和果', title: '和果今天的交班紀錄還沒匯出', meta: `最新一筆是 ${shortDate(L.date)}`, level: 'warn', sort: 0.3 });
   }
   return out;
 }
@@ -277,7 +278,7 @@ function renderDomains(focus) {
 
 // 有即時資料的領域，數字自動填；你寫的說明照樣顯示在下面
 function autoCard(domain) {
-  if (domain === '沁耘' && state.hecho?.month?.rate) {
+  if (domain === '和果' && state.hecho?.month?.rate) {
     const { month, latest } = state.hecho;
     const parts = [`和果 ${month.label} 出席率 · 每日平均 ${month.avg} 人`];
     if (latest?.expected) parts.push(`${shortDate(latest.date)} 實到 ${latest.present ?? '未點名'}／${latest.expected}`);
@@ -438,6 +439,19 @@ async function settle(name, p) {
   }
 }
 
+// 舊版把和果日照的卡片叫「沁耘」；Excel 裡還是舊名稱時改一次
+async function renameOldCard() {
+  const old = state.cards.find((c) => c.領域 === '沁耘');
+  if (!old || state.cards.some((c) => c.領域 === '和果')) return;
+  const patch = { 領域: '和果', 說明: old.說明 === '在這裡寫一句沁耘現況' ? '在這裡寫一句和果日照現況' : old.說明 };
+  try {
+    await state.store.updateCard('沁耘', patch);
+    state.cards = state.cards.map((c) => (c === old ? { ...c, ...patch } : c));
+  } catch (err) {
+    console.error('rename card', err);
+  }
+}
+
 let lastRefresh = 0;
 async function refresh() {
   if (state.loading) return;
@@ -453,7 +467,10 @@ async function refresh() {
     live ? settle('mail', getMail()) : Promise.resolve(demoMail()),
     live ? settle('hecho', getHecho()) : Promise.resolve(demoHecho()),
   ]);
-  if (db) Object.assign(state, db);
+  if (db) {
+    Object.assign(state, db);
+    await renameOldCard();
+  }
   if (events) state.events = events;
   if (weather) state.weather = weather;
   if (fx) state.fx = fx;
