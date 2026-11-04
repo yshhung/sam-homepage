@@ -258,6 +258,8 @@ def run(base, expect=None, dry=False):
     if fx is None:
         raise SystemExit('沒有匯率，無法計算')
     stale = apply_quotes(holdings, quotes)
+    if stale == 0:  # 證交所連不上但 Yahoo 補齊了，就不算錯誤
+        errors = [e for e in errors if not e.startswith('台股價格')]
     out = summary(holdings, state.get('daily', []), fx, now, stale)
     if errors:
         out['errors'] = errors
