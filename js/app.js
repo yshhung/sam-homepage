@@ -120,9 +120,9 @@ function hechoEntries(today) {
 
   if (age <= 3) {
     if (L.incidents > 0) out.push(hk('incident', `和果${label}有 ${L.incidents} 件異常事件`, '請看交班紀錄的特殊事項', 'bad', -1));
-    // 實到 0 人多半是統計還沒填完，不當成出席率異常
-    if (L.expected && L.present === 0) {
-      out.push(hk('unfilled', `和果${label}交班統計的實到是 0 人`, `應到 ${L.expected} 人，可能還沒填完`, 'info', 0.35));
+    // 實到是空的（數字檔）或 0 人（舊交班檔）：多半是 WorkLog 還沒點名，不當成出席率異常
+    if (L.expected && !L.present) {
+      out.push(hk('unfilled', `和果${label}還沒點名`, `應到 ${L.expected} 人，WorkLog 出勤表還是「○」，請同仁改成「V」`, 'info', 0.35));
     } else if (L.expected && L.present !== null) {
       const rate = Math.round((L.present / L.expected) * 100);
       if (rate < s.出席率門檻) out.push(hk('rate', `和果${label}出席率 ${rate}%`, `實到 ${L.present}／應到 ${L.expected}，低於 ${s.出席率門檻}%`, 'warn', 0.2));
@@ -280,7 +280,7 @@ function autoCard(domain) {
   if (domain === '沁耘' && state.hecho?.month?.rate) {
     const { month, latest } = state.hecho;
     const parts = [`和果 ${month.label} 出席率 · 每日平均 ${month.avg} 人`];
-    if (latest?.expected) parts.push(`${shortDate(latest.date)} 實到 ${latest.present}／${latest.expected}`);
+    if (latest?.expected) parts.push(`${shortDate(latest.date)} 實到 ${latest.present ?? '未點名'}／${latest.expected}`);
     return { num: `${Math.round(month.rate * 100)}%`, text: parts.join('；') };
   }
   if (domain === '工作' && state.mail.length) {
