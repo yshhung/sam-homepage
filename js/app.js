@@ -1,7 +1,7 @@
 import { CONFIG } from '../config.js';
 import { getAccount, initAuth, isConfigured, login, logout } from './auth.js';
 import { DemoStore, ExcelStore } from './store.js';
-import { completeMail, demoCalendar, demoHecho, demoMail, getCalendar, getFx, getHecho, getMail, getWeather } from './sources.js';
+import { demoCalendar, demoHecho, demoMail, getCalendar, getFx, getHecho, getMail, getWeather } from './sources.js';
 import { addDays, dateStr, diffDays, el, nextMonday, nowStamp, relDay, shortDate, timeStr, uid } from './util.js';
 
 const $ = (id) => document.getElementById(id);
@@ -94,8 +94,9 @@ function autoEntries(today) {
     out.push({
       key: `mail:${m.id}`, kind: 'auto', cat: '信件', title: m.subject,
       meta: [m.from, `${shortDate(dateStr(at))} ${timeStr(at)}`, m.flagged ? '已加旗標' : '重要・未讀'].filter(Boolean).join(' · '),
+      // 首頁只能讀信：按「已回覆」只會從首頁拿掉；在 Outlook 取消旗標也會自動消失
       level: m.flagged ? 'warn' : 'info', link: m.link, sort: m.flagged ? 0.6 : 0.7,
-      ...(m.flagged ? { doneLabel: '已回覆', onDone: () => mailDone(m.id) } : {}),
+      ...(m.flagged ? { doneLabel: '已回覆' } : {}),
     });
   }
 
@@ -323,11 +324,6 @@ function closeItem(id, status) {
 function dismissAuto(e) {
   const row = { ID: `auto:${e.key}`, 類別: e.cat, 標題: e.title, 備註: e.meta || '', 到期日: '', 狀態: '已處理', 延後至: '', 連結: '', 建立: nowStamp(), 完成: nowStamp() };
   mutate(() => { state.items = [...state.items, row]; }, () => state.store.addItem(row), '已處理');
-}
-
-function mailDone(id) {
-  mutate(() => { state.mail = state.mail.filter((m) => m.id !== id); },
-    () => (state.store.mode === 'live' ? completeMail(id) : Promise.resolve()), '已在 Outlook 標成完成');
 }
 
 let snoozeTarget = null;

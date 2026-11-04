@@ -2,8 +2,8 @@
 import { CONFIG } from '../config.js';
 
 // Files.ReadWrite：你自己 OneDrive 的首頁資料；Files.Read.All：讀和果 SharePoint 的匯出檔；
-// Mail.ReadWrite：讀需回覆的信、按「已回覆」時把 Outlook 旗標標成完成
-const SCOPES = ['User.Read', 'Files.ReadWrite', 'Files.Read.All', 'Calendars.Read', 'Mail.ReadWrite'];
+// Mail.Read：只讀需回覆的信，首頁不能改、不能刪你的信
+const SCOPES = ['User.Read', 'Files.ReadWrite', 'Files.Read.All', 'Calendars.Read', 'Mail.Read'];
 let pca = null;
 let account = null;
 

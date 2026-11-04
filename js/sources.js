@@ -1,6 +1,6 @@
 // 即時資料：Outlook 行事曆、天氣、匯率。每個來源只抓一次，再分給各區塊用。
 import { CONFIG } from '../config.js';
-import { graph } from './auth.js';
+import { graph, GraphError } from './auth.js';
 import { addDays, dateStr } from './util.js';
 
 export async function getCalendar() {
@@ -62,11 +62,6 @@ export async function getMail() {
     .sort((a, b) => b.received.localeCompare(a.received));
 }
 
-// 在首頁按「已回覆」＝在 Outlook 把旗標標成完成，三台裝置和 Outlook 都同步
-export function completeMail(id) {
-  return graph(`/me/messages/${encodeURIComponent(id)}`, { method: 'PATCH', body: { flag: { flagStatus: 'complete' } } });
-}
-
 export function demoMail() {
   const ago = (h) => new Date(Date.now() - h * 3600000).toISOString();
   return [
@@ -122,16 +117,33 @@ export function parseHandoverStats(stats = '') {
   };
 }
 
+// 優先讀「只有數字」的統計檔；還沒有這個檔時，才退回讀完整交班檔（裡面有長輩的照護紀錄）
+async function handoverStats() {
+  try {
+    const r = await (await hechoFile(CONFIG.hecho.stats)).json();
+    return { exported: r.exported || '', rows: r.rows || [], source: 'stats' };
+  } catch (e) {
+    if (!(e instanceof GraphError) || e.status !== 404) throw e;
+  }
+  const r = await (await hechoFile(CONFIG.hecho.handover)).json();
+  return {
+    exported: r.exported || '',
+    rows: (r.rows || []).map((row) => ({ date: row.date, ...parseHandoverStats(row.stats) })),
+    source: 'handover',
+  };
+}
+
 export async function getHecho() {
   const [handover, monthly] = await Promise.all([
-    hechoFile(CONFIG.hecho.handover).then((r) => r.json()),
+    handoverStats(),
     hechoFile(CONFIG.hecho.monthly).then((r) => r.text()).then(parseCsv),
   ]);
-  const latest = [...(handover.rows || [])].sort((a, b) => b.date.localeCompare(a.date))[0];
+  const latest = [...handover.rows].sort((a, b) => b.date.localeCompare(a.date))[0];
   const month = monthly[monthly.length - 1];
   return {
-    exported: handover.exported || '',
-    latest: latest ? { date: latest.date, ...parseHandoverStats(latest.stats) } : null,
+    exported: handover.exported,
+    source: handover.source,
+    latest: latest || null,
     month: month ? {
       label: `${month.年}/${month.月}`,
       rate: Number(month.出席率),

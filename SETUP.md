@@ -3,7 +3,7 @@
 目前的內容：
 - **第 1 階段**：今日重點（可完成、延後、編輯、問 Claude）、天氣、美元匯率、Outlook 今明行程、四張領域卡片
 - **第 2 階段**：
-  - 需回覆信件：Outlook 收件匣裡加了旗標的信，加上最近 3 天未讀且重要性高的信。按「已回覆」會在 Outlook 把旗標標成完成。
+  - 需回覆信件：Outlook 收件匣裡加了旗標的信，加上最近 3 天未讀且重要性高的信。按「已回覆」只會從首頁拿掉；在 Outlook 取消旗標或標成完成，首頁也會自動拿掉。
   - 沁耘營運異常：讀和果的交班匯出檔，異常事件、出席率偏低、員工請假偏多、平日 18:00 後還沒交班，都會列進重點。沁耘卡片會自動顯示本月出席率。
   - 只讀統計數字，不讀長輩或員工的姓名。
 
@@ -30,7 +30,7 @@
    - `Files.ReadWrite`：讀寫你自己 OneDrive 裡的首頁資料
    - `Files.Read.All`：讀和果 SharePoint「土城和果儀表板資料」裡的出勤與交班匯出檔
    - `Calendars.Read`：讀你的 Outlook 行事曆
-   - `Mail.ReadWrite`：讀需回覆的信；按「已回覆」時把 Outlook 旗標標成完成（不會寄信、不會刪信）
+   - `Mail.Read`：只讀需回覆的信（不能改、不能刪、不能寄）
    - （`User.Read` 預設已經有）
    - 按 **新增權限**，再按 **代表 沁耘健康企業有限公司 授與管理員同意** → 是
 
@@ -71,6 +71,36 @@ powershell -ExecutionPolicy Bypass -File tools/serve.ps1
 三台都用裕勝的帳號登入一次，之後會記住。
 
 ---
+
+## 資安設定（2026-11-04 已完成）
+
+| 防線 | 狀態 |
+|---|---|
+| 只有你能用：Entra 企業應用程式「Sam Homepage」→ 屬性 →「需要指派」= 是，只指派裕勝 | ✅ |
+| 權限最小化：信件只用 `Mail.Read`（首頁不能改、不能刪信），已撤銷 `Mail.ReadWrite` | ✅ |
+| 登入程式放在本站：`vendor/msal-browser-3.28.1.min.js`，已比對與 npm 官方套件 `@azure/msal-browser@3.28.1` 完全相同 | ✅ |
+| 內容安全政策（CSP）：程式只能從本站載入；只能連到微軟、天氣、匯率這幾個網址 | ✅ |
+| 和果只讀數字：有 `hechotc_handover_stats.json` 就只讀它；沒有時才退回讀完整交班檔 | ⚠️ 等匯出程式產生 stats 檔 |
+| GitHub 兩步驟驗證 | ⚠️ 請自己確認（見下方） |
+
+**確認 GitHub 兩步驟驗證**：登入 GitHub → 右上角頭像 → Settings → **Password and authentication**，「Two-factor authentication」要顯示 Enabled。沒有的話按 **Enable two-factor authentication**，用 Microsoft Authenticator 或 Google Authenticator 掃 QR code，並把復原碼存好。
+
+**手機或筆電遺失時**：
+1. 用電腦登入 <https://entra.microsoft.com> → **使用者** → 點你自己 → 上方 **撤銷工作階段**。所有裝置上的首頁、Outlook、Teams 都會被登出。
+2. 接著改你的 M365 密碼。
+3. iPhone 用「尋找」App 鎖定或清除裝置。
+
+平常請確認 iPhone 有設 Face ID 和密碼、MacBook 有設登入密碼。首頁會一直保持登入，裝置本身的鎖就是第一道防線。
+
+**`hechotc_handover_stats.json` 的格式**（給匯出程式用）：
+
+```json
+{ "exported": "2026-11-04 13:30",
+  "rows": [ { "date": "2026-11-03", "expected": 38, "present": 35, "clientLeave": 3,
+              "staffOn": 8, "staffLeave": 0, "incidents": 0 } ] }
+```
+
+放在和果文件庫的 `常備資料區/土城和果儀表板資料/`，跟現在的交班檔同一個資料夾。只能放數字，不能有姓名。
 
 ## 平常怎麼用
 
