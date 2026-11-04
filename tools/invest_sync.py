@@ -2,6 +2,7 @@
 
 讀 OneDrive「投資資料/holdings.json」（持股，只在 OneDrive，不進 GitHub；只有買賣時由 Claude 修改），
 用公開的收盤價算出市值，把最新價格與最近 70 天的總資產記在「投資資料/state.json」，
+這個月每天的總資產寫在「投資資料/history/YYYY-MM.json」（永久保留，過去的月份不再改），
 再把首頁需要的彙總數字寫到「Sam Homepage/invest.json」（沒有股數、代號、帳號）。
 雲端排程會先把 OneDrive 的檔案抄到暫存資料夾，用 --base 指過去、--expect 核對大小，算完再寫回 OneDrive。
 
@@ -264,7 +265,14 @@ def run(base, expect=None, dry=False):
     if dry:
         print(dumps(out))
         return
-    sizes = {'state.json': write_json(state_path, new_state), 'invest.json': write_json(out_path, out)}
+    month = now[:7]
+    month_rows = [dict(d, src='排程') for d in new_state['daily'] if d['date'].startswith(month)]
+    sizes = {
+        'state.json': write_json(state_path, new_state),
+        'invest.json': write_json(out_path, out),
+        # 永久的總資產歷史：一個月一個檔，只寫這個月（state 留 70 天，一定涵蓋整個月）
+        f'history/{month}.json': write_json(os.path.join(data_dir, 'history', f'{month}.json'), {'rows': month_rows}),
+    }
     print(f'invest.json 已更新：{now}，價格沒更新到 {stale} 檔' + (f'，{"；".join(errors)}' if errors else ''))
     print('BYTES ' + json.dumps(sizes))
 
