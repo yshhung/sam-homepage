@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <title>Parser test</title>
+  <style>body { font: 14px system-ui; background: #000; color: #e6edf3; padding: 16px; } .ok { color: #2fd47a; } .bad { color: #f87171; }</style>
+</head>
+<body>
+<h1>和果資料解析測試</h1>
+<ul id="out"></ul>
+<script type="module">
+import { parseCsv, parseHandoverStats } from '../js/sources.js';
+
+const out = document.getElementById('out');
+let failed = 0;
+function check(name, cond, detail = '') {
+  if (!cond) failed++;
+  const li = document.createElement('li');
+  li.className = cond ? 'ok' : 'bad';
+  li.textContent = `${cond ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`;
+  out.append(li);
+}
+
+// 跟交班紀錄「統計」欄同樣格式的假資料（姓名用 甲乙丙 代替）
+const stats = '個案出席：應到39人、實到35人、請假4人（一般請假：甲、乙、丙；臨時請假：丁）\n'
+  + '員工出勤：今日上班人數8人（護理師1人、社工0人、照顧服務員6人、清潔人員1人）；請假人數1人(戊病假)；遲到人數0人；早退人數0人；加班人數0人\n'
+  + '營運統計：今日參觀人數1人；今日簽約人數0人；今日開案人數0人；今日異常事件人數2人';
+const s = parseHandoverStats(stats);
+check('應到／實到', s.expected === 39 && s.present === 35, JSON.stringify(s));
+check('個案請假', s.clientLeave === 4);
+check('員工上班／請假', s.staffOn === 8 && s.staffLeave === 1);
+check('異常事件', s.incidents === 2);
+check('異常事件填 X 時當作沒有', parseHandoverStats('今日異常事件人數X人').incidents === null);
+check('空字串不會壞', parseHandoverStats('').expected === null);
+
+const csv = '﻿年,月,計算到,資料狀態,出席率,每日平均出席,服務日數\r\n2026,10,2026-10-31,完整,0.931,34.1,22\r\n2026,11,2026-11-03,進行中,"0.9",33.5,2\r\n';
+const rows = parseCsv(csv);
+check('CSV 列數', rows.length === 2, JSON.stringify(rows));
+check('CSV 去掉 BOM、讀欄位', rows[0].年 === '2026' && rows[1].出席率 === '0.9' && rows[1].每日平均出席 === '33.5');
+
+document.title = failed ? `FAIL ${failed}` : 'PASS';
+</script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <title>ExcelStore test</title>
+  <style>body { font: 14px system-ui; background: #000; color: #e6edf3; padding: 16px; } .ok { color: #2fd47a; } .bad { color: #f87171; }</style>
+</head>
+<body>
+<h1>ExcelStore 測試（假的 Graph）</h1>
+<ul id="out"></ul>
+<script type="module">
+import { ExcelStore } from '../js/store.js';
+import { GraphError } from '../js/auth.js';
+
+// 模擬 Excel 活頁簿：每張表記住所在工作表、欄位範圍與資料列
+function fakeWorkbook({ quoteSheet = false } = {}) {
+  const tables = {
+    Items: { sheet: '重點', c1: 'A', c2: 'J', top: 1, header: ['ID', '類別', '標題', '備註', '到期日', '狀態', '延後至', '連結', '建立', '完成'], rows: [] },
+    Cards: { sheet: '卡片', c1: 'A', c2: 'D', top: 1, header: ['領域', '數字', '說明', '更新'],
+      rows: [['工作', '—', '', ''], ['沁耘', '—', '', ''], ['投資', '—', '', ''], ['生活', '—', '', '']] },
+    Settings: { sheet: '設定', c1: 'A', c2: 'C', top: 1, header: ['項目', '值', '說明'], rows: [['雨機率門檻', 70, ''], ['匯率變動門檻', '0.8', '']] },
+  };
+  let exists = false;
+  const calls = [];
+  const blank = (t) => t.header.map(() => '');
+  const bySheet = (name) => Object.values(tables).find((t) => t.sheet === name);
+
+  async function graph(path, opts = {}) {
+    const method = opts.method || 'GET';
+    calls.push(`${method} ${path}`);
+    if (path.startsWith('/me/drive/root:')) {
+      if (method === 'PUT') { exists = true; return { id: 'F1', webUrl: 'https://example/xlsx' }; }
+      if (!exists) throw new GraphError(404, 'itemNotFound');
+      return { id: 'F1', webUrl: 'https://example/xlsx' };
+    }
+    let m = path.match(/\/tables\/(\w+)\/range\?/);
+    if (m) {
+      const t = tables[m[1]];
+      const data = t.rows.length ? t.rows : [blank(t)]; // Excel 的空表格會留一列空白
+      const last = t.top + data.length;
+      const sheet = quoteSheet ? `'${t.sheet}'` : t.sheet;
+      return { address: `${sheet}!$${t.c1}$${t.top}:$${t.c2}$${last}`, values: [t.header, ...data] };
+    }
+    m = path.match(/\/tables\/(\w+)\/rows$/);
+    if (m && method === 'POST') { tables[m[1]].rows.push(opts.body.values[0]); return {}; }
+    m = path.match(/\/worksheets\/([^/]+)\/range\(address='([A-Z]+)(\d+):([A-Z]+)(\d+)'\)(\/delete)?$/);
+    if (m) {
+      const t = bySheet(decodeURIComponent(m[1]));
+      const i = Number(m[3]) - t.top - 1;
+      if (m[6]) { t.rows.splice(i, 1); return {}; }
+      if (method === 'PATCH') { t.rows[i] = opts.body.values[0]; return {}; }
+    }
+    throw new Error(`fake graph: 沒處理 ${method} ${path}`);
+  }
+  return { graph, tables, calls };
+}
+
+const out = document.getElementById('out');
+let failed = 0;
+function check(name, cond, detail = '') {
+  if (!cond) failed++;
+  const li = document.createElement('li');
+  li.className = cond ? 'ok' : 'bad';
+  li.textContent = `${cond ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`;
+  out.append(li);
+}
+
+async function run(opts) {
+  const wb = fakeWorkbook(opts);
+  const s = new ExcelStore(wb.graph);
+  const tag = opts.quoteSheet ? '［工作表名稱有引號］' : '';
+
+  let db = await s.load();
+  check(`${tag}第一次會上傳範本`, wb.calls.some((c) => c.startsWith('PUT /me/drive/root:/Sam%20Homepage/SamHomepage.xlsx:/content')));
+  check(`${tag}空表格讀成 0 筆`, db.items.length === 0, JSON.stringify(db.items));
+  check(`${tag}設定：Excel 的值蓋過預設`, db.settings.雨機率門檻 === 70 && db.settings.匯率變動門檻 === 0.8 && db.settings.高溫門檻 === 34);
+
+  await s.addItem({ ID: 'a1', 類別: '待辦', 標題: '第一件', 到期日: '2026-11-05', 狀態: '待辦' });
+  await s.addItem({ ID: 'a2', 類別: '帳單', 標題: '第二件', 狀態: '待辦' });
+  db = await s.load();
+  check(`${tag}新增兩筆`, db.items.length === 2 && db.items[0].標題 === '第一件' && db.items[1].類別 === '帳單');
+  check(`${tag}欄位順序正確`, wb.tables.Items.rows[0][2] === '第一件' && wb.tables.Items.rows[0][4] === '2026-11-05');
+
+  await s.updateItem('a2', { 狀態: '完成' });
+  db = await s.load();
+  check(`${tag}修改第二筆`, db.items.find((o) => o.ID === 'a2').狀態 === '完成' && db.items.find((o) => o.ID === 'a1').狀態 === '待辦');
+
+  await s.deleteItem('a1');
+  db = await s.load();
+  check(`${tag}刪除第一筆`, db.items.length === 1 && db.items[0].ID === 'a2');
+  await s.updateItem('a2', { 備註: '刪除後再改' });
+  check(`${tag}刪除後列號仍正確`, wb.tables.Items.rows[0][3] === '刪除後再改');
+
+  // 使用者直接在 Excel 打了一列：沒有 ID、日期是 Excel 日期數字
+  wb.tables.Items.rows.push(['', '旅行', 'Excel 手打', '', 46330, '待辦', '', '', '', '']);
+  db = await s.load();
+  const typed = db.items.find((o) => o.標題 === 'Excel 手打');
+  check(`${tag}Excel 手打的列有暫時 ID`, typed && typed.ID.startsWith('__r'), typed?.ID);
+  check(`${tag}Excel 日期數字轉成文字日期`, typed?.到期日 === '2026-11-04', typed?.到期日);
+  await s.updateItem(typed.ID, { 狀態: '完成' });
+  const saved = wb.tables.Items.rows[1];
+  check(`${tag}改手打的列時補上正式 ID`, saved[0] && !saved[0].startsWith('__r') && saved[5] === '完成', saved.join('|'));
+
+  await s.updateCard('投資', { 數字: '+1.2%', 說明: '測試' });
+  check(`${tag}修改卡片`, wb.tables.Cards.rows[2][1] === '+1.2%' && wb.tables.Cards.rows[0][1] === '—');
+
+  let threw = false;
+  try { await s.updateItem('nope', { 狀態: '完成' }); } catch { threw = true; }
+  check(`${tag}找不到的資料會報錯`, threw);
+}
+
+await run({});
+await run({ quoteSheet: true });
+document.title = failed ? `FAIL ${failed}` : 'PASS';
+</script>
+</body>
+</html>

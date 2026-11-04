@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Sam">
+  <title>Sam's Homepage</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.1/lib/msal-browser.min.js"></script>
+</head>
+<body>
+  <main class="wk" id="app">
+    <header class="wk-head">
+      <div class="wk-head-l">
+        <div class="wk-eyebrow">Sam's Homepage</div>
+        <h1 class="wk-title" id="greeting">—</h1>
+        <p class="wk-brief" id="today-line">—</p>
+      </div>
+      <div class="wk-head-r">
+        <div class="wk-status" id="status"><span class="wk-dot"></span><span id="status-text">載入中</span></div>
+        <div class="wk-actions">
+          <button class="btn" id="btn-refresh" type="button" aria-label="重新整理">↻</button>
+          <button class="btn" id="btn-account" type="button">登入</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="wk-banner" id="banner" hidden></div>
+
+    <section class="wk-card focus" aria-labelledby="focus-h">
+      <div class="focus-head">
+        <h2 id="focus-h">今日重點</h2>
+        <span class="count" id="focus-count"></span>
+      </div>
+      <ul class="focus-list" id="focus-list"></ul>
+      <button class="link-btn" id="btn-upcoming" type="button" hidden></button>
+      <ul class="focus-list upcoming" id="upcoming-list" hidden></ul>
+    </section>
+
+    <section class="wk-strip" id="strip" aria-label="即時資訊"></section>
+
+    <div class="wk-sec">領域</div>
+    <section class="wk-domains" id="domains"></section>
+
+    <p class="wk-foot" id="foot"></p>
+  </main>
+
+  <button class="fab" id="btn-add" type="button" aria-label="新增重點">＋</button>
+
+  <dialog class="sheet" id="item-dialog">
+    <form method="dialog" id="item-form">
+      <h3 id="item-dialog-title">新增重點</h3>
+      <label>類別
+        <select name="類別">
+          <option>待辦</option><option>沁耘</option><option>信件</option><option>帳單</option>
+          <option>投資</option><option>旅行</option><option>行程</option><option>其他</option>
+        </select>
+      </label>
+      <label>標題<input name="標題" required autocomplete="off"></label>
+      <label>到期日<input name="到期日" type="date"></label>
+      <label>備註<textarea name="備註" rows="3"></textarea></label>
+      <label>連結<input name="連結" type="url" placeholder="https://"></label>
+      <div class="sheet-actions">
+        <button type="button" class="btn ghost" id="item-delete" hidden>刪除</button>
+        <span class="grow"></span>
+        <button type="button" class="btn ghost" id="item-cancel">取消</button>
+        <button type="submit" class="btn primary">儲存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="sheet" id="snooze-dialog">
+    <form method="dialog">
+      <h3>延後到</h3>
+      <div class="snooze-grid">
+        <button class="btn" value="1">明天</button>
+        <button class="btn" value="2">後天</button>
+        <button class="btn" value="mon">下週一</button>
+        <button class="btn" value="7">一週後</button>
+      </div>
+      <label>選日期<input type="date" id="snooze-date"></label>
+      <div class="sheet-actions">
+        <span class="grow"></span>
+        <button class="btn ghost" value="cancel">取消</button>
+        <button class="btn primary" value="date">確定</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="sheet" id="card-dialog">
+    <form method="dialog" id="card-form">
+      <h3 id="card-dialog-title">編輯卡片</h3>
+      <label>數字<input name="數字" autocomplete="off"></label>
+      <label>說明<textarea name="說明" rows="3"></textarea></label>
+      <div class="sheet-actions">
+        <span class="grow"></span>
+        <button type="button" class="btn ghost" id="card-cancel">取消</button>
+        <button type="submit" class="btn primary">儲存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
