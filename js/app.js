@@ -290,7 +290,8 @@ function renderDomains(focus) {
       d === '和果' && state.hecho ? el('button', { class: 'act d-ask', type: 'button', title: '複製最近的數字（沒有姓名），打開 Claude', onclick: askHecho }, '問 AI') : null,
       el('div', { class: 'd-foot' },
         el('span', { class: n ? 'pill on' : 'pill' }, n ? `${n} 件重點` : '沒有重點'),
-        link ? el('a', { href: link, target: '_blank', rel: 'noopener' }, '詳細 ↗') : null));
+        // 首頁自己的頁面（例如投資頁）在同一個畫面打開；外部連結開新分頁
+        link ? (/^https?:/.test(link) ? el('a', { href: link, target: '_blank', rel: 'noopener' }, '詳細 ↗') : el('a', { href: link }, '詳細 →')) : null));
   });
   $('domains').replaceChildren(...cards);
 }

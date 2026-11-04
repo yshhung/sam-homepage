@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <title>Invest test</title>
+  <style>body { font: 14px system-ui; background: #000; color: #e6edf3; padding: 16px; } .ok { color: #2fd47a; } .bad { color: #f87171; }</style>
+</head>
+<body>
+<h1>投資頁資料轉換測試（假資料）</h1>
+<ul id="out"></ul>
+<script type="module">
+import { applyPrices, buildDatasets, fxRows, historyRows, lastUpdateRows } from '../js/invest/data.js';
+
+const out = document.getElementById('out');
+let failed = 0;
+function check(name, cond, detail = '') {
+  if (!cond) failed++;
+  const li = document.createElement('li');
+  li.className = cond ? 'ok' : 'bad';
+  li.textContent = `${cond ? '✓' : '✗'} ${name}${detail ? ` — ${detail}` : ''}`;
+  out.append(li);
+}
+
+// 明顯是假的數字與代號
+const holdings = [
+  { code: 'AAA', currency: 'TWD', shares: 100, price: 10, price_date: '2026-01-02', prev_price: 9 },
+  { code: 'BBB', currency: 'USD', shares: 1, price: 50, price_date: '2026-01-06' },
+  { code: 'OPT', occ: 'OPT260116C00001000', kind: 'option', currency: 'USD', shares: -100, price: 1, price_date: '2026-01-02' },
+  { code: 'TWCASH', currency: 'TWD', shares: 1000, price: 1 },
+];
+const state = { prices: { AAA: [12, 10, '2026-01-05'], BBB: [40, 41, '2026-01-05'], OPT260116C00001000: [2, 1, '2026-01-05'], TWCASH: [9, 9, '2026-01-05'] }, daily: [{ date: '2026-01-05', fx: 30 }] };
+const h = applyPrices(holdings, state);
+check('state 的新價格蓋過持股檔', h[0].price === 12 && h[0].prev_price === 10 && h[0].price_date === '2026-01-05');
+check('持股檔比較新就不蓋', h[1].price === 50);
+check('選擇權用 occ 對價格', h[2].price === 2);
+check('現金不改', h[3].price === 1 && h[3].shares === 1000);
+check('不改到原本的陣列', holdings[0].price === 10);
+
+const hist = historyRows([
+  { rows: [{ date: '2025-01-01', total: 1, tw: 1, us: 0, fx: 30, src: '對帳單重建' }, { date: '2026-01-02', total: 100, tw: 60, us: 1, fx: 30, src: '排程' }] },
+  { rows: [{ date: '2026-01-03', total: 110, tw: 70, us: 1, fx: 31, src: '排程' }, { date: '2026-01-02', total: 105, tw: 65, us: 1, fx: 30, src: '排程' }] },
+]);
+check('歷史只放排程的列、同一天後面的蓋前面', hist.length === 2 && hist[0].total_twd === 105, JSON.stringify(hist));
+check('歷史轉成舊格式', hist[1].tw_twd === 70 && hist[1].us_usd === 1 && hist[1].at === '2026-01-03 23:59');
+
+check('匯率優先用 invest.json', fxRows({ fx: 31.5, updated: '2026-01-05 07:30' }, state)[0].rate === 31.5);
+check('沒有 invest.json 用 state 最後一天', fxRows(null, state)[0].rate === 30);
+check('都沒有就空的', fxRows(null, null).length === 0);
+check('最後更新', lastUpdateRows({ updated: '2026-01-05 07:30' })[0].at === '2026-01-05 07:30');
+
+const ds = buildDatasets({ holdings, state, invest: { fx: 30, updated: '2026-01-05 07:30' }, history: [], changes: null });
+check('資料表名稱跟舊儀表板一樣，缺的給空陣列', Array.isArray(ds.changes) && ds.changes.length === 0 && ds.holdings.length === 4 && 'cathay_bal' in ds && 'mk_tiles' in ds);
+
+document.title = failed ? `FAIL ${failed}` : 'PASS';
+</script>
+</body>
+</html>

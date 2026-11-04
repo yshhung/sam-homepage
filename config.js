@@ -30,8 +30,9 @@ export const CONFIG = {
   // 需回覆信件：收件匣裡「已加旗標」的信，加上最近幾天「未讀且重要性高」的信
   mail: { importantDays: 3 },
 
-  // 細節頁：舊的 claude.ai 儀表板之後不用了，投資、生活已經不連過去（生活改連下一趟旅行的頁面）
+  // 細節頁：舊的 claude.ai 儀表板之後不用了。投資連到首頁自己的投資頁；生活連下一趟旅行的頁面
   detailLinks: {
+    投資: 'invest.html',
     工作: 'https://claude.ai/artifact/VdqsDF6LADCfMum6mdSSDe#work',
     沁耘: 'https://claude.ai/artifact/VdqsDF6LADCfMum6mdSSDe#work',
     和果: 'https://claude.ai/artifact/VdqsDF6LADCfMum6mdSSDe#work',

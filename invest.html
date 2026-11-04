@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- 安全政策跟首頁一樣：程式只能從本站載入，資料只能連到微軟 -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://graph.microsoft.com https://login.microsoftonline.com https://*.sharepoint.com; frame-src https://login.microsoftonline.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>投資 · Sam's Homepage</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="invest.css">
+  <script src="vendor/msal-browser-3.28.1.min.js"></script>
+  <!-- 官方 d3 7.9.0（npm 套件 d3@7.9.0 的 dist/d3.min.js，已核對 npm 的 sha512） -->
+  <script src="vendor/d3-7.9.0.min.js"></script>
+  <script src="js/invest/shim.js"></script>
+</head>
+<body>
+<div id="dash-root">
+<div class="inv-banner" id="inv-banner" hidden></div>
+<div class="sd">
+  <header class="sd-head">
+    <div>
+      <a class="sd-back" href="./">← 首頁</a>
+      <h1 class="sd-title" id="title">投資</h1>
+      <p class="sd-take" id="takeaway">總資產 <span class="dash-skeleton" data-source="totals" data-field="total_twd" data-row="0">—</span> · 台股 <span class="dash-skeleton" data-source="totals" data-field="tw_share" data-row="0">—</span> · 美股 <span class="dash-skeleton" data-source="totals" data-field="us_share" data-row="0">—</span></p>
+    </div>
+    <div class="sd-upbox">
+      <div class="sd-upc" id="lastupdate"><div class="sd-uh"><span class="sd-live"></span>最後更新</div><b class="dash-skeleton" data-source="lastupdate" data-field="at" data-row="0">—</b></div>
+    </div>
+  </header>
+  <nav class="mk-tabs" id="tabs" role="tablist">
+    <button type="button" role="tab" id="tab-mine" data-pane="mine" aria-selected="true">總覽</button>
+    <button type="button" role="tab" id="tab-market" data-pane="market" aria-selected="false">市場</button>
+    <button type="button" role="tab" id="tab-hold" data-pane="hold" aria-selected="false">持股</button>
+    <button type="button" role="tab" id="tab-plans" data-pane="plans" aria-selected="false">計畫</button>
+    <button type="button" role="tab" id="tab-cal" data-pane="cal" aria-selected="false">行事曆</button>
+    <button type="button" role="tab" id="tab-trades" data-pane="trades" aria-selected="false">交易紀錄</button>
+  </nav>
+<div class="mk-pane" id="pane-mine">
+
+  <section class="sd-kpis" id="kpis">
+    <div class="sd-kpi"><span class="sd-k">總資產（台幣）</span><span class="sd-v dash-skeleton" data-source="totals" data-field="total_twd" data-row="0">—</span><span class="sd-s" id="kpi-total-s">—</span></div>
+    <div class="sd-kpi"><span class="sd-k">今日變動</span><span class="sd-v dash-skeleton" data-source="totals" data-field="day_twd" data-row="0">—</span><span class="sd-s" id="kpi-day-s">—</span></div>
+    <div class="sd-kpi"><span class="sd-k">未實現損益</span><span class="sd-v dash-skeleton" data-source="totals" data-field="pnl_twd" data-row="0">—</span><span class="sd-s" id="kpi-pnl-s">—</span></div>
+    <div class="sd-kpi"><span class="sd-k">現金 <span id="kpi-cash-fx" style="font-size:.82em;font-weight:500;letter-spacing:.02em;margin-left:4px;opacity:.85">—</span></span><span class="sd-v dash-skeleton" data-source="totals" data-field="cash_twd" data-row="0">—</span><span class="sd-s" id="kpi-fx-s">—</span></div>
+  </section>
+  <section class="sd-card" id="goal-status">
+    <h2>目標狀態</h2>
+    <button type="button" class="sd-golink" id="goal-status-link">詳細 →</button>
+    <p class="sd-note" id="goal-status-note">—</p>
+    <div class="sd-gs" id="goal-status-list" data-source="goal_pace goal_catchup"></div>
+  </section>
+
+  <section class="sd-card" id="trend">
+    <h2>資產趨勢</h2>
+    <div class="sd-segs"><div class="sd-seg sd-seg2" id="trend-ser"><button data-s="all" aria-pressed="true">TW+US</button><button data-s="tw">TW</button><button data-s="us">US</button></div><div class="sd-seg sd-seg2" id="trend-seg"><button data-r="30">1M</button><button data-r="90">3M</button><button data-r="182">6M</button><button data-r="365">1Y</button><button data-r="0" aria-pressed="true">All</button></div></div>
+    <h3 class="sd-sub" id="trend-stats-h" hidden></h3>
+    <div class="sch-kv" id="trend-stats"></div>
+    <p class="sd-note" id="trend-stats-note"></p>
+    <div class="sch-kv" id="trend-hilo" data-source="trend_series"></div>
+    <div class="sd-chart" data-source="trend_series"><svg id="trend-svg" width="100%" height="220"></svg><div class="sd-tip"></div></div>
+  </section>
+
+  <section class="sd-card" id="alloc">
+    <h2>資產配置</h2>
+    <p class="sd-note">含嘉信現金與國泰現金（國泰待補款為負數時不列入）；每張圖前八大以外合併為其他，滑過看金額</p>
+    <div class="sd-donuts">
+      <div class="sd-dblock"><h3>全部（台幣）</h3><div class="sd-donut" data-source="positions"><svg id="donut-all" width="100%" viewBox="0 0 200 200"></svg><ul class="sd-legend" id="legend-all"></ul><div class="sd-tip"></div></div></div>
+      <div class="sd-dblock"><h3>台股（台幣）</h3><div class="sd-donut" data-source="positions"><svg id="donut-tw" width="100%" viewBox="0 0 200 200"></svg><ul class="sd-legend" id="legend-tw"></ul><div class="sd-tip"></div></div></div>
+      <div class="sd-dblock"><h3>美股（美金）</h3><div class="sd-donut" data-source="positions"><svg id="donut-us" width="100%" viewBox="0 0 200 200"></svg><ul class="sd-legend" id="legend-us"></ul><div class="sd-tip"></div></div></div>
+    </div>
+  </section>
+
+  <section class="sd-card" id="sector">
+    <h2>產業與集中度</h2>
+    <p class="sd-note" id="sector-note">—</p>
+    <div class="sd-secwrap">
+      <div class="sd-chart" data-source="sector_mix" style="min-height:160px"><svg id="sector-svg" width="100%" height="200"></svg><div class="sd-tip"></div></div>
+      <div class="sd-cm" id="conc" data-source="concentration"></div>
+    </div>
+  </section>
+
+</div>
+<div class="mk-pane" id="pane-hold" hidden>
+  <div class="sd-grid">
+  <section class="sd-card sd-hold" id="tw">
+    <h2>台股持股（台幣）</h2>
+    <p class="sd-note" id="tw-note">—</p>
+    <div class="sd-scroll"><table class="sd-table" data-source="positions" data-row-key="code">
+      <thead><tr><th class="l" data-field="code">代號</th><th class="l" data-field="name">名稱</th><th data-field="price">現價</th><th data-field="value">市值</th><th data-field="pnl_pct">損益%</th><th data-field="pnl">損益</th><th data-field="avg">均價</th><th data-field="cost">成本</th><th data-field="shares">股數</th></tr></thead>
+      <tbody id="tw-body"></tbody></table></div>
+  </section>
+  <section class="sd-card sd-hold" id="us">
+    <h2>美股持股（美金）</h2>
+    <p class="sd-note" id="us-note">—</p>
+    <div class="sd-scroll"><table class="sd-table" data-source="positions" data-row-key="code">
+      <thead><tr><th class="l" data-field="code">代號</th><th class="l" data-field="name">名稱</th><th data-field="price">現價</th><th data-field="value">市值</th><th data-field="pnl_pct">損益%</th><th data-field="pnl">損益</th><th data-field="avg">均價</th><th data-field="cost">成本</th><th data-field="shares">股數</th></tr></thead>
+      <tbody id="us-body"></tbody></table></div>
+  </section>
+  </div>
+
+  <section class="sd-card" id="opts">
+    <h2>選擇權與掛單</h2>
+    <p class="sd-note">你回報成交或改單時更新</p>
+    <div class="sd-list" id="opt-list" data-source="options positions"></div>
+  </section>
+  <section class="sd-card" id="mk-cc">
+    <h2>Cover Call 參考</h2>
+    <p class="sd-note" id="mk-cc-note">滿 100 股標的的 IV、週選與月選到期日、約 +5%／+10% 價位；只呈現數據，不建議履約價或時機</p>
+    <div class="sd-scroll"><table class="sd-table" id="mk-cc-tbl" data-source="cc_ref" data-row-key="code">
+      <thead><tr><th class="l" data-field="code">標的</th><th data-field="iv">IV／IV Rank</th><th data-field="wk">週選到期</th><th data-field="mo">月選到期</th><th data-field="p5">約 +5%</th><th data-field="p10">約 +10%</th><th class="l" data-field="note">提醒</th></tr></thead>
+      <tbody></tbody></table></div>
+  </section>
+
+  <div class="sd-grid">
+    <section class="sd-card" id="heat">
+      <h2>今日熱力圖</h2>
+      <p class="sd-note">格子大小＝市值（台幣），顏色＝最近一個交易日漲跌（±5% 封頂）</p>
+      <div class="sd-chart" data-source="positions"><svg id="heat-svg" width="100%" height="260"></svg><div class="sd-tip"></div></div>
+    </section>
+    <section class="sd-card" id="contrib">
+      <h2>損益貢獻</h2>
+      <p class="sd-note">各檔未實現損益（台幣），由大到小</p>
+      <div class="sd-chart" data-source="positions"><svg id="contrib-svg" width="100%" height="260"></svg><div class="sd-tip"></div></div>
+    </section>
+  </div>
+
+
+</div>
+<div class="mk-pane" id="pane-plans" hidden>
+  <section class="sd-card" id="goals">
+    <h2>目標進度</h2>
+    <p class="sd-note" id="goal-note">—</p>
+    <div id="goal-total" data-source="goal_pace"></div>
+    <div class="sd-gmk" id="goal-markets" data-source="goal_pace"></div>
+  </section>
+  <div class="sd-grid">
+    <section class="sd-card" id="next-up">
+      <h2>接近觸發</h2>
+      <p class="sd-note">所有計畫價依「現價離觸發還差幾%」排序，只列 15% 以內；黃＝5% 以內、紅＝已到價或在區間內；路線B標的以前收 −3% 當觸發價</p>
+      <div class="sd-list" id="next-list" data-source="plan_next"></div>
+    </section>
+    <section class="sd-card" id="deadlines">
+      <h2>期限</h2>
+      <p class="sd-note">有日期的計畫與選擇權到期，依剩餘天數排；黃＝7 天內</p>
+      <div class="sd-list" id="dl-list" data-source="plans options"></div>
+    </section>
+  </div>
+  <section class="sd-card" id="rules">
+    <h2>規則與上限</h2>
+    <p class="sd-note">部位上限用了多少（黃線＝年底要回到的上限），以及加碼規則本月次數；上限或次數變了請告訴我</p>
+    <div class="sd-rules" id="rule-list" data-source="rule_usage"></div>
+  </section>
+  <section class="sd-card" id="plans">
+    <h2>計畫價</h2>
+    <p class="sd-note">白點＝現價；每檔標狀態：已掛單／未掛單／等條件／待決定／續抱；計畫在我們討論定案後才更新</p>
+    <div class="sd-leg2"><span><i class="k-stop"></i>停損／暫停</span><span><i class="k-add"></i>加碼／買點</span><span><i class="k-target"></i>停利／目標</span><span><i class="k-order"></i>掛單／處理線</span><span><i class="k-strike"></i>Call 履約價</span></div>
+    <div id="plan-list" data-source="plans positions watchlist"></div>
+  </section>
+
+    <section class="sd-card sd-hold" id="watch">
+      <h2>追蹤雷達</h2>
+      <p class="sd-note">現價由早報（美股）與午報（台股）更新；有加碼區的標的顯示距離</p>
+      <div class="sd-scroll"><table class="sd-table" data-source="watchlist" data-row-key="code">
+        <thead><tr><th class="l" data-field="code">代號</th><th class="l" data-field="name">名稱</th><th data-field="price">現價</th><th>漲跌</th><th>加碼區</th><th>狀態</th><th class="l" data-field="note">備註</th></tr></thead>
+        <tbody id="wl-body"></tbody></table></div>
+    </section>
+
+
+</div>
+<div class="mk-pane" id="pane-cal" hidden>
+  <section class="sd-card" id="events">
+    <h2>事件行事曆</h2>
+    <p class="sd-note">本月與後兩個月的財報、到期、配息與總經；顏色代表類型，「~」表示日期未確定；點或滑過日期，下方顯示完整內容</p>
+    <div class="sd-leg2"><span><i class="ev-earnings"></i>財報／法說</span><span><i class="ev-option"></i>選擇權到期</span><span><i class="ev-dividend"></i>配息</span><span><i class="ev-plan"></i>計畫期限</span><span><i class="ev-macro"></i>總經</span></div>
+    <div class="sd-cal" id="ev-cal" data-source="events"></div>
+    <div class="sd-evdetail" id="ev-detail"></div>
+  </section>
+</div>
+<div class="mk-pane" id="pane-trades" hidden>
+  <section class="sd-card" id="changes">
+    <h2>交易紀錄</h2>
+    <p class="sd-note">你回報的買賣與選擇權操作，加上嘉信匯出的交易紀錄（2022/12 起的買賣、選擇權、入金、分割與合併；配息與股息再投資不列），以及國泰對帳單（2024/11 起的全部買賣，含定期定額、手續費與交易稅）；依日期由新到舊。嘉信檔約每半年到一年上傳一次，最近一次 2026/10/22</p>
+    <div class="sd-scroll"><table class="sd-table" data-source="changes" data-row-key="id">
+      <thead><tr><th data-field="id">#</th><th class="l" data-field="date">日期</th><th class="l" data-field="code">標的</th><th class="l" data-field="action">動作</th><th data-field="qty">數量</th><th data-field="price">價格</th><th class="l" data-field="note">備註</th></tr></thead>
+      <tbody id="ch-body"></tbody></table></div>
+  </section>
+</div>
+<div class="mk-pane" id="pane-market" hidden>
+  <div id="mk-groups" data-source="mk_tiles"></div>
+  <div class="sd-grid">
+    <section class="sd-card" id="mk-watch">
+      <h2>今日觀察</h2>
+      <p class="sd-note">計畫價距離、漲跌超過門檻的持股與追蹤標的、近期事件；顏色：綠＝正常、黃＝留意、紅＝已觸及</p>
+      <div class="sd-list" id="mk-watch-list" data-source="mk_notes"></div>
+    </section>
+    <section class="sd-card" id="mk-news">
+      <h2>財經新聞</h2>
+      <p class="sd-note">總經與投資相關新聞，含個股漲跌原因；保留最近一天半</p>
+      <div class="sd-scroll"><table class="sd-table mk-news" id="mk-news-tbl" data-source="fin_news" data-row-key="title">
+        <thead><tr><th class="l" data-field="title">標題</th><th class="l" data-field="rel">跟你的關係</th></tr></thead>
+        <tbody></tbody></table></div>
+    </section>
+  </div>
+  <div id="mk-other"></div>
+</div>
+</div>
+</div>
+<script src="js/invest/page0.js"></script>
+<script src="js/invest/page1.js"></script>
+<script src="js/invest/page2.js"></script>
+<script src="js/invest/page3.js"></script>
+<script src="js/invest/page4.js"></script>
+<script src="js/invest/page5.js"></script>
+<script type="module" src="js/invest/load.js"></script>
+</body>
+</html>

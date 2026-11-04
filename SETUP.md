@@ -16,6 +16,7 @@
 - **投資**：每日同步把 OneDrive `投資資料/holdings.json`（持股，只在買賣時由 Claude 修改）和 `state.json`（最新價格、最近 70 天總資產）抄到雲端暫存，執行 `tools/invest_sync.py`，用公開收盤價（都不用登入）算出總資產、國泰、嘉信、今日與本月變動，寫回 `state.json` 和 `Sam Homepage/invest.json`。抄的時候會核對檔案大小，不對就不更新。`history.json` 是 11/4 以前的舊紀錄，不再更新。首頁只讀這個彙總檔，看不到股數、代號或帳號；持股檔不在 GitHub。
   - 總資產單日或本月變動超過「投資變動門檻」（Excel「設定」表，預設 2%）、數字超過 3 天沒更新、有價格沒抓到，都會列進重點。
   - 買賣或入金出金後，在 Claude App 告訴 Claude，由「首頁投資與旅行」技能改持股檔；隔天 07:30 首頁就會更新。
+- **投資頁**（`invest.html`，投資卡片的「詳細 →」）：原本 claude.ai「Sam的投資儀表板」整頁搬過來，分頁有總覽（總資產、目標進度、資產趨勢、配置、產業與集中度）、市場、持股、計畫、行事曆、交易紀錄。登入後直接讀 OneDrive「投資資料」（只讀），網頁裡沒有任何數字或代號；補進度標的、定期定額金額等私人設定放在 `投資資料/page_config.json`。圖表用本站的 `vendor/d3-7.9.0.min.js`（npm 官方 d3@7.9.0，已核對 sha512）。
 - **生活**：大數字是距離下一趟旅行的天數（`Sam Homepage/life.json`，行程確定或改變時由 Claude 更新；還在規劃中的旅行 3 週內會提醒還沒確定）。說明列出 TickTick「🏠我的家庭」「🏃我的生活」「📦生活瑣事」近 7 天的扣款、帳單與下一件事，直接用 ticktick.json，沒有另外一份資料。
 
 資料存在你 OneDrive 的 `Sam Homepage/SamHomepage.xlsx`，第一次登入時會自動建立。
@@ -143,4 +144,5 @@ powershell -ExecutionPolicy Bypass -File tools/serve.ps1
 | `template/SamHomepage.xlsx` | 第一次登入時上傳到 OneDrive 的空白資料表 |
 | `tools/serve.ps1` | 本機測試用伺服器 |
 | `tools/make-template.ps1`、`tools/make-icons.ps1` | 重新產生 Excel 範本與圖示 |
+| `invest.html`、`invest.css`、`js/invest/` | 投資頁；`js/invest/page*.js` 是舊儀表板的頁面程式，`shim.js`、`load.js`、`data.js` 負責從 OneDrive 讀資料 |
 | `tools/invest_sync.py` | 每天更新投資彙總（`--selftest` 只跑計算測試，`--dry-run` 只印結果不寫檔） |
