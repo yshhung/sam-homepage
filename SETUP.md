@@ -9,11 +9,11 @@
 
 想讓某封信出現在今日重點，在 Outlook 幫它加旗標就好。
 
-- **沁耘網站與社群**：Claude 桌面版的排程「Sam 首頁：沁耘網站與社群數字」每天 07:30 左右，從 WordPress.com（qinyunhealth.com）和 Metricool（hecho.daycare 的 IG、FB、Google 商家）抓數字，寫進 OneDrive 的 `Sam Homepage/company_stats.json`。首頁只讀這個檔，網頁裡不存任何 WordPress 或 Metricool 的權杖。
+- **每日同步**：claude.ai 的雲端排程「Sam 首頁：每日同步（07:30）」每天早上 07:30 左右在雲端執行（不用開任何電腦），更新 OneDrive `Sam Homepage/` 裡的 ticktick.json、company_stats.json、invest.json。它跑在雲端環境「Sam 首頁同步」，網路只放行證交所、櫃買中心、Yahoo Finance、jsDelivr、currency-api 五個網址，連接器只接 Microsoft 365、TickTick、WordPress.com、Metricool。
+- **沁耘網站與社群**：每日同步從 WordPress.com（qinyunhealth.com）和 Metricool（hecho.daycare 的 IG、FB、Google 商家）抓數字，寫進 OneDrive 的 `Sam Homepage/company_stats.json`。首頁只讀這個檔，網頁裡不存任何 WordPress 或 Metricool 的權杖。
   - 沁耘卡片顯示網站本月瀏覽、訪客、文章數，以及 IG、FB 追蹤人數。
   - 網站兩週沒有新文章、IG 或 FB 兩週沒發文、數字超過 3 天沒更新，都會列進重點。
-  - 排程只在辦公室電腦的 Claude 開著時跑；關著的話，下次打開會補跑。
-- **投資**：同一個 07:30 排程執行 `tools/invest_sync.py`（排程資料夾裡有一份同樣的副本），用公開收盤價（證交所、櫃買中心 OpenAPI、Yahoo Finance、currency-api，都不用登入）更新 OneDrive `投資資料/` 裡的持股檔，再把總資產、國泰、嘉信、今日與本月變動寫進 `Sam Homepage/invest.json`。首頁只讀這個彙總檔，看不到股數、代號或帳號；持股檔不在 GitHub。
+- **投資**：每日同步把 OneDrive `投資資料/holdings.json`（持股，只在買賣時由 Claude 修改）和 `state.json`（最新價格、最近 70 天總資產）抄到雲端暫存，執行 `tools/invest_sync.py`，用公開收盤價（都不用登入）算出總資產、國泰、嘉信、今日與本月變動，寫回 `state.json` 和 `Sam Homepage/invest.json`。抄的時候會核對檔案大小，不對就不更新。`history.json` 是 11/4 以前的舊紀錄，不再更新。首頁只讀這個彙總檔，看不到股數、代號或帳號；持股檔不在 GitHub。
   - 總資產單日或本月變動超過「投資變動門檻」（Excel「設定」表，預設 2%）、數字超過 3 天沒更新、有價格沒抓到，都會列進重點。
   - 買賣或入金出金後，在 Claude App 告訴 Claude，由「首頁投資與旅行」技能改持股檔；隔天 07:30 首頁就會更新。
 - **生活**：大數字是距離下一趟旅行的天數（`Sam Homepage/life.json`，行程確定或改變時由 Claude 更新；還在規劃中的旅行 3 週內會提醒還沒確定）。說明列出 TickTick「🏠我的家庭」「🏃我的生活」「📦生活瑣事」近 7 天的扣款、帳單與下一件事，直接用 ticktick.json，沒有另外一份資料。
@@ -118,7 +118,7 @@ powershell -ExecutionPolicy Bypass -File tools/serve.ps1
 
 | 想做的事 | 在哪裡做 | 首頁什麼時候更新 |
 |---|---|---|
-| 新增、完成、改期待辦 | 在 Claude App 說，或直接在 TickTick 裡改 | 透過 Claude 改的：Claude 改完會順手更新同步檔，下次打開首頁就是新的。直接在 TickTick 改的：每天 07:30 的備援同步補上 |
+| 新增、完成、改期待辦 | 在 Claude App 說，或直接在 TickTick 裡改 | 透過 Claude 改的：Claude 改完會順手更新同步檔，下次打開首頁就是新的。直接在 TickTick 改的：每天 07:30 的雲端每日同步補上 |
 | 排行程 | Claude App 或 Outlook | 下次打開首頁 |
 | 信件不要再出現 | 在 Outlook 取消旗標或標成完成 | 下次打開首頁 |
 | 處理某件事 | 首頁上按「問 Claude」，會複製內容並打開 Claude | — |
