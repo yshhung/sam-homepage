@@ -300,6 +300,65 @@ export function lifeView(life, ticktick, today) {
   return { num, text: parts.join('；'), link: trip?.url || '', alerts };
 }
 
+// ---------- 新聞：早報、晚報整理的（保留 7 天） ----------
+// 雲端報告每天寫 投資資料/市場/<早報|晚報>/news_<星期幾>.json，下週同一天蓋掉，所以最多 14 個檔。
+// 檔沒變就用上次讀過的（記在這台裝置），每次重新整理只多 2 個列資料夾的請求。
+
+const NEWS_DIRS = ['投資資料/市場/早報', '投資資料/市場/晚報'];
+const NEWS_CACHE = 'sam.news.v1';
+
+export async function getNews() {
+  let cache = {};
+  try { cache = JSON.parse(localStorage.getItem(NEWS_CACHE)) || {}; } catch { cache = {}; }
+  const next = {};
+  const lists = await Promise.all(NEWS_DIRS.map(async (dir) => {
+    const path = dir.split('/').map(encodeURIComponent).join('/');
+    try {
+      return (await graph(`/me/drive/root:/${path}:/children?$select=id,name,lastModifiedDateTime&$top=200`)).value || [];
+    } catch (e) {
+      if (e instanceof GraphError && e.status === 404) return []; // 報告還沒跑過
+      throw e;
+    }
+  }));
+  const files = lists.flat().filter((f) => /^news_[1-7]\.json$/.test(f.name));
+  const parts = await Promise.all(files.map(async (f) => {
+    const k = `${f.id}@${f.lastModifiedDateTime}`;
+    if (!cache[k]) {
+      const rows = await (await graph(`/me/drive/items/${encodeURIComponent(f.id)}/content`, { raw: true })).json();
+      cache[k] = Array.isArray(rows) ? rows : [];
+    }
+    next[k] = cache[k];
+    return next[k];
+  }));
+  try { localStorage.setItem(NEWS_CACHE, JSON.stringify(next)); } catch { /* 存不了就下次重讀 */ }
+  return parts.flat();
+}
+
+export function demoNews() {
+  const t = dateStr();
+  return [
+    { title: '示範財經新聞：某指數收漲', src: '示範來源', url: 'https://example.com/', rel: '示範說明', cat: '財經', by: '早報', at: `${t}T08:50:00+08:00` },
+    { title: '示範生活新聞：某項補助上路', src: '示範來源', url: 'https://example.com/', rel: '', cat: '生活', by: '早報', at: `${t}T08:50:00+08:00` },
+    { title: '示範財經新聞：某公司公布財報', src: '示範來源', url: 'https://example.com/', rel: '', cat: '財經', by: '晚報', at: `${addDays(t, -1)}T22:05:00+08:00` },
+  ];
+}
+
+// 只留 7 天內、網址是 http(s) 的；同一個網址只留最新一次；新的在前
+export function newsView(rows, now = new Date()) {
+  const since = now.getTime() - 7 * 86400000;
+  const seen = new Set();
+  return (Array.isArray(rows) ? rows : [])
+    .filter((r) => r && r.title && /^https?:\/\//.test(r.url || '') && Date.parse(r.at) >= since)
+    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
+    .filter((r) => {
+      const k = r.url.replace(/[?#].*$/, '').replace(/\/$/, '') || r.title;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    })
+    .map((r) => ({ title: r.title, src: r.src || '', url: r.url, rel: r.rel || '', cat: r.cat || '財經', by: r.by || '', day: dateStr(new Date(r.at)) }));
+}
+
 const WX = {
   0: '晴', 1: '晴時多雲', 2: '多雲', 3: '陰', 45: '霧', 48: '霧', 51: '毛毛雨', 53: '毛毛雨', 55: '毛毛雨',
   61: '小雨', 63: '雨', 65: '大雨', 80: '陣雨', 81: '陣雨', 82: '強陣雨', 95: '雷雨', 96: '雷雨', 99: '雷雨',

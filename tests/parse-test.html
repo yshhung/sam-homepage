@@ -9,7 +9,7 @@
 <h1>和果、投資、生活資料解析測試</h1>
 <ul id="out"></ul>
 <script type="module">
-import { hechoSummary, investView, lifeView, parseCsv } from '../js/sources.js';
+import { hechoSummary, investView, lifeView, newsView, parseCsv } from '../js/sources.js';
 
 const out = document.getElementById('out');
 let failed = 0;
@@ -70,6 +70,20 @@ check('只有規劃中的旅行也顯示倒數', lv.num === '10 天' && lv.text.
 lv = lifeView({ trips: [{ name: '出門', start: '2026-01-04', end: '2026-01-06', status: 'confirmed' }] }, null, '2026-01-05');
 check('旅行途中', lv.num === '旅行中', lv.num);
 check('沒有資料不顯示', lifeView(null, null, '2026-01-05') === null);
+
+// 新聞：7 天內、只留 http(s)、同網址留最新、新的在前（假的標題與網址）
+const nnow = new Date('2026-01-08T12:00:00+08:00');
+const nv = newsView([
+  { title: '舊聞', url: 'https://example.test/old', at: '2025-12-31T08:50:00+08:00', by: '早報' },
+  { title: '財經一', url: 'https://example.test/a?x=1', at: '2026-01-07T08:50:00+08:00', by: '早報', cat: '財經' },
+  { title: '財經一（晚報又寫）', url: 'https://example.test/a', at: '2026-01-07T22:05:00+08:00', by: '晚報', cat: '財經' },
+  { title: '生活一', url: 'https://example.test/l', at: '2026-01-08T08:50:00+08:00', by: '早報', cat: '生活' },
+  { title: '壞網址', url: 'javascript:alert(1)', at: '2026-01-08T08:50:00+08:00' },
+  { title: '', url: 'https://example.test/empty', at: '2026-01-08T08:50:00+08:00' },
+], nnow);
+check('新聞只留 7 天內、新的在前、同網址留最新', nv.map((n) => n.title).join('|') === '生活一|財經一（晚報又寫）', JSON.stringify(nv));
+check('新聞帶日期與分類', nv[0].day === '2026-01-08' && nv[0].cat === '生活' && nv[1].by === '晚報');
+check('新聞沒有資料不會壞', newsView(null, nnow).length === 0);
 
 document.title = failed ? `FAIL ${failed}` : 'PASS';
 </script>

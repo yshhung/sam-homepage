@@ -7,6 +7,8 @@
   報別：早報、晚報、週回顧
   data.json：報告整理好的中間資料（區塊格式跟舊的早報、晚報一樣：invest、news_fin、summary_invest）
   輸出：<輸出資料夾>/mk_tiles.json、mk_notes.json、fin_news.json、inv_brief.json，有 Cover Call 表才有 cc_ref.json；
+        早報、晚報另外寫 news_<星期幾 1～7>.json（財經＋生活新聞），給首頁的「新聞」區；
+        每週同一天會蓋掉上週那天的檔，所以首頁永遠有最近 7 天的新聞，不用另外刪
         最後一行印出 BYTES {檔名: 位元組數}
 """
 import datetime
@@ -102,6 +104,11 @@ def convert(slot, data, now):
         r['id'] = f"{slot}-{r.get('section', '')}-{i + 1}"
     news = [{'title': it.get('title', ''), 'src': it.get('src', ''), 'url': it.get('url'), 'rel': it.get('rel', ''), **tag}
             for b in blocks(nf, 'news') for it in (b.get('items') or [])]
+    # 首頁新聞：財經（news_fin）＋生活（news_life），只留有網址的
+    home = [{'title': it.get('title', ''), 'src': it.get('src', ''), 'url': it.get('url'), 'rel': it.get('rel', ''), 'cat': cat, **tag}
+            for cat, arr in (('財經', nf), ('生活', data.get('news_life')))
+            for b in blocks(arr, 'news') for it in (b.get('items') or [])
+            if isinstance(it, dict) and str(it.get('url') or '').startswith(('https://', 'http://'))]
     si = (data.get('summary_invest') or '').strip()
     out = {
         'mk_tiles.json': rows,
@@ -111,6 +118,8 @@ def convert(slot, data, now):
     }
     if cc is not None:
         out['cc_ref.json'] = uniq(cc, 'code')
+    if slot in ('早報', '晚報'):
+        out[f'news_{now.isoweekday()}.json'] = home
     return out
 
 
@@ -133,7 +142,8 @@ def selftest():
     now = datetime.datetime(2026, 1, 5, 8, 50, tzinfo=TZ)
     data = {
         'summary_invest': '假的重點',
-        'news_fin': [{'t': 'news', 'title': '財經新聞', 'items': [{'title': 'A', 'src': 'S', 'url': 'u', 'rel': 'r'}, {'title': 'A', 'src': 'S2'}]}],
+        'news_fin': [{'t': 'news', 'title': '財經新聞', 'items': [{'title': 'A', 'src': 'S', 'url': 'https://example.test/a', 'rel': 'r'}, {'title': 'A', 'src': 'S2'}]}],
+        'news_life': [{'t': 'news', 'title': '生活新聞', 'items': [{'title': 'L', 'src': 'S3', 'url': 'https://example.test/l'}, {'title': 'X', 'url': 'javascript:alert(1)'}]}],
         'invest': [
             {'t': 'watch', 'title': '今日觀察', 'items': [{'lvl': 'look', 'text': '假觀察'}]},
             {'t': 'market', 'title': '美股收盤', 'tiles': [{'name': 'X 指數', 'value': 100, 'pct': 1.0}], 'summary': '一句話'},
@@ -154,6 +164,9 @@ def selftest():
     check('30 秒重點一筆', out['inv_brief.json'][0]['text'] == '假的重點' and out['inv_brief.json'][0]['slot'] == '早報')
     check('Cover Call 表', out['cc_ref.json'][0]['code'] == 'ZZZ' and out['cc_ref.json'][0]['p10'] == '110')
     check('每列都標報別與時間', all(r['by'] == '早報' and r['at'].startswith('2026-01-05T08:50') for r in out['mk_tiles.json']))
+    hn = out.get('news_1.json')  # 2026-01-05 是週一
+    check('首頁新聞檔：財經＋生活、只留 http 網址', hn is not None and [(r['cat'], r['title']) for r in hn] == [('財經', 'A'), ('生活', 'L')])
+    check('週回顧不寫首頁新聞檔', not any(k.startswith('news_') for k in convert('週回顧', data, now)))
     print('PASS' if ok else 'FAIL')
     return ok
 

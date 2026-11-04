@@ -4,9 +4,9 @@ import { CONFIG } from '../config.js';
 import { getAccount, initAuth, isConfigured, login, logout } from './auth.js';
 import { DemoStore, ExcelStore } from './store.js';
 import {
-  demoCalendar, demoCompany, demoHecho, demoInvest, demoLife, demoMail, demoTickTick,
-  getCalendar, getCompany, getFx, getHecho, getInvest, getLife, getMail, getTickTick, getWeather, hechoSummary,
-  investView, lifeView,
+  demoCalendar, demoCompany, demoHecho, demoInvest, demoLife, demoMail, demoNews, demoTickTick,
+  getCalendar, getCompany, getFx, getHecho, getInvest, getLife, getMail, getNews, getTickTick, getWeather, hechoSummary,
+  investView, lifeView, newsView,
 } from './sources.js';
 import { dateStr, diffDays, el, relDay, shortDate, timeStr } from './util.js';
 
@@ -22,9 +22,9 @@ const TICKTICK_WEB = 'https://ticktick.com/webapp/';
 const state = {
   store: null,
   cards: [], settings: { ...CONFIG.defaults },
-  events: [], weather: null, fx: null, mail: [], hecho: null, company: null, ticktick: null, invest: null, life: null,
+  events: [], weather: null, fx: null, mail: [], hecho: null, company: null, ticktick: null, invest: null, life: null, news: [],
   errors: {}, syncedAt: null, loading: false,
-  showUpcoming: false,
+  showUpcoming: false, showAllNews: false,
 };
 
 // ---------- 組出今日重點 ----------
@@ -199,6 +199,7 @@ function render() {
 
   renderStrip(today);
   renderDomains(focus);
+  renderNews(today);
 
   const foot = [];
   if (state.ticktick?.updated) foot.push(document.createTextNode(`TickTick 更新於 ${state.ticktick.updated.slice(5)}`));
@@ -296,6 +297,23 @@ function renderDomains(focus) {
   $('domains').replaceChildren(...cards);
 }
 
+// 新聞：早報、晚報整理的，點標題開原文（新分頁）
+const NEWS_FIRST = 6;
+function renderNews(today) {
+  const items = newsView(state.news);
+  $('news-sec').hidden = $('news').hidden = !items.length && !state.errors.news;
+  $('news-count').textContent = items.length ? String(items.length) : '';
+  const shown = state.showAllNews ? items : items.slice(0, NEWS_FIRST);
+  const dayLabel = (d) => { const n = diffDays(today, d); return n === 0 ? '今天' : n === 1 ? '昨天' : shortDate(d); };
+  $('news-list').replaceChildren(...(items.length ? shown.map((n) => el('li', { class: `n-row ${n.cat === '生活' ? 'life' : 'fin'}` },
+    el('a', { class: 'n-title', href: n.url, target: '_blank', rel: 'noopener noreferrer' }, n.title),
+    el('div', { class: 'f-meta' }, el('span', { class: 'chip' }, n.cat), ` ${[n.src, `${dayLabel(n.day)}${n.by}`, n.rel].filter(Boolean).join(' · ')}`)))
+    : [el('li', { class: 'f-meta' }, state.errors.news)]));
+  const more = $('btn-news-more');
+  more.hidden = items.length <= NEWS_FIRST;
+  more.textContent = state.showAllNews ? '▾ 收起' : `▸ 再看 ${items.length - NEWS_FIRST} 則（7 天內）`;
+}
+
 // 有即時資料的領域，數字自動填；Excel「卡片」表寫的說明照樣顯示在下面
 function autoCard(domain) {
   if (domain === '沁耘' && state.company?.website) {
@@ -389,6 +407,7 @@ function openClaude() {
 
 $('btn-refresh').addEventListener('click', () => refresh());
 $('btn-upcoming').addEventListener('click', () => { state.showUpcoming = !state.showUpcoming; render(); });
+$('btn-news-more').addEventListener('click', () => { state.showAllNews = !state.showAllNews; render(); });
 $('btn-account').addEventListener('click', () => (getAccount() ? logout() : login()));
 
 // ---------- 讀資料 ----------
@@ -403,7 +422,7 @@ async function settle(name, p) {
     state.errors[name] = {
       data: `卡片與門檻：${err.message}`, calendar: '行事曆抓不到', weather: '天氣抓不到', fx: '匯率抓不到',
       mail: '信件抓不到', hecho: `和果資料抓不到（${err.message}）`, company: '網站與社群數字抓不到', ticktick: 'TickTick 同步檔抓不到',
-      invest: '投資數字抓不到', life: '旅行資料抓不到',
+      invest: '投資數字抓不到', life: '旅行資料抓不到', news: '新聞抓不到',
     }[name];
     return undefined;
   }
@@ -416,7 +435,7 @@ async function refresh() {
   lastRefresh = Date.now();
   renderStatus();
   const live = state.store.mode === 'live';
-  const [db, events, weather, fx, mail, hecho, company, ticktick, invest, life] = await Promise.all([
+  const [db, events, weather, fx, mail, hecho, company, ticktick, invest, life, news] = await Promise.all([
     settle('data', state.store.load()),
     live ? settle('calendar', getCalendar()) : Promise.resolve(demoCalendar()),
     settle('weather', getWeather()),
@@ -427,6 +446,7 @@ async function refresh() {
     live ? settle('ticktick', getTickTick()) : Promise.resolve(demoTickTick()),
     live ? settle('invest', getInvest()) : Promise.resolve(demoInvest()),
     live ? settle('life', getLife()) : Promise.resolve(demoLife()),
+    live ? settle('news', getNews()) : Promise.resolve(demoNews()),
   ]);
   if (db) Object.assign(state, db);
   if (events) state.events = events;
@@ -438,6 +458,7 @@ async function refresh() {
   if (ticktick !== undefined) state.ticktick = ticktick;
   if (invest !== undefined) state.invest = invest;
   if (life !== undefined) state.life = life;
+  if (news) state.news = news;
   state.syncedAt = timeStr();
   state.loading = false;
   render();
