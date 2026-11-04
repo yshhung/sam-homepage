@@ -6,9 +6,9 @@ import { addDays, dateStr, diffDays, el, nextMonday, nowStamp, relDay, shortDate
 
 const $ = (id) => document.getElementById(id);
 
-const DOMAINS = ['工作', '和果', '投資', '生活'];
-// 沁耘是公司（歸工作），和果是日照中心
-const DOMAIN_OF = { 和果: '和果', 沁耘: '工作', 待辦: '工作', 信件: '工作', 行程: '工作', 投資: '投資', 帳單: '生活', 旅行: '生活', 天氣: '生活', 其他: '生活' };
+const DOMAINS = ['工作', '沁耘', '和果', '投資', '生活'];
+// 沁耘是公司（網站、曝光、課程），和果是日照中心
+const DOMAIN_OF = { 和果: '和果', 沁耘: '沁耘', 網站: '沁耘', 社群: '沁耘', 課程: '沁耘', 待辦: '工作', 信件: '工作', 行程: '工作', 投資: '投資', 帳單: '生活', 旅行: '生活', 天氣: '生活', 其他: '生活' };
 const CLOSED = new Set(['完成', '已處理']);
 
 const state = {
@@ -439,16 +439,22 @@ async function settle(name, p) {
   }
 }
 
-// 舊版把和果日照的卡片叫「沁耘」；Excel 裡還是舊名稱時改一次
-async function renameOldCard() {
-  const old = state.cards.find((c) => c.領域 === '沁耘');
-  if (!old || state.cards.some((c) => c.領域 === '和果')) return;
-  const patch = { 領域: '和果', 說明: old.說明 === '在這裡寫一句沁耘現況' ? '在這裡寫一句和果日照現況' : old.說明 };
+// 舊版 Excel 的卡片表：和果日照的那列叫「沁耘」，也還沒有公司（沁耘）那列。各補一次
+async function migrateCards() {
   try {
-    await state.store.updateCard('沁耘', patch);
-    state.cards = state.cards.map((c) => (c === old ? { ...c, ...patch } : c));
+    const old = state.cards.find((c) => c.領域 === '沁耘');
+    if (old && !state.cards.some((c) => c.領域 === '和果')) {
+      const patch = { 領域: '和果', 說明: old.說明 === '在這裡寫一句沁耘現況' ? '在這裡寫一句和果日照現況' : old.說明 };
+      await state.store.updateCard('沁耘', patch);
+      state.cards = state.cards.map((c) => (c === old ? { ...c, ...patch } : c));
+    }
+    if (!state.cards.some((c) => c.領域 === '沁耘')) {
+      const card = { 領域: '沁耘', 數字: '—', 說明: '在這裡寫一句公司現況（網站、曝光、課程）', 更新: '' };
+      await state.store.addCard(card);
+      state.cards = [...state.cards, card];
+    }
   } catch (err) {
-    console.error('rename card', err);
+    console.error('migrate cards', err);
   }
 }
 
@@ -469,7 +475,7 @@ async function refresh() {
   ]);
   if (db) {
     Object.assign(state, db);
-    await renameOldCard();
+    await migrateCards();
   }
   if (events) state.events = events;
   if (weather) state.weather = weather;
