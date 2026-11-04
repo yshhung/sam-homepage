@@ -9,6 +9,8 @@ export const CONFIG = {
 
   // 沁耘網站與社群數字：由這台電腦上的排程每天更新（WordPress.com、Metricool）
   companyStatsPath: 'Sam Homepage/company_stats.json',
+  // TickTick 待辦：Claude 改完 TickTick 會更新，每天 07:30 排程備援
+  tickTickPath: 'Sam Homepage/ticktick.json',
 
   weather: { name: '土城', lat: 24.972, lon: 121.443 },
 

@@ -1,9 +1,9 @@
 // Microsoft 登入（MSAL）與 Microsoft Graph 呼叫
 import { CONFIG } from '../config.js';
 
-// Files.ReadWrite：你自己 OneDrive 的首頁資料；Files.Read.All：讀和果 SharePoint 的匯出檔；
-// Mail.Read：只讀需回覆的信，首頁不能改、不能刪你的信
-const SCOPES = ['User.Read', 'Files.ReadWrite', 'Files.Read.All', 'Calendars.Read', 'Mail.Read'];
+// 首頁只讀不寫：Files.Read.All 讀你 OneDrive 的同步檔與和果 SharePoint 的匯出檔；
+// Calendars.Read、Mail.Read 只讀行程與信件。首頁不能改、不能刪任何檔案或信件
+const SCOPES = ['User.Read', 'Files.Read.All', 'Calendars.Read', 'Mail.Read'];
 // 記住上次登入的帳號（只有電子郵件，沒有密碼或憑證），下次自動帶入、不用再選帳號
 const HINT_KEY = 'samhome.loginHint';
 let pca = null;

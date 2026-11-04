@@ -1,72 +1,75 @@
+// 首頁只負責「看」：資料都從原本的地方讀（Outlook、TickTick 同步檔、和果與沁耘的數字檔），
+// 不寫入任何東西。新增、完成待辦一律在 Claude App 或 TickTick 裡做。
 import { CONFIG } from '../config.js';
 import { getAccount, initAuth, isConfigured, login, logout } from './auth.js';
 import { DemoStore, ExcelStore } from './store.js';
-import { demoCalendar, demoCompany, demoHecho, demoMail, getCalendar, getCompany, getFx, getHecho, getMail, getWeather, hechoSummary } from './sources.js';
-import { addDays, dateStr, diffDays, el, nextMonday, nowStamp, relDay, shortDate, timeStr, uid } from './util.js';
+import {
+  demoCalendar, demoCompany, demoHecho, demoMail, demoTickTick,
+  getCalendar, getCompany, getFx, getHecho, getMail, getTickTick, getWeather, hechoSummary,
+} from './sources.js';
+import { dateStr, diffDays, el, relDay, shortDate, timeStr } from './util.js';
 
 const $ = (id) => document.getElementById(id);
 
 const DOMAINS = ['工作', '沁耘', '和果', '投資', '生活'];
 // 沁耘是公司（網站、曝光、課程），和果是日照中心
-const DOMAIN_OF = { 和果: '和果', 沁耘: '沁耘', 網站: '沁耘', 社群: '沁耘', 課程: '沁耘', 待辦: '工作', 信件: '工作', 行程: '工作', 投資: '投資', 帳單: '生活', 旅行: '生活', 天氣: '生活', 其他: '生活' };
-const CLOSED = new Set(['完成', '已處理']);
+const DOMAIN_OF = { 和果: '和果', 沁耘: '沁耘', 網站: '沁耘', 社群: '沁耘', 課程: '沁耘', 信件: '工作', 行程: '工作', 投資: '投資', 天氣: '生活' };
+// TickTick 清單 → 卡片（清單定義見「待辦行程分流」技能）
+const LIST_DOMAIN = { '💼公司營運': '沁耘', '🦄未來拓展': '沁耘', '🏫社區長照營運': '和果', '🏠我的家庭': '生活', '🏃我的生活': '生活', '📦生活瑣事': '生活' };
+const TICKTICK_WEB = 'https://ticktick.com/webapp/';
 
 const state = {
   store: null,
-  items: [], cards: [], settings: { ...CONFIG.defaults },
-  events: [], weather: null, fx: null, mail: [], hecho: null, company: null,
+  cards: [], settings: { ...CONFIG.defaults },
+  events: [], weather: null, fx: null, mail: [], hecho: null, company: null, ticktick: null,
   errors: {}, syncedAt: null, loading: false,
   showUpcoming: false,
 };
 
 // ---------- 組出今日重點 ----------
 
-// 自動產生的重點（行程、天氣、匯率）按「已處理」後，存成 ID 為 auto:… 的一列
-function dismissedKeys() {
-  return new Set(state.items.filter((o) => o.ID.startsWith('auto:') && CLOSED.has(o.狀態)).map((o) => o.ID.slice(5)));
+function domainOf(e) {
+  return e.domain || DOMAIN_OF[e.cat] || '工作';
 }
 
-function manualEntries(today) {
-  const lead = state.settings.提前提醒天數;
+// TickTick：逾期、今天、幾天內到期放今日重點，其他放「之後」
+function tickTickEntries(today) {
+  const t = state.ticktick;
   const focus = [];
   const upcoming = [];
-  for (const o of state.items) {
-    if (o.ID.startsWith('auto:') || CLOSED.has(o.狀態)) continue;
-    if (o.延後至 && o.延後至 > today) { upcoming.push(entryFromItem(o, today, o.延後至)); continue; }
-    const e = entryFromItem(o, today, o.到期日);
-    if (!o.到期日 || diffDays(o.到期日, today) <= lead) focus.push(e);
-    else upcoming.push(e);
+  if (!t) return { focus, upcoming };
+  const lead = state.settings.提前提醒天數;
+  for (const task of t.tasks || []) {
+    if (!task.due) continue;
+    const n = diffDays(task.due, today);
+    const meta = [`${relDay(task.due, today)} · ${shortDate(task.due)}${task.time ? ` ${task.time}` : ''}`];
+    if (task.priority === 5) meta.push('高優先');
+    const e = {
+      key: `tt:${task.id}`, cat: task.list.replace(/^\p{Extended_Pictographic}️?/u, '') || 'TickTick',
+      domain: LIST_DOMAIN[task.list] || '工作', title: task.title, meta: meta.join(' · '),
+      level: n < 0 ? 'bad' : n === 0 ? 'warn' : 'info', link: TICKTICK_WEB, linkLabel: '打開 TickTick',
+      sort: n + (task.time ? Number(task.time.slice(0, 2)) / 100 : 0.5), when: task.due, overdue: n < 0,
+    };
+    (n <= lead ? focus : upcoming).push(e);
   }
+  const age = t.updated ? diffDays(today, t.updated.slice(0, 10)) : 99;
+  if (age >= 2) focus.push({ key: 'tt:stale', cat: 'TickTick', domain: '工作', title: `TickTick 待辦 ${age} 天沒同步`, meta: '在 Claude App 改過待辦，或等每天 07:30 的備援同步', level: 'info', sort: 0.85 });
   return { focus, upcoming };
-}
-
-function entryFromItem(o, today, when) {
-  const n = when ? diffDays(when, today) : null;
-  const level = n === null ? 'calm' : n < 0 ? 'bad' : n === 0 ? 'warn' : 'info';
-  const meta = [];
-  if (o.延後至 && o.延後至 > today) meta.push(`延後到 ${shortDate(o.延後至)}`);
-  else if (o.到期日) meta.push(`${relDay(o.到期日, today)} · ${shortDate(o.到期日)}`);
-  if (o.備註) meta.push(o.備註);
-  return {
-    key: o.ID, kind: 'item', item: o, cat: o.類別 || '其他', title: o.標題, meta: meta.join(' · '),
-    level, link: o.連結, sort: n === null ? 50 : n, when,
-  };
 }
 
 function autoEntries(today) {
   const out = [];
   const s = state.settings;
   const now = `${today}T${timeStr()}`;
-  const tomorrow = addDays(today, 1);
 
   for (const ev of state.events) {
     const day = ev.start.slice(0, 10);
     if (day === today && !ev.allDay && ev.end < now) continue;
     const time = ev.allDay ? '整天' : `${ev.start.slice(11)}–${ev.end.slice(11)}`;
     out.push({
-      key: `cal:${ev.id}`, kind: 'auto', cat: '行程', title: ev.subject,
+      key: `cal:${ev.id}`, cat: '行程', title: ev.subject,
       meta: [day === today ? '今天' : '明天', time, ev.location].filter(Boolean).join(' · '),
-      level: day === today ? 'warn' : 'info', link: ev.link,
+      level: day === today ? 'warn' : 'info', link: ev.link, linkLabel: '打開 Outlook',
       sort: day === today ? 0.1 + Number(ev.start.slice(11, 13)) / 100 : 1.5,
     });
   }
@@ -78,34 +81,31 @@ function autoEntries(today) {
     if (w.min <= s.低溫門檻) out.push(wx('cold', `今天低溫 ${w.min}°C`, '注意長輩保暖'));
   }
   function wx(type, title, meta) {
-    return { key: `wx:${today}:${type}`, kind: 'auto', cat: '天氣', title, meta, level: 'warn', sort: 0.05 };
+    return { key: `wx:${type}`, cat: '天氣', title, meta, level: 'warn', sort: 0.05 };
   }
 
   const fx = state.fx;
   if (fx && Math.abs(fx.change) >= s.匯率變動門檻) {
     out.push({
-      key: `fx:${fx.date}`, kind: 'auto', cat: '投資',
+      key: 'fx', cat: '投資',
       title: `美元兌台幣 ${fx.rate.toFixed(2)}（${fx.change > 0 ? '+' : ''}${fx.change.toFixed(2)}%）`,
       meta: `超過你設的 ${s.匯率變動門檻}% 門檻`, level: 'info', sort: 0.9,
     });
   }
 
+  // 在 Outlook 取消旗標或標成完成，下次同步就會消失
   for (const m of state.mail) {
     const at = new Date(m.received);
     out.push({
-      key: `mail:${m.id}`, kind: 'auto', cat: '信件', title: m.subject,
+      key: `mail:${m.id}`, cat: '信件', title: m.subject,
       meta: [m.from, `${shortDate(dateStr(at))} ${timeStr(at)}`, m.flagged ? '已加旗標' : '重要・未讀'].filter(Boolean).join(' · '),
-      // 首頁只能讀信：按「已回覆」只會從首頁拿掉；在 Outlook 取消旗標也會自動消失
-      level: m.flagged ? 'warn' : 'info', link: m.link, sort: m.flagged ? 0.6 : 0.7,
-      ...(m.flagged ? { doneLabel: '已回覆' } : {}),
+      level: m.flagged ? 'warn' : 'info', link: m.link, linkLabel: '打開 Outlook', sort: m.flagged ? 0.6 : 0.7,
     });
   }
 
   out.push(...hechoEntries(today));
   out.push(...companyEntries(today));
-
-  const gone = dismissedKeys();
-  return out.filter((e) => !gone.has(e.key));
+  return out;
 }
 
 // 沁耘：兩週沒有新內容就提醒；數字太久沒更新也提醒（排程只在這台電腦開著時跑）
@@ -113,10 +113,9 @@ function companyEntries(today) {
   const c = state.company;
   if (!c) return [];
   const out = [];
-  const ck = (type, cat, title, meta, level, sort) =>
-    ({ key: `company:${type}:${today.slice(0, 7)}`, kind: 'auto', cat, title, meta, level, sort });
+  const ck = (type, cat, title, meta, level, sort) => ({ key: `company:${type}`, cat, title, meta, level, sort });
   const age = c.updated ? diffDays(today, c.updated.slice(0, 10)) : 99;
-  if (age >= 3) out.push({ key: `company:stale:${today}`, kind: 'auto', cat: '沁耘', title: `網站與社群數字 ${age} 天沒更新`, meta: '辦公室電腦的 Claude 開著時，排程才會更新', level: 'info', sort: 0.8 });
+  if (age >= 3) out.push(ck('stale', '沁耘', `網站與社群數字 ${age} 天沒更新`, '辦公室電腦的 Claude 開著時，排程才會更新', 'info', 0.8));
   const w = c.website || {};
   const s = c.social || {};
   if (w.posts14d === 0) out.push(ck('web', '網站', '網站兩週沒有新文章', `${w.domain || '網站'}：近 14 天瀏覽 ${w.views14d ?? '—'} 次`, 'info', 0.75));
@@ -135,12 +134,11 @@ function hechoEntries(today) {
   const L = h.latest;
   const age = diffDays(today, L.date);
   const label = age === 0 ? '今天' : shortDate(L.date);
-  const hk = (type, title, meta, level, sort) =>
-    ({ key: `hecho:${L.date}:${type}`, kind: 'auto', cat: '和果', title, meta, level, sort });
+  const hk = (type, title, meta, level, sort) => ({ key: `hecho:${type}`, cat: '和果', title, meta, level, sort });
 
   if (age <= 3) {
     if (L.incidents > 0) out.push(hk('incident', `和果${label}有 ${L.incidents} 件異常事件`, '請看交班紀錄的特殊事項', 'bad', -1));
-    // 實到是空的（數字檔）或 0 人（舊交班檔）：多半是 WorkLog 還沒點名，不當成出席率異常
+    // 實到是空的：多半是 WorkLog 還沒點名，不當成出席率異常
     if (L.expected && !L.present) {
       out.push(hk('unfilled', `和果${label}還沒點名`, `應到 ${L.expected} 人，WorkLog 出勤表還是「○」，請同仁改成「V」`, 'info', 0.35));
     } else if (L.expected && L.present !== null) {
@@ -153,16 +151,16 @@ function hechoEntries(today) {
   // 平日 18:00 後還沒有今天的交班紀錄
   const dow = new Date(`${today}T12:00:00+08:00`).getUTCDay();
   if (dow >= 1 && dow <= 5 && timeStr() >= '18:00' && L.date < today) {
-    out.push({ key: `hecho:${today}:missing`, kind: 'auto', cat: '和果', title: '和果今天的交班紀錄還沒匯出', meta: `最新一筆是 ${shortDate(L.date)}`, level: 'warn', sort: 0.3 });
+    out.push(hk('missing', '和果今天的交班紀錄還沒匯出', `最新一筆是 ${shortDate(L.date)}`, 'warn', 0.3));
   }
   return out;
 }
 
 function buildFocus() {
   const today = dateStr();
-  const manual = manualEntries(today);
-  const focus = [...manual.focus, ...autoEntries(today)].sort((a, b) => a.sort - b.sort);
-  const upcoming = manual.upcoming.sort((a, b) => (a.when || '').localeCompare(b.when || ''));
+  const tt = tickTickEntries(today);
+  const focus = [...tt.focus, ...autoEntries(today)].sort((a, b) => a.sort - b.sort);
+  const upcoming = tt.upcoming.sort((a, b) => a.sort - b.sort);
   return { focus, upcoming };
 }
 
@@ -174,7 +172,7 @@ function render() {
   $('greeting').textContent = `${hour < 11 ? '早安' : hour < 18 ? '午安' : '晚安'}，Sam`;
 
   const { focus, upcoming } = buildFocus();
-  const overdue = focus.filter((e) => e.kind === 'item' && e.level === 'bad').length;
+  const overdue = focus.filter((e) => e.overdue).length;
   $('today-line').textContent = `${shortDate(today)} · ${focus.length ? `${focus.length} 件重點${overdue ? `，其中 ${overdue} 件逾期` : ''}` : '今天沒有需要處理的事'}`;
 
   renderStatus();
@@ -194,7 +192,8 @@ function render() {
   renderDomains(focus);
 
   const foot = [];
-  if (state.store?.webUrl) foot.push(el('a', { href: state.store.webUrl, target: '_blank', rel: 'noopener' }, '在 Excel 打開資料'));
+  if (state.ticktick?.updated) foot.push(document.createTextNode(`TickTick 更新於 ${state.ticktick.updated.slice(5)}`));
+  if (state.store?.webUrl) foot.push(el('a', { href: state.store.webUrl, target: '_blank', rel: 'noopener' }, '在 Excel 改卡片與門檻'));
   foot.push(el('a', { href: CONFIG.detailLinks.工作, target: '_blank', rel: 'noopener' }, '舊版 Homepage'));
   $('foot').replaceChildren(...foot.flatMap((a, i) => (i ? [' · ', a] : [a])));
 }
@@ -220,32 +219,22 @@ function renderStatus() {
   if (state.store?.mode === 'demo') {
     banner.hidden = false;
     banner.textContent = isConfigured()
-      ? '還沒登入：現在顯示示範資料，只存在這台裝置。按右上角「登入」改用你 OneDrive 裡的資料。'
-      : '示範模式：還沒設定 Microsoft 登入，資料只存在這台裝置。設定步驟請見 SETUP.md。';
+      ? '還沒登入：現在顯示示範資料。按右上角「登入」看你自己的資料。'
+      : '示範模式：還沒設定 Microsoft 登入。設定步驟請見 SETUP.md。';
   } else if (errs.length) {
     banner.hidden = false;
     banner.textContent = errs.join('；');
   } else banner.hidden = true;
 }
 
+// 只能看：打開原本的地方，或帶到 Claude 處理
 function focusRow(e) {
   const actions = [];
-  if (e.kind === 'item') {
-    actions.push(el('button', { class: 'act primary', type: 'button', onclick: () => closeItem(e.item.ID, '完成') }, '完成'));
-    actions.push(el('button', { class: 'act', type: 'button', onclick: () => snooze(e.item) }, '延後'));
-  } else {
-    actions.push(el('button', { class: 'act primary', type: 'button', onclick: () => (e.onDone ? e.onDone() : dismissAuto(e)) }, e.doneLabel || '已處理'));
-  }
-  if (e.link) actions.push(el('a', { class: 'act', href: e.link, target: '_blank', rel: 'noopener' }, '打開'));
-  actions.push(el('button', { class: 'act', type: 'button', title: '複製給 Claude', onclick: () => toClaude(e) }, '問 Claude'));
-
+  if (e.link) actions.push(el('a', { class: 'act', href: e.link, target: '_blank', rel: 'noopener' }, e.linkLabel || '打開'));
+  actions.push(el('button', { class: 'act primary', type: 'button', title: '複製給 Claude', onclick: () => toClaude(e) }, '問 Claude'));
   const body = el('div', { class: 'f-body' },
     el('div', { class: 'f-top' }, el('span', { class: 'chip' }, e.cat), el('span', { class: 'f-title' }, e.title)),
     e.meta ? el('div', { class: 'f-meta' }, e.meta) : null);
-  if (e.kind === 'item') {
-    body.classList.add('editable');
-    body.addEventListener('click', () => openItemDialog(e.item));
-  }
   return el('li', { class: `f-row ${e.level}` }, body, el('div', { class: 'f-acts' }, actions));
 }
 
@@ -265,9 +254,11 @@ function renderStrip(today) {
   tiles.push(tile('今日行程', state.errors.calendar ? '—' : `${todays.length} 個`,
     next ? `下一個 ${next.allDay ? '整天' : next.start.slice(11)} ${next.subject}` : todays.length ? '今天的行程都結束了' : '今天沒有行程'));
 
-  const open = state.items.filter((o) => !o.ID.startsWith('auto:') && !CLOSED.has(o.狀態));
-  const overdue = open.filter((o) => o.到期日 && o.到期日 < today && !(o.延後至 > today));
-  tiles.push(tile('待辦', `${open.length} 件`, overdue.length ? `${overdue.length} 件逾期` : '沒有逾期', overdue.length ? 'down' : ''));
+  const tasks = state.ticktick?.tasks || [];
+  const overdue = tasks.filter((t) => t.due && t.due < today).length;
+  const dueToday = tasks.filter((t) => t.due === today).length;
+  tiles.push(tile('TickTick', state.ticktick ? `今天 ${dueToday} 件` : '—',
+    state.ticktick ? (overdue ? `${overdue} 件逾期` : '沒有逾期') : state.errors.ticktick ? '抓不到' : '還沒同步', overdue ? 'down' : ''));
 
   $('strip').replaceChildren(...tiles);
 }
@@ -279,15 +270,13 @@ function tile(k, v, s, tone = '') {
 function renderDomains(focus) {
   const cards = DOMAINS.map((d) => {
     const c = state.cards.find((x) => x.領域 === d) || { 領域: d, 數字: '—', 說明: '' };
-    const n = focus.filter((e) => DOMAIN_OF[e.cat] === d).length;
+    const n = focus.filter((e) => domainOf(e) === d).length;
     const auto = autoCard(d);
     return el('article', { class: 'domain' },
-      el('div', { class: 'd-head' },
-        el('h2', {}, d),
-        el('button', { class: 'icon-btn', type: 'button', 'aria-label': `編輯${d}卡片`, onclick: () => openCardDialog(c) }, '✎')),
+      el('div', { class: 'd-head' }, el('h2', {}, d)),
       el('div', { class: 'd-num' }, auto?.num || c.數字 || '—'),
       auto ? el('p', { class: 'd-text auto' }, auto.text) : null,
-      c.說明 ? el('p', { class: 'd-text' }, c.說明) : null,
+      c.說明 && !c.說明.startsWith('在這裡寫一句') ? el('p', { class: 'd-text' }, c.說明) : null,
       d === '和果' && state.hecho ? el('button', { class: 'act d-ask', type: 'button', title: '複製最近的數字（沒有姓名），打開 Claude', onclick: askHecho }, '問 AI') : null,
       el('div', { class: 'd-foot' },
         el('span', { class: n ? 'pill on' : 'pill' }, n ? `${n} 件重點` : '沒有重點'),
@@ -296,7 +285,7 @@ function renderDomains(focus) {
   $('domains').replaceChildren(...cards);
 }
 
-// 有即時資料的領域，數字自動填；你寫的說明照樣顯示在下面
+// 有即時資料的領域，數字自動填；Excel「卡片」表寫的說明照樣顯示在下面
 function autoCard(domain) {
   if (domain === '沁耘' && state.company?.website) {
     const { website: w, social: s = {} } = state.company;
@@ -317,7 +306,7 @@ function autoCard(domain) {
   return null;
 }
 
-// ---------- 動作 ----------
+// ---------- 帶到 Claude ----------
 
 let toastTimer;
 function toast(msg) {
@@ -328,56 +317,10 @@ function toast(msg) {
   toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
 }
 
-// 先改畫面再寫資料，寫失敗就重新讀一次
-async function mutate(localChange, remote, okMsg) {
-  localChange();
-  render();
-  try {
-    await remote();
-    if (okMsg) toast(okMsg);
-  } catch (err) {
-    console.error(err);
-    toast(`沒存到：${err.message}`);
-    await refresh();
-  }
-}
-
-function closeItem(id, status) {
-  const patch = { 狀態: status, 完成: nowStamp() };
-  mutate(() => { state.items = state.items.map((o) => (o.ID === id ? { ...o, ...patch } : o)); },
-    () => state.store.updateItem(id, patch), `已${status}`);
-}
-
-function dismissAuto(e) {
-  const row = { ID: `auto:${e.key}`, 類別: e.cat, 標題: e.title, 備註: e.meta || '', 到期日: '', 狀態: '已處理', 延後至: '', 連結: '', 建立: nowStamp(), 完成: nowStamp() };
-  mutate(() => { state.items = [...state.items, row]; }, () => state.store.addItem(row), '已處理');
-}
-
-let snoozeTarget = null;
-function snooze(item) {
-  snoozeTarget = item;
-  $('snooze-date').value = addDays(dateStr(), 1);
-  $('snooze-dialog').returnValue = '';
-  $('snooze-dialog').showModal();
-}
-
-$('snooze-dialog').addEventListener('close', () => {
-  const v = $('snooze-dialog').returnValue;
-  const item = snoozeTarget;
-  snoozeTarget = null;
-  if (!item || !v || v === 'cancel') return;
-  const today = dateStr();
-  const to = v === 'mon' ? nextMonday(today) : v === 'date' ? $('snooze-date').value : addDays(today, Number(v));
-  if (!to || to <= today) return;
-  const patch = { 延後至: to };
-  mutate(() => { state.items = state.items.map((o) => (o.ID === item.ID ? { ...o, ...patch } : o)); },
-    () => state.store.updateItem(item.ID, patch), `延後到 ${shortDate(to)}`);
-});
-
 function toClaude(e) {
   const lines = [`請幫我處理這件事：${e.title}`, `類別：${e.cat}`];
   if (e.meta) lines.push(`補充：${e.meta}`);
-  if (e.item?.到期日) lines.push(`期限：${e.item.到期日}`);
+  if (e.key.startsWith('tt:') && e.key !== 'tt:stale') lines.push('（這是 TickTick 的待辦；做完請幫我在 TickTick 標成完成，並更新首頁的 TickTick 同步檔）');
   if (e.cat === '和果' && state.hecho) lines.push('', '和果最近的數字（只有統計）：', hechoSummary(state.hecho));
   copyAndOpenClaude(lines.join('\n'));
 }
@@ -425,63 +368,6 @@ function openClaude() {
   window.open(CLAUDE_WEB, '_blank', 'noopener');
 }
 
-// 新增 / 編輯
-let editing = null;
-function openItemDialog(item = null) {
-  editing = item;
-  const f = $('item-form');
-  f.reset();
-  $('item-dialog-title').textContent = item ? '編輯重點' : '新增重點';
-  $('item-delete').hidden = !item;
-  if (item) for (const k of ['類別', '標題', '到期日', '備註', '連結']) f.elements[k].value = item[k] || '';
-  $('item-dialog').showModal();
-  setTimeout(() => f.elements.標題.focus(), 50);
-}
-
-$('item-form').addEventListener('submit', () => {
-  const f = $('item-form');
-  const data = Object.fromEntries(['類別', '標題', '到期日', '備註', '連結'].map((k) => [k, f.elements[k].value.trim()]));
-  if (!data.標題) return;
-  if (editing) {
-    const id = editing.ID;
-    mutate(() => { state.items = state.items.map((o) => (o.ID === id ? { ...o, ...data } : o)); },
-      () => state.store.updateItem(id, data), '已儲存');
-  } else {
-    const row = { ID: uid(), ...data, 狀態: '待辦', 延後至: '', 建立: nowStamp(), 完成: '' };
-    mutate(() => { state.items = [...state.items, row]; }, () => state.store.addItem(row), '已新增');
-  }
-  editing = null;
-});
-
-$('item-cancel').addEventListener('click', () => $('item-dialog').close());
-$('item-delete').addEventListener('click', () => {
-  if (!editing || !confirm(`刪除「${editing.標題}」？`)) return;
-  const id = editing.ID;
-  $('item-dialog').close();
-  editing = null;
-  mutate(() => { state.items = state.items.filter((o) => o.ID !== id); }, () => state.store.deleteItem(id), '已刪除');
-});
-
-let editingCard = null;
-function openCardDialog(card) {
-  editingCard = card;
-  const f = $('card-form');
-  $('card-dialog-title').textContent = `編輯「${card.領域}」卡片`;
-  f.elements.數字.value = card.數字 === '—' ? '' : card.數字 || '';
-  f.elements.說明.value = card.說明 || '';
-  $('card-dialog').showModal();
-}
-
-$('card-form').addEventListener('submit', () => {
-  const f = $('card-form');
-  const d = editingCard.領域;
-  const patch = { 數字: f.elements.數字.value.trim() || '—', 說明: f.elements.說明.value.trim(), 更新: nowStamp() };
-  mutate(() => { state.cards = state.cards.map((c) => (c.領域 === d ? { ...c, ...patch } : c)); },
-    () => state.store.updateCard(d, patch), '已儲存');
-});
-$('card-cancel').addEventListener('click', () => $('card-dialog').close());
-
-$('btn-add').addEventListener('click', () => openItemDialog());
 $('btn-refresh').addEventListener('click', () => refresh());
 $('btn-upcoming').addEventListener('click', () => { state.showUpcoming = !state.showUpcoming; render(); });
 $('btn-account').addEventListener('click', () => (getAccount() ? logout() : login()));
@@ -496,29 +382,10 @@ async function settle(name, p) {
   } catch (err) {
     console.error(name, err);
     state.errors[name] = {
-      data: `OneDrive 資料：${err.message}`, calendar: '行事曆抓不到', weather: '天氣抓不到', fx: '匯率抓不到',
-      mail: '信件抓不到', hecho: `和果資料抓不到（${err.message}）`, company: '網站與社群數字抓不到',
+      data: `卡片與門檻：${err.message}`, calendar: '行事曆抓不到', weather: '天氣抓不到', fx: '匯率抓不到',
+      mail: '信件抓不到', hecho: `和果資料抓不到（${err.message}）`, company: '網站與社群數字抓不到', ticktick: 'TickTick 同步檔抓不到',
     }[name];
     return undefined;
-  }
-}
-
-// 舊版 Excel 的卡片表：和果日照的那列叫「沁耘」，也還沒有公司（沁耘）那列。各補一次
-async function migrateCards() {
-  try {
-    const old = state.cards.find((c) => c.領域 === '沁耘');
-    if (old && !state.cards.some((c) => c.領域 === '和果')) {
-      const patch = { 領域: '和果', 說明: old.說明 === '在這裡寫一句沁耘現況' ? '在這裡寫一句和果日照現況' : old.說明 };
-      await state.store.updateCard('沁耘', patch);
-      state.cards = state.cards.map((c) => (c === old ? { ...c, ...patch } : c));
-    }
-    if (!state.cards.some((c) => c.領域 === '沁耘')) {
-      const card = { 領域: '沁耘', 數字: '—', 說明: '在這裡寫一句公司現況（網站、曝光、課程）', 更新: '' };
-      await state.store.addCard(card);
-      state.cards = [...state.cards, card];
-    }
-  } catch (err) {
-    console.error('migrate cards', err);
   }
 }
 
@@ -529,7 +396,7 @@ async function refresh() {
   lastRefresh = Date.now();
   renderStatus();
   const live = state.store.mode === 'live';
-  const [db, events, weather, fx, mail, hecho, company] = await Promise.all([
+  const [db, events, weather, fx, mail, hecho, company, ticktick] = await Promise.all([
     settle('data', state.store.load()),
     live ? settle('calendar', getCalendar()) : Promise.resolve(demoCalendar()),
     settle('weather', getWeather()),
@@ -537,23 +404,22 @@ async function refresh() {
     live ? settle('mail', getMail()) : Promise.resolve(demoMail()),
     live ? settle('hecho', getHecho()) : Promise.resolve(demoHecho()),
     live ? settle('company', getCompany()) : Promise.resolve(demoCompany()),
+    live ? settle('ticktick', getTickTick()) : Promise.resolve(demoTickTick()),
   ]);
-  if (db) {
-    Object.assign(state, db);
-    await migrateCards();
-  }
+  if (db) Object.assign(state, db);
   if (events) state.events = events;
   if (weather) state.weather = weather;
   if (fx) state.fx = fx;
   if (mail) state.mail = mail;
   if (hecho) state.hecho = hecho;
   if (company !== undefined) state.company = company;
+  if (ticktick !== undefined) state.ticktick = ticktick;
   state.syncedAt = timeStr();
   state.loading = false;
   render();
 }
 
-// 從別台裝置改過資料：切回這個畫面時自動重新讀
+// 在別的地方改過資料：切回這個畫面時自動重新讀
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && Date.now() - lastRefresh > 30000) refresh();
 });

@@ -164,16 +164,42 @@ export function demoHecho() {
   };
 }
 
-// ---------- 沁耘網站與社群 ----------
+// ---------- TickTick 同步檔 ----------
+// Claude 每次改 TickTick 後會更新這個檔，每天 07:30 的排程也會再整理一次
 
-export async function getCompany() {
-  const path = CONFIG.companyStatsPath.split('/').map(encodeURIComponent).join('/');
+async function oneDriveJson(relPath) {
+  const path = relPath.split('/').map(encodeURIComponent).join('/');
   try {
     return await (await graph(`/me/drive/root:/${path}:/content`, { raw: true })).json();
   } catch (e) {
-    if (e instanceof GraphError && e.status === 404) return null; // 排程還沒跑過
+    if (e instanceof GraphError && e.status === 404) return null; // 還沒同步過
     throw e;
   }
+}
+
+export function getTickTick() {
+  return oneDriveJson(CONFIG.tickTickPath);
+}
+
+export function demoTickTick() {
+  const t = dateStr();
+  const d = (n) => addDays(t, n);
+  return {
+    updated: `${t} 08:10`,
+    tasks: [
+      { id: 'd1', title: '與護理師會談', list: '🏫社區長照營運', due: d(-2), time: '12:00', priority: 3 },
+      { id: 'd2', title: '寄出上個月核銷資料', list: '🏫社區長照營運', due: t, time: '10:00', priority: 5 },
+      { id: 'd3', title: '繳納房屋租賃所得稅扣繳', list: '💼公司營運', due: d(2), time: '10:00', priority: 5 },
+      { id: 'd4', title: '預約雷射除毛', list: '🏠我的家庭', due: d(1), time: null, priority: 3 },
+      { id: 'd5', title: '取消 LINE 收回功能', list: '📦生活瑣事', due: d(6), time: '09:00', priority: 0 },
+    ],
+  };
+}
+
+// ---------- 沁耘網站與社群 ----------
+
+export function getCompany() {
+  return oneDriveJson(CONFIG.companyStatsPath);
 }
 
 export function demoCompany() {

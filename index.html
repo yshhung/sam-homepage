@@ -55,61 +55,6 @@
     <p class="wk-foot" id="foot"></p>
   </main>
 
-  <button class="fab" id="btn-add" type="button" aria-label="新增重點">＋</button>
-
-  <dialog class="sheet" id="item-dialog">
-    <form method="dialog" id="item-form">
-      <h3 id="item-dialog-title">新增重點</h3>
-      <label>類別
-        <select name="類別">
-          <option>待辦</option><option>沁耘</option><option>網站</option><option>社群</option><option>課程</option><option>和果</option><option>信件</option><option>帳單</option>
-          <option>投資</option><option>旅行</option><option>行程</option><option>其他</option>
-        </select>
-      </label>
-      <label>標題<input name="標題" required autocomplete="off"></label>
-      <label>到期日<input name="到期日" type="date"></label>
-      <label>備註<textarea name="備註" rows="3"></textarea></label>
-      <label>連結<input name="連結" type="url" placeholder="https://"></label>
-      <div class="sheet-actions">
-        <button type="button" class="btn ghost" id="item-delete" hidden>刪除</button>
-        <span class="grow"></span>
-        <button type="button" class="btn ghost" id="item-cancel">取消</button>
-        <button type="submit" class="btn primary">儲存</button>
-      </div>
-    </form>
-  </dialog>
-
-  <dialog class="sheet" id="snooze-dialog">
-    <form method="dialog">
-      <h3>延後到</h3>
-      <div class="snooze-grid">
-        <button class="btn" value="1">明天</button>
-        <button class="btn" value="2">後天</button>
-        <button class="btn" value="mon">下週一</button>
-        <button class="btn" value="7">一週後</button>
-      </div>
-      <label>選日期<input type="date" id="snooze-date"></label>
-      <div class="sheet-actions">
-        <span class="grow"></span>
-        <button class="btn ghost" value="cancel">取消</button>
-        <button class="btn primary" value="date">確定</button>
-      </div>
-    </form>
-  </dialog>
-
-  <dialog class="sheet" id="card-dialog">
-    <form method="dialog" id="card-form">
-      <h3 id="card-dialog-title">編輯卡片</h3>
-      <label>數字<input name="數字" autocomplete="off"></label>
-      <label>說明<textarea name="說明" rows="3"></textarea></label>
-      <div class="sheet-actions">
-        <span class="grow"></span>
-        <button type="button" class="btn ghost" id="card-cancel">取消</button>
-        <button type="submit" class="btn primary">儲存</button>
-      </div>
-    </form>
-  </dialog>
-
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script type="module" src="js/app.js"></script>
