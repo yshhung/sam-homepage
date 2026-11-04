@@ -8,6 +8,11 @@
   - 只讀統計數字，不讀長輩或員工的姓名。
 
 想讓某封信出現在今日重點，在 Outlook 幫它加旗標就好。
+
+- **沁耘網站與社群**：Claude 桌面版的排程「Sam 首頁：沁耘網站與社群數字」每天 07:30 左右，從 WordPress.com（qinyunhealth.com）和 Metricool（hecho.daycare 的 IG、FB、Google 商家）抓數字，寫進 OneDrive 的 `Sam Homepage/company_stats.json`。首頁只讀這個檔，網頁裡不存任何 WordPress 或 Metricool 的權杖。
+  - 沁耘卡片顯示網站本月瀏覽、訪客、文章數，以及 IG、FB 追蹤人數。
+  - 網站兩週沒有新文章、IG 或 FB 兩週沒發文、數字超過 3 天沒更新，都會列進重點。
+  - 排程只在辦公室電腦的 Claude 開著時跑；關著的話，下次打開會補跑。
 資料存在你 OneDrive 的 `Sam Homepage/SamHomepage.xlsx`，第一次登入時會自動建立。
 
 沒設定之前，首頁是**示範模式**：可以操作，但資料只存在那台裝置的瀏覽器。

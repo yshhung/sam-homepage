@@ -1,7 +1,7 @@
 import { CONFIG } from '../config.js';
 import { getAccount, initAuth, isConfigured, login, logout } from './auth.js';
 import { DemoStore, ExcelStore } from './store.js';
-import { demoCalendar, demoHecho, demoMail, getCalendar, getFx, getHecho, getMail, getWeather } from './sources.js';
+import { demoCalendar, demoCompany, demoHecho, demoMail, getCalendar, getCompany, getFx, getHecho, getMail, getWeather } from './sources.js';
 import { addDays, dateStr, diffDays, el, nextMonday, nowStamp, relDay, shortDate, timeStr, uid } from './util.js';
 
 const $ = (id) => document.getElementById(id);
@@ -14,7 +14,7 @@ const CLOSED = new Set(['完成', '已處理']);
 const state = {
   store: null,
   items: [], cards: [], settings: { ...CONFIG.defaults },
-  events: [], weather: null, fx: null, mail: [], hecho: null,
+  events: [], weather: null, fx: null, mail: [], hecho: null, company: null,
   errors: {}, syncedAt: null, loading: false,
   showUpcoming: false,
 };
@@ -102,9 +102,28 @@ function autoEntries(today) {
   }
 
   out.push(...hechoEntries(today));
+  out.push(...companyEntries(today));
 
   const gone = dismissedKeys();
   return out.filter((e) => !gone.has(e.key));
+}
+
+// 沁耘：兩週沒有新內容就提醒；數字太久沒更新也提醒（排程只在這台電腦開著時跑）
+function companyEntries(today) {
+  const c = state.company;
+  if (!c) return [];
+  const out = [];
+  const ck = (type, cat, title, meta, level, sort) =>
+    ({ key: `company:${type}:${today.slice(0, 7)}`, kind: 'auto', cat, title, meta, level, sort });
+  const age = c.updated ? diffDays(today, c.updated.slice(0, 10)) : 99;
+  if (age >= 3) out.push({ key: `company:stale:${today}`, kind: 'auto', cat: '沁耘', title: `網站與社群數字 ${age} 天沒更新`, meta: '辦公室電腦的 Claude 開著時，排程才會更新', level: 'info', sort: 0.8 });
+  const w = c.website || {};
+  const s = c.social || {};
+  if (w.posts14d === 0) out.push(ck('web', '網站', '網站兩週沒有新文章', `${w.domain || '網站'}：近 14 天瀏覽 ${w.views14d ?? '—'} 次`, 'info', 0.75));
+  if (s.igContent14d === 0 && s.fbContent14d === 0) out.push(ck('social', '社群', 'IG 和 FB 兩週沒有發文', `IG ${s.igFollowers ?? '—'} 人追蹤、FB ${s.fbFollowers ?? '—'} 人追蹤`, 'info', 0.76));
+  else if (s.igContent14d === 0) out.push(ck('ig', '社群', 'IG 兩週沒有發文', `目前 ${s.igFollowers ?? '—'} 人追蹤`, 'info', 0.76));
+  else if (s.fbContent14d === 0) out.push(ck('fb', '社群', 'FB 兩週沒有發文', `目前 ${s.fbFollowers ?? '—'} 人追蹤`, 'info', 0.76));
+  return out;
 }
 
 // 和果：最新一天的交班統計（只用數字），太舊的資料不提醒
@@ -278,6 +297,12 @@ function renderDomains(focus) {
 
 // 有即時資料的領域，數字自動填；你寫的說明照樣顯示在下面
 function autoCard(domain) {
+  if (domain === '沁耘' && state.company?.website) {
+    const { website: w, social: s = {} } = state.company;
+    const parts = [`網站本月 ${w.visitors} 位訪客、${w.posts} 篇文章（上月瀏覽 ${w.prevViews}）`];
+    parts.push(`IG ${s.igFollowers ?? '—'}・FB ${s.fbFollowers ?? '—'} 人追蹤`);
+    return { num: `${w.views} 瀏覽`, text: parts.join('；') };
+  }
   if (domain === '和果' && state.hecho?.month?.rate) {
     const { month, latest } = state.hecho;
     const parts = [`和果 ${month.label} 出席率 · 每日平均 ${month.avg} 人`];
@@ -433,7 +458,7 @@ async function settle(name, p) {
     console.error(name, err);
     state.errors[name] = {
       data: `OneDrive 資料：${err.message}`, calendar: '行事曆抓不到', weather: '天氣抓不到', fx: '匯率抓不到',
-      mail: '信件抓不到', hecho: `和果資料抓不到（${err.message}）`,
+      mail: '信件抓不到', hecho: `和果資料抓不到（${err.message}）`, company: '網站與社群數字抓不到',
     }[name];
     return undefined;
   }
@@ -465,13 +490,14 @@ async function refresh() {
   lastRefresh = Date.now();
   renderStatus();
   const live = state.store.mode === 'live';
-  const [db, events, weather, fx, mail, hecho] = await Promise.all([
+  const [db, events, weather, fx, mail, hecho, company] = await Promise.all([
     settle('data', state.store.load()),
     live ? settle('calendar', getCalendar()) : Promise.resolve(demoCalendar()),
     settle('weather', getWeather()),
     settle('fx', getFx()),
     live ? settle('mail', getMail()) : Promise.resolve(demoMail()),
     live ? settle('hecho', getHecho()) : Promise.resolve(demoHecho()),
+    live ? settle('company', getCompany()) : Promise.resolve(demoCompany()),
   ]);
   if (db) {
     Object.assign(state, db);
@@ -482,6 +508,7 @@ async function refresh() {
   if (fx) state.fx = fx;
   if (mail) state.mail = mail;
   if (hecho) state.hecho = hecho;
+  if (company !== undefined) state.company = company;
   state.syncedAt = timeStr();
   state.loading = false;
   render();

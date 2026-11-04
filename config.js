@@ -7,6 +7,9 @@ export const CONFIG = {
   // 首頁資料在你 OneDrive 裡的位置（第一次登入會自動建立）
   filePath: 'Sam Homepage/SamHomepage.xlsx',
 
+  // 沁耘網站與社群數字：由這台電腦上的排程每天更新（WordPress.com、Metricool）
+  companyStatsPath: 'Sam Homepage/company_stats.json',
+
   weather: { name: '土城', lat: 24.972, lon: 121.443 },
 
   // 和果 SharePoint 文件庫裡，給儀表板用的匯出檔（只有統計數字）

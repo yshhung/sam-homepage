@@ -163,6 +163,26 @@ export function demoHecho() {
   };
 }
 
+// ---------- 沁耘網站與社群 ----------
+
+export async function getCompany() {
+  const path = CONFIG.companyStatsPath.split('/').map(encodeURIComponent).join('/');
+  try {
+    return await (await graph(`/me/drive/root:/${path}:/content`, { raw: true })).json();
+  } catch (e) {
+    if (e instanceof GraphError && e.status === 404) return null; // 排程還沒跑過
+    throw e;
+  }
+}
+
+export function demoCompany() {
+  return {
+    updated: `${dateStr()} 07:30`,
+    website: { domain: 'qinyunhealth.com', month: dateStr().slice(0, 7), views: 120, visitors: 48, posts: 1, prevViews: 436, prevVisitors: 129, views14d: 90, posts14d: 1 },
+    social: { igFollowers: 66, igReach7d: 0, igContent14d: 0, fbFollowers: 103, fbViews7d: 8, fbContent14d: 2, gbpReach7d: null, gbpClicks7d: null },
+  };
+}
+
 const WX = {
   0: '晴', 1: '晴時多雲', 2: '多雲', 3: '陰', 45: '霧', 48: '霧', 51: '毛毛雨', 53: '毛毛雨', 55: '毛毛雨',
   61: '小雨', 63: '雨', 65: '大雨', 80: '陣雨', 81: '陣雨', 82: '強陣雨', 95: '雷雨', 96: '雷雨', 99: '雷雨',
