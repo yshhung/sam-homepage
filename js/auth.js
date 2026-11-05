@@ -66,7 +66,9 @@ async function getToken() {
   try {
     return (await pca.acquireTokenSilent({ scopes: SCOPES, account })).accessToken;
   } catch (e) {
-    if (!(e instanceof msal.InteractionRequiredAuthError)) throw e;
+    // 背景續登逾時（瀏覽器擋了隱藏視窗）也當成要重新登入，不然會一直抓不到資料
+    const timedOut = /timeout/i.test(e?.errorCode || '');
+    if (!(e instanceof msal.InteractionRequiredAuthError) && !timedOut) throw e;
     try {
       const r = await pca.ssoSilent({ scopes: SCOPES, loginHint: account?.username || loginHint() });
       account = r.account;
