@@ -8,12 +8,15 @@
   data.json：報告整理好的中間資料（區塊格式跟舊的早報、晚報一樣：invest、news_fin、summary_invest）
   輸出：<輸出資料夾>/mk_tiles.json、mk_notes.json、fin_news.json、inv_brief.json，有 Cover Call 表才有 cc_ref.json；
         早報、晚報另外寫 news_<星期幾 1～7>.json（財經＋生活新聞），給首頁的「新聞」區；
-        每週同一天會蓋掉上週那天的檔，所以首頁永遠有最近 7 天的新聞，不用另外刪
+        每週同一天會蓋掉上週那天的檔，所以首頁永遠有最近 7 天的新聞，不用另外刪；
+        data.json 有 news_digest（各類別一段摘要）時另外寫 news_digest.json，首頁顯示最新一份，
+        摘要裡的連結只留本報新聞列過的網址（AI 自己生出來的網址會變成純文字）
         最後一行印出 BYTES {檔名: 位元組數}
 """
 import datetime
 import json
 import os
+import re
 import sys
 
 TZ = datetime.timezone(datetime.timedelta(hours=8))  # 台北沒有夏令時間
@@ -45,6 +48,27 @@ def text_items(b):
         else:
             out.append(('', str(it)))
     return out
+
+
+DIGEST_CATS = ('台股', '美股', '總經', '生活')
+LINK = re.compile(r'\[([^\]\n]+)\]\(([^)\s]+)\)')
+
+
+def norm_url(u):
+    return re.sub(r'[?#].*$', '', str(u or '')).rstrip('/')
+
+
+def digest(data, urls):
+    """news_digest → [{cat, text}]：類別照固定順序、空的不留、連結只留新聞列過的網址"""
+    ok = {norm_url(u) for u in urls}
+    def fix(m):
+        text, url = m.group(1), m.group(2)
+        return m.group(0) if url.startswith(('https://', 'http://')) and norm_url(url) in ok else text
+    by = {}
+    for it in data.get('news_digest') or []:
+        if isinstance(it, dict) and it.get('cat') in DIGEST_CATS and str(it.get('text') or '').strip():
+            by.setdefault(it['cat'], []).append(LINK.sub(fix, str(it['text']).strip()))
+    return [{'cat': c, 'text': '\n'.join(by[c])} for c in DIGEST_CATS if c in by]
 
 
 def convert(slot, data, now):
@@ -120,6 +144,9 @@ def convert(slot, data, now):
         out['cc_ref.json'] = uniq(cc, 'code')
     if slot in ('早報', '晚報'):
         out[f'news_{now.isoweekday()}.json'] = home
+        dg = digest(data, [r['url'] for r in home])
+        if dg:  # 沒寫摘要（例如週日晚報）就不寫檔，首頁繼續顯示上一份
+            out['news_digest.json'] = {'by': slot, 'at': at, 'items': dg}
     return out
 
 
@@ -144,6 +171,11 @@ def selftest():
         'summary_invest': '假的重點',
         'news_fin': [{'t': 'news', 'title': '財經新聞', 'items': [{'title': 'A', 'src': 'S', 'url': 'https://example.test/a', 'rel': 'r'}, {'title': 'A', 'src': 'S2'}]}],
         'news_life': [{'t': 'news', 'title': '生活新聞', 'items': [{'title': 'L', 'src': 'S3', 'url': 'https://example.test/l'}, {'title': 'X', 'url': 'javascript:alert(1)'}]}],
+        'news_digest': [
+            {'cat': '生活', 'text': '假生活摘要[L](https://example.test/l/)。'},
+            {'cat': '台股', 'text': '假台股摘要[A](https://example.test/a?x=1)，[編的](https://example.test/fake)，[壞](javascript:alert)。'},
+            {'cat': '其他', 'text': '不該出現'}, {'cat': '美股', 'text': '  '},
+        ],
         'invest': [
             {'t': 'watch', 'title': '今日觀察', 'items': [{'lvl': 'look', 'text': '假觀察'}]},
             {'t': 'market', 'title': '美股收盤', 'tiles': [{'name': 'X 指數', 'value': 100, 'pct': 1.0}], 'summary': '一句話'},
@@ -166,6 +198,11 @@ def selftest():
     check('每列都標報別與時間', all(r['by'] == '早報' and r['at'].startswith('2026-01-05T08:50') for r in out['mk_tiles.json']))
     hn = out.get('news_1.json')  # 2026-01-05 是週一
     check('首頁新聞檔：財經＋生活、只留 http 網址', hn is not None and [(r['cat'], r['title']) for r in hn] == [('財經', 'A'), ('生活', 'L')])
+    dg = out.get('news_digest.json')
+    check('摘要：類別照順序、去掉空的與不認識的', dg and dg['by'] == '早報' and [r['cat'] for r in dg['items']] == ['台股', '生活'])
+    check('摘要：只留新聞列過的網址', dg and dg['items'][0]['text'] == '假台股摘要[A](https://example.test/a?x=1)，編的，壞。'
+          and '[L](https://example.test/l/)' in dg['items'][1]['text'])
+    check('沒寫摘要就不寫摘要檔', 'news_digest.json' not in convert('晚報', {**data, 'news_digest': []}, now))
     check('週回顧不寫首頁新聞檔', not any(k.startswith('news_') for k in convert('週回顧', data, now)))
     print('PASS' if ok else 'FAIL')
     return ok

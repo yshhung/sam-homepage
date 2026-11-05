@@ -101,6 +101,13 @@ h2::before { content: ""; width: 3px; height: 13px; background: var(--acc); bord
 .n-row.life { border-left-color: var(--live); }
 .n-title { font-size: 15px; line-height: 1.45; color: var(--fg); overflow-wrap: anywhere; }
 .n-title:hover { text-decoration: underline; }
+.n-digest { display: grid; gap: 10px; }
+.n-dig { display: grid; gap: 6px; border-left: 3px solid var(--acc); padding: 2px 0 2px 12px; }
+.n-dig.life { border-left-color: var(--live); }
+.n-dig .chip { justify-self: start; }
+.n-dig p { margin: 0; font-size: 15px; line-height: 1.7; white-space: pre-line; overflow-wrap: anywhere; }
+.n-dig a { color: var(--acc); text-decoration: underline; text-underline-offset: 3px; }
+.wk-card .focus-list[hidden] { display: none; }
 
 /* 即時資訊條 */
 .wk-strip { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }

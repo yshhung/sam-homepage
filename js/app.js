@@ -6,7 +6,7 @@ import { DemoStore, ExcelStore } from './store.js';
 import {
   demoCalendar, demoCompany, demoHecho, demoInvest, demoLife, demoMail, demoNews, demoTickTick,
   getCalendar, getCompany, getFx, getHecho, getInvest, getLife, getMail, getNews, getTickTick, getWeather, hechoSummary,
-  investView, lifeView, newsView,
+  digestView, investView, lifeView, newsView,
 } from './sources.js';
 import { dateStr, diffDays, el, relDay, shortDate, timeStr } from './util.js';
 
@@ -22,9 +22,9 @@ const TICKTICK_WEB = 'https://ticktick.com/webapp/';
 const state = {
   store: null,
   cards: [], settings: { ...CONFIG.defaults },
-  events: [], weather: null, fx: null, mail: [], hecho: null, company: null, ticktick: null, invest: null, life: null, news: [],
+  events: [], weather: null, fx: null, mail: [], hecho: null, company: null, ticktick: null, invest: null, life: null, news: [], digests: [],
   errors: {}, syncedAt: null, loading: false,
-  showUpcoming: false, showAllNews: false, showAllFocus: false,
+  showUpcoming: false, showAllNews: false, showAllFocus: false, showNewsList: false,
 };
 
 // ---------- 組出今日重點 ----------
@@ -306,10 +306,23 @@ const NEWS_FIRST = 6;
 const FOCUS_FIRST = 5;
 function renderNews(today) {
   const items = newsView(state.news);
-  $('news-sec').hidden = $('news').hidden = !items.length && !state.errors.news;
-  $('news-count').textContent = items.length ? String(items.length) : '';
-  const shown = state.showAllNews ? items : items.slice(0, NEWS_FIRST);
+  const dg = digestView(state.digests);
+  $('news-sec').hidden = $('news').hidden = !items.length && !dg && !state.errors.news;
   const dayLabel = (d) => { const n = diffDays(today, d); return n === 0 ? '今天' : n === 1 ? '昨天' : shortDate(d); };
+  // 有摘要：顯示最新一份摘要，新聞列表收在下面；還沒有摘要：照舊顯示列表
+  $('news-h').textContent = dg ? '新聞摘要' : '早報、晚報整理的新聞';
+  $('news-count').textContent = dg ? `${dg.by} · ${dayLabel(dg.day)} ${dg.time}` : items.length ? String(items.length) : '';
+  $('news-digest').hidden = !dg;
+  $('news-digest').replaceChildren(...(dg ? dg.items.map((it) => el('div', { class: `n-dig ${it.cat === '生活' ? 'life' : 'fin'}` },
+    el('span', { class: 'chip' }, it.from ? `${it.cat} · ${it.from}` : it.cat),
+    el('p', {}, ...it.parts.map((p) => (p.url ? el('a', { href: p.url, target: '_blank', rel: 'noopener noreferrer' }, p.text) : p.text))))) : []));
+  const listOpen = !dg || state.showNewsList;
+  $('news-list').hidden = !listOpen;
+  const toggle = $('btn-news-list');
+  toggle.hidden = !dg || !items.length;
+  toggle.textContent = state.showNewsList ? '▾ 收起新聞列表' : `▸ 看新聞列表（7 天內 ${items.length} 則）`;
+  if (!listOpen) { $('btn-news-more').hidden = true; return; }
+  const shown = state.showAllNews ? items : items.slice(0, NEWS_FIRST);
   $('news-list').replaceChildren(...(items.length ? shown.map((n) => el('li', { class: `n-row ${n.cat === '生活' ? 'life' : 'fin'}` },
     el('a', { class: 'n-title', href: n.url, target: '_blank', rel: 'noopener noreferrer' }, n.title),
     el('div', { class: 'f-meta' }, el('span', { class: 'chip' }, n.cat), ` ${[n.src, `${dayLabel(n.day)}${n.by}`, n.rel].filter(Boolean).join(' · ')}`)))
@@ -413,6 +426,7 @@ function openClaude() {
 $('btn-refresh').addEventListener('click', () => refresh());
 $('btn-upcoming').addEventListener('click', () => { state.showUpcoming = !state.showUpcoming; render(); });
 $('btn-focus-more').addEventListener('click', () => { state.showAllFocus = !state.showAllFocus; render(); });
+$('btn-news-list').addEventListener('click', () => { state.showNewsList = !state.showNewsList; render(); });
 $('btn-news-more').addEventListener('click', () => { state.showAllNews = !state.showAllNews; render(); });
 $('btn-account').addEventListener('click', () => (getAccount() ? logout() : login()));
 
@@ -464,7 +478,7 @@ async function refresh() {
   if (ticktick !== undefined) state.ticktick = ticktick;
   if (invest !== undefined) state.invest = invest;
   if (life !== undefined) state.life = life;
-  if (news) state.news = news;
+  if (news) { state.news = news.rows; state.digests = news.digests; }
   state.syncedAt = timeStr();
   state.loading = false;
   render();

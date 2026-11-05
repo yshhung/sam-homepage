@@ -300,12 +300,13 @@ export function lifeView(life, ticktick, today) {
   return { num, text: parts.join('；'), link: trip?.url || '', alerts };
 }
 
-// ---------- 新聞：早報、晚報整理的（保留 7 天） ----------
-// 雲端報告每天寫 投資資料/市場/<早報|晚報>/news_<星期幾>.json，下週同一天蓋掉，所以最多 14 個檔。
+// ---------- 新聞：早報、晚報整理的 ----------
+// 雲端報告每次寫 投資資料/市場/<早報|晚報>/news_digest.json（各類別一段摘要，首頁只顯示最新一份），
+// 另外每天寫 news_<星期幾>.json（新聞列表，下週同一天蓋掉，所以保留 7 天，收在摘要下面）。
 // 檔沒變就用上次讀過的（記在這台裝置），每次重新整理只多 2 個列資料夾的請求。
 
 const NEWS_DIRS = ['投資資料/市場/早報', '投資資料/市場/晚報'];
-const NEWS_CACHE = 'sam.news.v1';
+const NEWS_CACHE = 'sam.news.v2';
 
 export async function getNews() {
   let cache = {};
@@ -320,27 +321,68 @@ export async function getNews() {
       throw e;
     }
   }));
-  const files = lists.flat().filter((f) => /^news_[1-7]\.json$/.test(f.name));
+  const files = lists.flat().filter((f) => /^news_([1-7]|digest)\.json$/.test(f.name));
   const parts = await Promise.all(files.map(async (f) => {
     const k = `${f.id}@${f.lastModifiedDateTime}`;
-    if (!cache[k]) {
-      const rows = await (await graph(`/me/drive/items/${encodeURIComponent(f.id)}/content`, { raw: true })).json();
-      cache[k] = Array.isArray(rows) ? rows : [];
-    }
+    if (cache[k] === undefined) cache[k] = await (await graph(`/me/drive/items/${encodeURIComponent(f.id)}/content`, { raw: true })).json();
     next[k] = cache[k];
-    return next[k];
+    return { digest: f.name === 'news_digest.json', data: next[k] };
   }));
   try { localStorage.setItem(NEWS_CACHE, JSON.stringify(next)); } catch { /* 存不了就下次重讀 */ }
-  return parts.flat();
+  return {
+    rows: parts.filter((p) => !p.digest && Array.isArray(p.data)).flatMap((p) => p.data),
+    digests: parts.filter((p) => p.digest && p.data && typeof p.data === 'object').map((p) => p.data),
+  };
 }
 
 export function demoNews() {
   const t = dateStr();
-  return [
+  const digest = {
+    by: '早報', at: `${t}T08:50:00+08:00`,
+    items: [
+      { cat: '台股', text: '示範：某指數[收漲 1%](https://example.com/)，電子股帶動。' },
+      { cat: '美股', text: '示範：某公司[公布財報](https://example.com/)，盤後上漲；另一檔持平。' },
+      { cat: '總經', text: '示範：今晚公布某項經濟數據，市場預期持平。' },
+      { cat: '生活', text: '示範：[某項長照補助上路](https://example.com/)，申請方式簡化。' },
+    ],
+  };
+  return { digests: [digest], rows: [
     { title: '示範財經新聞：某指數收漲', src: '示範來源', url: 'https://example.com/', rel: '示範說明', cat: '財經', by: '早報', at: `${t}T08:50:00+08:00` },
     { title: '示範生活新聞：某項補助上路', src: '示範來源', url: 'https://example.com/', rel: '', cat: '生活', by: '早報', at: `${t}T08:50:00+08:00` },
     { title: '示範財經新聞：某公司公布財報', src: '示範來源', url: 'https://example.com/', rel: '', cat: '財經', by: '晚報', at: `${addDays(t, -1)}T22:05:00+08:00` },
-  ];
+  ] };
+}
+
+// 摘要：取最新一份（3 天內）；最新那份沒有的類別（例如晚報沒有生活），用 24 小時內另一份補上並標出是哪份；
+// 類別照固定順序；[文字](網址) 拆成文字與連結（只認 http(s)）
+const DIGEST_CATS = ['台股', '美股', '總經', '生活'];
+const LINK_RE = /\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g;
+export function digestView(digests, now = new Date()) {
+  const all = (Array.isArray(digests) ? digests : [])
+    .filter((x) => x && Array.isArray(x.items) && x.items.length && Date.parse(x.at) >= now.getTime() - 3 * 86400000)
+    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+  const d = all[0];
+  if (!d) return null;
+  const items = DIGEST_CATS.map((cat) => {
+    const has = (x) => x.items.some((it) => it && it.cat === cat && String(it.text || '').trim());
+    const src = has(d) ? d : all.find((x) => has(x) && Date.parse(d.at) - Date.parse(x.at) <= 86400000);
+    if (!src) return null;
+    const text = src.items.filter((it) => it && it.cat === cat).map((it) => String(it.text || '').trim()).filter(Boolean).join('\n')
+      .replace(/\[([^\]\n]+)\]\((?!https?:\/\/)[^)\s]*\)/g, '$1');
+    if (!text) return null;
+    const parts = [];
+    let last = 0;
+    for (const m of text.matchAll(LINK_RE)) {
+      if (m.index > last) parts.push({ text: text.slice(last, m.index) });
+      parts.push({ text: m[1], url: m[2] });
+      last = m.index + m[0].length;
+    }
+    if (last < text.length) parts.push({ text: text.slice(last) });
+    return { cat, parts, from: src === d ? '' : src.by || '' };
+  }).filter(Boolean);
+  if (!items.length) return null;
+  const at = new Date(d.at);
+  return { by: d.by || '', day: dateStr(at), time: `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`, items };
 }
 
 // 只留 7 天內、網址是 http(s) 的；同一個網址只留最新一次；新的在前
