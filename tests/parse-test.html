@@ -8,7 +8,9 @@
 <body>
 <h1>和果、投資、生活資料解析測試</h1>
 <ul id="out"></ul>
+<script src="../vendor/lunar-javascript-1.7.7.js"></script>
 <script type="module">
+import { almanac, almanacText, toTrad } from '../js/almanac.js';
 import { digestView, hechoSummary, investView, lifeView, newsView, parseCsv } from '../js/sources.js';
 
 const out = document.getElementById('out');
@@ -105,6 +107,13 @@ const dv2 = digestView([
 check('晚報沒有的類別用早報補、標出來源', dv2 && dv2.by === '晚報' && dv2.items.map((i) => `${i.cat}:${i.parts[0].text}:${i.from}`).join('|') === '台股:晚上的台股:|生活:早上的生活:早報', JSON.stringify(dv2));
 check('摘要超過 3 天不顯示', digestView([{ by: '早報', at: '2026-01-01T08:50:00+08:00', items: [{ cat: '台股', text: 'x' }] }], nnow) === null);
 check('摘要沒有資料不會壞', digestView(null, nnow) === null);
+
+// 農民曆（套件離線計算；春節日期是公開的固定資料）
+check('農曆：2026/2/17 是正月初一', almanac('2026-02-17')?.lunar === '正月初一', JSON.stringify(almanac('2026-02-17')));
+check('農曆：2025/1/29 是正月初一', almanac('2025-01-29')?.lunar === '正月初一');
+check('節氣：2026/2/4 立春', almanac('2026-02-04')?.term === '立春', almanac('2026-02-04')?.term);
+check('宜忌轉繁體、各 3 項', (() => { const a = almanac('2026-11-05'); return a && a.yi.length <= 3 && a.ji.length <= 3 && !/[开动纳盖坏门会进]/.test(a.yi.join('') + a.ji.join('')); })(), almanacText('2026-11-05'));
+check('簡轉繁', toTrad('开市、动土、纳财') === '開市、動土、納財');
 
 document.title = failed ? `FAIL ${failed}` : 'PASS';
 </script>

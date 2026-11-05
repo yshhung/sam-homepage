@@ -1,9 +1,9 @@
 // 只快取首頁本身的檔案，讓它開得快；資料一律即時抓，不快取。
-const VERSION = 'v16';
+const VERSION = 'v17';
 const SHELL = [
   './', 'index.html', 'styles.css', 'config.js', 'manifest.webmanifest', 'template/SamHomepage.xlsx',
-  'vendor/msal-browser-3.28.1.min.js',
-  'js/app.js', 'js/auth.js', 'js/store.js', 'js/sources.js', 'js/util.js',
+  'vendor/msal-browser-3.28.1.min.js', 'vendor/lunar-javascript-1.7.7.js',
+  'js/app.js', 'js/almanac.js', 'js/auth.js', 'js/store.js', 'js/sources.js', 'js/util.js',
   'invest.html', 'invest.css', 'vendor/d3-7.9.0.min.js', 'js/invest/shim.js', 'js/invest/data.js', 'js/invest/load.js',
   'js/invest/page0.js', 'js/invest/page1.js', 'js/invest/page2.js', 'js/invest/page3.js', 'js/invest/page4.js', 'js/invest/page5.js',
   'icons/icon-192.png', 'icons/apple-touch-icon.png',

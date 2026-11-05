@@ -110,13 +110,20 @@ h2::before { content: ""; width: 3px; height: 13px; background: var(--acc); bord
 .wk-card .focus-list[hidden] { display: none; }
 
 /* 即時資訊條 */
-.wk-strip { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.wk-strip { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 10px; }
 @media (min-width: 760px) { .wk-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; } }
 .tile { background: linear-gradient(180deg, var(--panel2), var(--panel)); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; }
 .tile .k { font-size: 11px; letter-spacing: .1em; color: var(--muted); }
 .tile .v { font-size: clamp(1.25rem, 3vw, 1.7rem); font-weight: 650; letter-spacing: -.02em; margin: 6px 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tile .v.up { color: var(--live); }
 .tile .v.down { color: var(--bad); }
+.tile.asset .s { display: grid; gap: 1px; -webkit-line-clamp: unset; }
+.tile.asset .ln { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile.asset .ln.split { white-space: normal; }
+.tile.asset .ln.split > span { display: inline-block; white-space: nowrap; margin-right: 6px; }
+.tile.asset .up { color: var(--live); }
+.tile.asset .down { color: var(--bad); }
+.tile.asset b { font-weight: 600; }
 .tile .s { font-size: 12px; color: var(--muted); line-height: 1.5; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 
 /* 領域卡片 */

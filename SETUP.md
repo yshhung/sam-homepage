@@ -91,6 +91,7 @@ powershell -ExecutionPolicy Bypass -File tools/serve.ps1
 | 只有你能用：Entra 企業應用程式「Sam Homepage」→ 屬性 →「需要指派」= 是，只指派裕勝 | ✅ |
 | 權限最小化：信件只用 `Mail.Read`（首頁不能改、不能刪信），已撤銷 `Mail.ReadWrite` | ✅ |
 | 登入程式放在本站：`vendor/msal-browser-3.28.1.min.js`，已比對與 npm 官方套件 `@azure/msal-browser@3.28.1` 完全相同 | ✅ |
+| 農民曆程式放在本站：`vendor/lunar-javascript-1.7.7.js`（MIT，授權見 `vendor/lunar-javascript-LICENSE.txt`），是 npm 官方 `lunar-javascript@1.7.7` 套件裡的 `lunar.js`，套件 sha512 與 npm 登記的一致；離線計算，不連外網 | ✅ |
 | 內容安全政策（CSP）：程式只能從本站載入；只能連到微軟、天氣、匯率這幾個網址 | ✅ |
 | 和果只讀數字：只讀 `hechotc_handover_stats.json`，完整交班檔（有照護紀錄）一律不下載 | ✅ 2026-11-04 |
 | GitHub 兩步驟驗證 | ⚠️ 請自己確認（見下方） |

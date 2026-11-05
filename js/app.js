@@ -9,6 +9,7 @@ import {
   digestView, investView, lifeView, newsView,
 } from './sources.js';
 import { dateStr, diffDays, el, relDay, shortDate, timeStr } from './util.js';
+import { almanacText } from './almanac.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -182,7 +183,8 @@ function render() {
 
   const { focus, upcoming } = buildFocus();
   const overdue = focus.filter((e) => e.overdue).length;
-  $('today-line').textContent = `${shortDate(today)} · ${focus.length ? `${focus.length} 件重點${overdue ? `，其中 ${overdue} 件逾期` : ''}` : '今天沒有需要處理的事'}`;
+  const alm = almanacText(today);
+  $('today-line').textContent = `${shortDate(today)}${alm ? ` · ${alm}` : ''} · ${focus.length ? `${focus.length} 件重點${overdue ? `，其中 ${overdue} 件逾期` : ''}` : '今天沒有需要處理的事'}`;
 
   renderStatus();
 
@@ -258,10 +260,7 @@ function renderStrip(today) {
   const wt = w?.days?.find((d) => d.date === today);
   tiles.push(tile(`天氣 · ${CONFIG.weather.name}`, w ? `${w.now}°C` : '—', wt ? `${w.text} · ${wt.min}–${wt.max}° · 雨 ${wt.rain}%` : state.errors.weather ? '抓不到' : '載入中'));
 
-  const fx = state.fx;
-  tiles.push(tile('美元 / 台幣', fx ? fx.rate.toFixed(2) : '—',
-    fx ? `${fx.change > 0 ? '▲' : fx.change < 0 ? '▼' : ''} ${Math.abs(fx.change).toFixed(2)}% · ${fx.date.slice(5)}` : state.errors.fx ? '抓不到' : '載入中',
-    fx && fx.change !== 0 ? (fx.change > 0 ? 'up' : 'down') : ''));
+  tiles.push(assetTile(today));
 
   const todays = state.events.filter((ev) => ev.start.slice(0, 10) === today);
   const next = todays.find((ev) => ev.allDay || ev.end >= `${today}T${timeStr()}`);
@@ -275,6 +274,31 @@ function renderStrip(today) {
     state.ticktick ? (overdue ? `${overdue} 件逾期` : '沒有逾期') : state.errors.ticktick ? '抓不到' : '還沒同步', overdue ? 'down' : ''));
 
   $('strip').replaceChildren(...tiles);
+}
+
+// 總資產：台股＋美股合計（invest.json）；今日變動用美股習慣：漲綠、跌紅
+function assetTile(today) {
+  const inv = state.invest;
+  if (!inv?.totalTwd) return tile('總資產', '—', state.errors.invest ? '抓不到' : state.loading ? '載入中' : '還沒同步');
+  const sign = (v) => (v > 0 ? '+' : v < 0 ? '−' : '');
+  const tone = (v) => (v > 0 ? 'up' : v < 0 ? 'down' : '');
+  const pct = (v) => (typeof v === 'number' ? `${sign(v)}${Math.abs(v).toFixed(2)}%` : '—');
+  const big = `${(inv.totalTwd / 10000).toLocaleString('zh-TW', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} 萬`;
+  const age = inv.updated ? diffDays(today, inv.updated.slice(0, 10)) : 99;
+  const lines = [];
+  if (typeof inv.dayPct === 'number') {
+    const amt = Math.round(inv.totalTwd * inv.dayPct / (100 + inv.dayPct));
+    const a = Math.abs(amt);
+    const amtText = a >= 10000 ? `${(a / 10000).toFixed(1)} 萬` : a.toLocaleString('en-US');
+    lines.push(el('span', { class: `ln ${tone(inv.dayPct)}` }, `今日 ${sign(amt)}${amtText}（${pct(inv.dayPct)}）`));
+  }
+  if (age >= 3) lines.push(el('span', { class: 'ln' }, `${age} 天沒更新`));
+  else if (typeof inv.cathayDayPct === 'number' || typeof inv.schwabDayPct === 'number') {
+    lines.push(el('span', { class: 'ln split' },
+      el('span', {}, '台股 ', el('b', { class: tone(inv.cathayDayPct) }, pct(inv.cathayDayPct))), ' ',
+      el('span', {}, '美股 ', el('b', { class: tone(inv.schwabDayPct) }, pct(inv.schwabDayPct)))));
+  }
+  return el('div', { class: 'tile asset' }, el('div', { class: 'k' }, '總資產（NT$）'), el('div', { class: 'v' }, big), el('div', { class: 's' }, ...lines));
 }
 
 function tile(k, v, s, tone = '') {
