@@ -24,7 +24,7 @@ const state = {
   cards: [], settings: { ...CONFIG.defaults },
   events: [], weather: null, fx: null, mail: [], hecho: null, company: null, ticktick: null, invest: null, life: null, news: [],
   errors: {}, syncedAt: null, loading: false,
-  showUpcoming: false, showAllNews: false,
+  showUpcoming: false, showAllNews: false, showAllFocus: false,
 };
 
 // ---------- 組出今日重點 ----------
@@ -187,8 +187,12 @@ function render() {
   renderStatus();
 
   const list = $('focus-list');
-  list.replaceChildren(...(focus.length ? focus.map(focusRow) : [el('li', { class: 'empty' }, '✓ 今天沒有重點，放心做別的事')]));
+  const shownFocus = state.showAllFocus ? focus : focus.slice(0, FOCUS_FIRST);
+  list.replaceChildren(...(focus.length ? shownFocus.map(focusRow) : [el('li', { class: 'empty' }, '✓ 今天沒有重點，放心做別的事')]));
   $('focus-count').textContent = focus.length ? String(focus.length) : '';
+  const focusMore = $('btn-focus-more');
+  focusMore.hidden = focus.length <= FOCUS_FIRST;
+  focusMore.textContent = state.showAllFocus ? '▾ 收起' : `▸ 再看 ${focus.length - FOCUS_FIRST} 件`;
 
   const upBtn = $('btn-upcoming');
   upBtn.hidden = upcoming.length === 0;
@@ -299,6 +303,7 @@ function renderDomains(focus) {
 
 // 新聞：早報、晚報整理的，點標題開原文（新分頁）
 const NEWS_FIRST = 6;
+const FOCUS_FIRST = 5;
 function renderNews(today) {
   const items = newsView(state.news);
   $('news-sec').hidden = $('news').hidden = !items.length && !state.errors.news;
@@ -407,6 +412,7 @@ function openClaude() {
 
 $('btn-refresh').addEventListener('click', () => refresh());
 $('btn-upcoming').addEventListener('click', () => { state.showUpcoming = !state.showUpcoming; render(); });
+$('btn-focus-more').addEventListener('click', () => { state.showAllFocus = !state.showAllFocus; render(); });
 $('btn-news-more').addEventListener('click', () => { state.showAllNews = !state.showAllNews; render(); });
 $('btn-account').addEventListener('click', () => (getAccount() ? logout() : login()));
 
