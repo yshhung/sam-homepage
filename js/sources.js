@@ -436,8 +436,42 @@ const WX = {
   61: '小雨', 63: '雨', 65: '大雨', 80: '陣雨', 81: '陣雨', 82: '強陣雨', 95: '雷雨', 96: '雷雨', 99: '雷雨',
 };
 
-export async function getWeather() {
-  const { lat, lon } = CONFIG.weather;
+// 目前位置：瀏覽器定位（第一次會問要不要允許），座標只留到小數 2 位（約 1 公里）
+// 不允許、太久沒回應或沒有定位功能，就用設定裡的土城
+function currentPosition() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ lat: Math.round(p.coords.latitude * 100) / 100, lon: Math.round(p.coords.longitude * 100) / 100 }),
+      () => resolve(null),
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 15 * 60 * 1000 },
+    );
+  });
+}
+
+// 座標換地名（BigDataCloud 免費服務，不用金鑰）；同一個座標記在這台裝置，不重複問
+async function placeName(lat, lon) {
+  const key = `place:${lat},${lon}`;
+  try { const hit = localStorage.getItem(key); if (hit) return hit; } catch { /* 無痕模式等 */ }
+  try {
+    const q = new URLSearchParams({ latitude: lat, longitude: lon, localityLanguage: 'zh-Hant' });
+    const r = await (await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?${q}`)).json();
+    const name = (r.city && r.locality && !r.locality.startsWith(r.city) ? `${r.city}${r.locality}` : r.locality || r.city || '').trim();
+    if (name) { try { localStorage.setItem(key, name); } catch { /* 存不了也沒關係 */ } }
+    return name || '目前位置';
+  } catch {
+    return '目前位置';
+  }
+}
+
+export async function getLocation() {
+  const pos = await currentPosition();
+  if (!pos) return { ...CONFIG.weather, here: false };
+  return { ...pos, name: await placeName(pos.lat, pos.lon), here: true };
+}
+
+export async function getWeather(loc = CONFIG.weather) {
+  const { lat, lon } = loc;
   const q = new URLSearchParams({
     latitude: lat, longitude: lon, timezone: 'Asia/Taipei', forecast_days: '3',
     current: 'temperature_2m,weather_code',
@@ -451,7 +485,7 @@ export async function getWeather() {
     rain: r.daily.precipitation_probability_max[i] ?? 0,
     text: WX[r.daily.weather_code[i]] || '',
   }));
-  return { now: Math.round(r.current.temperature_2m), text: WX[r.current.weather_code] || '', days };
+  return { now: Math.round(r.current.temperature_2m), text: WX[r.current.weather_code] || '', days, place: loc.name || CONFIG.weather.name, here: !!loc.here };
 }
 
 // 匯率資料每天更新一次；拿最新一天跟前一天比

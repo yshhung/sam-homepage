@@ -5,7 +5,7 @@ import { getAccount, initAuth, isConfigured, login, logout } from './auth.js';
 import { DemoStore, ExcelStore } from './store.js';
 import {
   demoCalendar, demoCompany, demoHecho, demoInvest, demoLife, demoMail, demoMonthDays, demoNews, demoTickTick,
-  getCalendar, getCompany, getFx, getHecho, getInvest, getLife, getMail, getMonthDays, getNews, getTickTick, getWeather, hechoSummary,
+  getCalendar, getCompany, getFx, getHecho, getInvest, getLife, getLocation, getMail, getMonthDays, getNews, getTickTick, getWeather, hechoSummary,
   digestView, investView, lifeView, newsView,
 } from './sources.js';
 import { addDays, dateStr, diffDays, el, relDay, shortDate, timeStr, weekday } from './util.js';
@@ -257,8 +257,8 @@ function renderCal(today) {
   const [y, m, d] = today.split('-').map(Number);
   const a = almanac(today, 6);
   const left = el('div', { class: 'cal-today' },
-    el('div', { class: 'cal-ym' }, `${y} 年 ${m} 月 · 星期${weekday(today)}`),
-    el('div', { class: 'cal-day' }, String(d)),
+    el('div', { class: 'cal-ym' }, `${y} 年 · 星期${weekday(today)}`),
+    el('div', { class: 'cal-day' }, `${m}/${d}`),
     a ? el('div', { class: 'cal-lunar' }, `農曆${a.lunar}`, a.term ? el('span', { class: 'chip' }, a.term) : null) : null,
     a?.yi.length ? el('div', { class: 'cal-yj yi' }, el('b', {}, '宜'), el('span', {}, a.yi.join('、'))) : null,
     a?.ji.length ? el('div', { class: 'cal-yj ji' }, el('b', {}, '忌'), el('span', {}, a.ji.join('、'))) : null,
@@ -284,7 +284,8 @@ function renderCal(today) {
 // 日曆卡片裡的天氣：現在溫度＋今天高低溫與降雨，再加明天、後天
 function calWeather(today) {
   const w = state.weather;
-  const head = el('div', { class: 'cal-wx-k' }, `天氣 · ${CONFIG.weather.name}`);
+  const head = el('div', { class: 'cal-wx-k', title: w?.here ? '依這台裝置的目前位置' : '沒有取得目前位置，用預設地點' },
+    `天氣 · ${w?.place || CONFIG.weather.name}${w?.here ? ' 📍' : ''}`);
   if (!w) return el('div', { class: 'cal-wx' }, head, el('div', { class: 'cal-wx-s' }, state.errors.weather ? '抓不到' : '載入中'));
   const s = state.settings;
   const rainy = (d) => d.rain >= s.雨機率門檻;
@@ -522,7 +523,7 @@ async function refresh() {
   const [db, events, weather, fx, mail, hecho, company, ticktick, invest, life, news, monthDays] = await Promise.all([
     settle('data', state.store.load()),
     live ? settle('calendar', getCalendar()) : Promise.resolve(demoCalendar()),
-    settle('weather', getWeather()),
+    settle('weather', getLocation().then(getWeather)),
     settle('fx', getFx()),
     live ? settle('mail', getMail()) : Promise.resolve(demoMail()),
     live ? settle('hecho', getHecho()) : Promise.resolve(demoHecho()),
