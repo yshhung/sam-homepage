@@ -32,6 +32,21 @@ export function almanac(date, n = 3) {
   }
 }
 
+// 月曆格子裡的小字：節氣優先，初一顯示月份，其他顯示日（「廿七」）
+export function lunarDay(date) {
+  const Solar = globalThis.Solar;
+  if (!Solar?.fromYmd) return '';
+  try {
+    const [y, m, d] = date.split('-').map(Number);
+    const l = Solar.fromYmd(y, m, d).getLunar();
+    const term = l.getJieQi();
+    if (term) return toTrad(term);
+    return toTrad(l.getDay() === 1 ? `${l.getMonthInChinese()}月` : l.getDayInChinese());
+  } catch {
+    return '';
+  }
+}
+
 // 日期列用的一段文字：「農曆九月十五 · 宜 祭祀、出行、嫁娶 · 忌 動土、安葬、開市」
 export function almanacText(date) {
   const a = almanac(date);

@@ -10,8 +10,8 @@
 <ul id="out"></ul>
 <script src="../vendor/lunar-javascript-1.7.7.js"></script>
 <script type="module">
-import { almanac, almanacText, toTrad } from '../js/almanac.js';
-import { digestView, hechoSummary, investView, lifeView, newsView, parseCsv } from '../js/sources.js';
+import { almanac, almanacText, lunarDay, toTrad } from '../js/almanac.js';
+import { digestView, eventDays, hechoSummary, investView, lifeView, newsView, parseCsv } from '../js/sources.js';
 
 const out = document.getElementById('out');
 let failed = 0;
@@ -114,6 +114,17 @@ check('農曆：2025/1/29 是正月初一', almanac('2025-01-29')?.lunar === '�
 check('節氣：2026/2/4 立春', almanac('2026-02-04')?.term === '立春', almanac('2026-02-04')?.term);
 check('宜忌轉繁體、各 3 項', (() => { const a = almanac('2026-11-05'); return a && a.yi.length <= 3 && a.ji.length <= 3 && !/[开动纳盖坏门会进]/.test(a.yi.join('') + a.ji.join('')); })(), almanacText('2026-11-05'));
 check('簡轉繁', toTrad('开市、动土、纳财') === '開市、動土、納財');
+check('月曆小字：初一顯示月份', lunarDay('2026-02-17') === '正月', lunarDay('2026-02-17'));
+check('月曆小字：節氣優先', lunarDay('2026-02-04') === '立春', lunarDay('2026-02-04'));
+check('月曆小字：一般日子', lunarDay('2026-11-05') === '廿七', lunarDay('2026-11-05'));
+
+// 日曆打點：跨天行程每天都算，整天行程結束日（隔天 00:00）不算
+const ed = eventDays([
+  { start: '2026-11-05', end: '2026-11-05T10:00', allDay: false },
+  { start: '2026-11-10', end: '2026-11-12T00:00', allDay: true },
+  { start: '2026-11-20', end: '2026-11-21T09:00', allDay: false },
+]);
+check('日曆打點的日子', ed.join(',') === '2026-11-05,2026-11-10,2026-11-11,2026-11-20,2026-11-21', ed.join(','));
 
 document.title = failed ? `FAIL ${failed}` : 'PASS';
 </script>

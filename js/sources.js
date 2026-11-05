@@ -24,6 +24,36 @@ export async function getCalendar() {
   }));
 }
 
+// 日曆卡片用：這個月有 Outlook 行程的日子（只拿日期，不拿標題）
+export async function getMonthDays(today = dateStr()) {
+  const first = `${today.slice(0, 7)}-01`;
+  const next = addDays(first, 32).slice(0, 7);
+  const q = new URLSearchParams({
+    startDateTime: `${first}T00:00:00`, endDateTime: `${next}-01T00:00:00`,
+    $select: 'start,end,isAllDay,isCancelled', $top: '300',
+  });
+  const r = await graph(`/me/calendarView?${q}`, { headers: { Prefer: 'outlook.timezone="Asia/Taipei"' } });
+  return eventDays(r.value.filter((e) => !e.isCancelled).map((e) => ({
+    start: e.start.dateTime.slice(0, 10), end: e.end.dateTime.slice(0, 16), allDay: e.isAllDay,
+  })));
+}
+
+// 跨天的行程每天都算；整天行程的結束日是隔天 00:00，不算那天
+export function eventDays(events) {
+  const days = new Set();
+  for (const e of events) {
+    let last = e.end.slice(0, 10);
+    if (e.allDay || e.end.slice(11) === '00:00') last = addDays(last, -1);
+    if (last < e.start) last = e.start;
+    for (let d = e.start, i = 0; d <= last && i < 62; d = addDays(d, 1), i++) days.add(d);
+  }
+  return [...days].sort();
+}
+
+export function demoMonthDays(today = dateStr()) {
+  return [addDays(today, -3), today, addDays(today, 1), addDays(today, 6), addDays(today, 13)];
+}
+
 export function demoCalendar() {
   const t = dateStr();
   const tm = addDays(t, 1);

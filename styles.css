@@ -109,6 +109,33 @@ h2::before { content: ""; width: 3px; height: 13px; background: var(--acc); bord
 .n-dig a { color: var(--acc); text-decoration: underline; text-underline-offset: 3px; }
 .wk-card .focus-list[hidden] { display: none; }
 
+/* 日曆卡片：手機上下排，大螢幕左右排 */
+.cal { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+@media (min-width: 760px) { .cal { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 24px; align-items: center; } }
+.cal-today { display: grid; gap: 6px; align-content: center; min-width: 0; }
+.cal-ym { font-size: 12px; letter-spacing: .1em; color: var(--acc); }
+.cal-day { font-size: clamp(3.2rem, 9vw, 4.6rem); font-weight: 700; line-height: 1; letter-spacing: -.03em; }
+.cal-lunar { font-size: 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cal-lunar .chip { background: #0e2a3a; color: var(--acc); }
+.cal-yj { display: flex; gap: 8px; font-size: 14px; line-height: 1.6; align-items: baseline; }
+.cal-yj b { flex: none; width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; font-size: 12px; font-weight: 600; }
+.cal-yj.yi b { background: #0f2a1e; color: var(--live); }
+.cal-yj.ji b { background: #2a1414; color: var(--bad); }
+.cal-yj span { color: var(--fg); overflow-wrap: anywhere; }
+.cal-month { display: grid; gap: 6px; min-width: 0; }
+.cal-open { justify-self: end; font-size: 12px; color: var(--muted); }
+.cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; text-align: center; }
+.cal-w { font-size: 11px; color: var(--muted); padding: 2px 0 4px; }
+.cal-w.we, .cal-c.we .n { color: #c9a3a3; }
+.cal-c { position: relative; display: grid; gap: 1px; padding: 5px 0 8px; border-radius: 8px; min-width: 0; }
+.cal-c .n { font-size: 14px; font-weight: 550; }
+.cal-c .l { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: clip; }
+.cal-c.past { opacity: .45; }
+.cal-c.has::after { content: ""; position: absolute; left: 50%; bottom: 3px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--amb); }
+.cal-c.today { background: var(--acc); }
+.cal-c.today .n, .cal-c.today .l { color: #00141f; }
+.cal-c.today.has::after { background: #00141f; }
+
 /* 即時資訊條 */
 .wk-strip { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 10px; }
 @media (min-width: 760px) { .wk-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; } }
