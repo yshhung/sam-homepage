@@ -261,7 +261,8 @@ function renderCal(today) {
     el('div', { class: 'cal-day' }, String(d)),
     a ? el('div', { class: 'cal-lunar' }, `農曆${a.lunar}`, a.term ? el('span', { class: 'chip' }, a.term) : null) : null,
     a?.yi.length ? el('div', { class: 'cal-yj yi' }, el('b', {}, '宜'), el('span', {}, a.yi.join('、'))) : null,
-    a?.ji.length ? el('div', { class: 'cal-yj ji' }, el('b', {}, '忌'), el('span', {}, a.ji.join('、'))) : null);
+    a?.ji.length ? el('div', { class: 'cal-yj ji' }, el('b', {}, '忌'), el('span', {}, a.ji.join('、'))) : null,
+    calWeather(today));
 
   const days = new Set([...state.monthDays, ...state.events.map((ev) => ev.start.slice(0, 10))]);
   const first = `${today.slice(0, 7)}-01`;
@@ -280,12 +281,25 @@ function renderCal(today) {
   $('cal').replaceChildren(left, grid);
 }
 
+// 日曆卡片裡的天氣：現在溫度＋今天高低溫與降雨，再加明天、後天
+function calWeather(today) {
+  const w = state.weather;
+  const head = el('div', { class: 'cal-wx-k' }, `天氣 · ${CONFIG.weather.name}`);
+  if (!w) return el('div', { class: 'cal-wx' }, head, el('div', { class: 'cal-wx-s' }, state.errors.weather ? '抓不到' : '載入中'));
+  const s = state.settings;
+  const rainy = (d) => d.rain >= s.雨機率門檻;
+  const wt = w.days.find((d) => d.date === today);
+  const rest = w.days.filter((d) => d.date > today).slice(0, 2);
+  return el('div', { class: 'cal-wx' }, head,
+    el('div', { class: 'cal-wx-now' },
+      el('span', { class: 'cal-wx-t' }, `${w.now}°`),
+      el('span', {}, w.text, wt ? el('span', { class: 'cal-wx-s' }, ` · ${wt.min}–${wt.max}° · `, el('span', { class: rainy(wt) ? 'rain' : '' }, `雨 ${wt.rain}%`)) : null)),
+    rest.length ? el('div', { class: 'cal-wx-next' }, rest.map((d) =>
+      el('span', {}, `${diffDays(d.date, today) === 1 ? '明天' : '後天'} ${d.text} ${d.min}–${d.max}° `, el('span', { class: rainy(d) ? 'rain' : '' }, `雨 ${d.rain}%`)))) : null);
+}
+
 function renderStrip(today) {
   const tiles = [];
-  const w = state.weather;
-  const wt = w?.days?.find((d) => d.date === today);
-  tiles.push(tile(`天氣 · ${CONFIG.weather.name}`, w ? `${w.now}°C` : '—', wt ? `${w.text} · ${wt.min}–${wt.max}° · 雨 ${wt.rain}%` : state.errors.weather ? '抓不到' : '載入中'));
-
   tiles.push(assetTile(today));
 
   const todays = state.events.filter((ev) => ev.start.slice(0, 10) === today);
