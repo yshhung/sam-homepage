@@ -6,7 +6,7 @@ import { DemoStore, ExcelStore } from './store.js';
 import {
   demoCalendar, demoCompany, demoHecho, demoInvest, demoLife, demoMail, demoMonthDays, demoNews, demoTickTick,
   getCalendar, getCompany, getFx, getHecho, getInvest, getLife, getLocation, getMail, getMonthDays, getNews, getTickTick, getWeather, hechoSummary,
-  digestView, investView, lifeView, newsView,
+  digestView, investView, lifeView, newsView, planView,
 } from './sources.js';
 import { addDays, dateStr, diffDays, el, relDay, shortDate, timeStr, weekday } from './util.js';
 import { almanac, lunarDay } from './almanac.js';
@@ -111,6 +111,10 @@ function autoEntries(today) {
   // 投資：總資產變動超過門檻、數字太久沒更新
   const inv = investView(state.invest, today, s.投資變動門檻);
   for (const a of inv?.alerts || []) out.push({ key: `invest:${a.type}`, cat: '投資', domain: '投資', title: a.title, meta: a.meta, level: a.level, sort: a.type === 'day' ? 0.4 : 0.88 });
+  // 投資計畫書的觸發警報：觸發中就一直列著，條件解除自動消失
+  for (const a of planView(state.invest, today)?.alerts || []) {
+    out.push({ key: `plan:${a.key}`, cat: '投資', domain: '投資', title: a.isNew ? `🆕 ${a.title}` : a.title, meta: a.meta, level: a.lvl === 'risk' ? 'bad' : 'warn', sort: a.lvl === 'risk' ? 0.3 : 0.45 });
+  }
 
   // 生活：旅行快到了、規劃中的旅行還沒訂
   const life = lifeView(state.life, state.ticktick, today);
@@ -203,6 +207,7 @@ function render() {
 
   renderStrip(today);
   renderDomains(focus);
+  renderPlan(today);
   renderNews(today);
 
   const foot = [];
@@ -364,6 +369,30 @@ function renderDomains(focus) {
         link ? (/^https?:/.test(link) ? el('a', { href: link, target: '_blank', rel: 'noopener' }, '詳細 ↗') : el('a', { href: link }, '詳細 →')) : null));
   });
   $('domains').replaceChildren(...cards);
+}
+
+// 投資計畫：四池（等寬等高、手機 2×2、大螢幕一列 4 張）、觸發中的警報、小計
+function renderPlan(today) {
+  const v = planView(state.invest, today);
+  $('plan-sec').hidden = $('plan').hidden = !v;
+  if (!v) return;
+  const pools = v.pools.map((x) => el('div', { class: `pool ${x.tone}` },
+    el('div', { class: 'k' }, x.label),
+    el('div', { class: 'v' }, x.pct),
+    el('div', { class: 's' }, x.target),
+    el('div', { class: `s dev ${x.tone}` }, x.out ? `${x.dev}・超出區間` : x.dev),
+    el('div', { class: 's' }, x.sub || '\u00a0')));
+  const alerts = v.alerts.map((a) => el('li', { class: `f-row ${a.lvl === 'risk' ? 'bad' : 'warn'}` },
+    el('div', { class: 'f-body' },
+      el('div', { class: 'f-top' }, el('span', { class: 'chip' }, a.isNew ? '新觸發' : `${shortDate(a.since)} 起`), el('span', { class: 'f-title' }, a.title)),
+      el('div', { class: 'f-meta' }, a.meta))));
+  const stats = v.stats.map((x) => el('div', { class: `pstat ${x.tone || ''}` }, el('div', { class: 'k' }, x.k), el('div', { class: 'v' }, x.v), el('div', { class: 's' }, x.s)));
+  $('plan-pools').replaceChildren(...pools);
+  $('plan-alerts').hidden = !alerts.length;
+  $('plan-alerts').replaceChildren(...alerts);
+  $('plan-stats').replaceChildren(...stats);
+  $('plan-note').textContent = v.note;
+  $('plan-count').textContent = v.alerts.length ? `${v.alerts.length} 個警報觸發中` : '沒有觸發';
 }
 
 // 新聞：早報、晚報整理的，點標題開原文（新分頁）

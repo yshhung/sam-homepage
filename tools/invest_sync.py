@@ -10,7 +10,10 @@
   台股上市 TWSE OpenAPI、台股上櫃 TPEx OpenAPI、美股與選擇權 Yahoo Finance chart、匯率 currency-api。
 抓不到的價格沿用上一次的值，並在 invest.json 的 stalePrices 記數量。
 
-用法：python tools/invest_sync.py [--base 資料夾] [--expect holdings.json=位元組,state.json=位元組] [--dry-run]
+投資計畫書 v1 的四池與觸發警報在 tools/invest_plan.py：有抄 rules.json、plans.json 就算四池；
+加 --alerts（只有 07:30 每日同步加）才另外抓 S&P 500、VIX 與信念股的一年收盤，重新判斷警報。
+
+用法：python tools/invest_sync.py [--base 資料夾] [--expect holdings.json=位元組,state.json=位元組] [--alerts] [--dry-run]
       python tools/invest_sync.py --selftest   （只跑計算測試，不連網、不讀寫檔案）
 """
 import json
@@ -18,6 +21,9 @@ import os
 import sys
 import urllib.request
 from datetime import datetime, timedelta, timezone
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import invest_plan  # noqa: E402
 
 TPE = timezone(timedelta(hours=8))
 ONEDRIVE = os.environ.get('SAM_ONEDRIVE', r'C:\Users\YuSheng\OneDrive - 沁耘健康企業有限公司')
@@ -72,6 +78,46 @@ def yahoo_quote(symbol):
     earlier = [c for d, c in bars if d < day]
     prev = earlier[-1] if earlier else r['meta'].get('chartPreviousClose', price)
     return price, round(prev, 4) if prev is not None else None, day
+
+
+def yahoo_year(symbol):
+    """一年的日收盤：回傳 (最新收盤, 日期, 52 週收盤高點)。"""
+    r = get_json(f'https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=1y&interval=1d')['chart']['result'][0]
+    off = r['meta'].get('gmtoffset', 0)
+    bars = [(datetime.fromtimestamp(t + off, timezone.utc).strftime('%Y-%m-%d'), c)
+            for t, c in zip(r.get('timestamp') or [], r['indicators']['quote'][0].get('close') or []) if c is not None]
+    if not bars:
+        raise ValueError('沒有收盤資料')
+    return bars[-1][1], bars[-1][0], max(c for _, c in bars)
+
+
+def fetch_market(plans, errors):
+    """警報用：S&P 500 與 VIX 的收盤、信念股的 52 週收盤高點。S&P 500 抓不到就回傳 None（這次不判斷警報）。"""
+    try:
+        spx = yahoo_year('%5EGSPC')
+    except Exception as e:
+        errors.append(f'S&P 500 抓不到，警報沿用上次：{e}')
+        return None
+    market = {'spx': spx, 'year': {}}
+    try:
+        v = yahoo_year('%5EVIX')
+        market['vix'] = (v[0], v[1])
+    except Exception as e:
+        errors.append(f'VIX 抓不到：{e}')
+    for p in plans or []:
+        if p.get('pool') != 'conviction':
+            continue
+        code = p['code']
+        syms = [f'{code}.TW', f'{code}.TWO'] if p.get('market') == '台股' else [code]
+        for sym in syms:
+            try:
+                market['year'][code] = yahoo_year(sym)
+                break
+            except Exception:
+                continue
+        else:
+            errors.append(f'{code} 52 週高點抓不到')
+    return market
 
 
 def usd_twd():
@@ -246,7 +292,7 @@ def load_json(path, default=None):
         return json.load(f)
 
 
-def run(base, expect=None, dry=False):
+def run(base, expect=None, dry=False, alerts=False):
     """base 底下要有「投資資料/holdings.json」（state.json 可以沒有）；
     結果寫到「投資資料/state.json」與「Sam Homepage/invest.json」，最後一行印出每個檔的位元組數。"""
     now = datetime.now(TPE).strftime('%Y-%m-%d %H:%M')
@@ -287,6 +333,18 @@ def run(base, expect=None, dry=False):
         apply_quotes(wl_items, quotes)
         watch = {w['code']: [w['price'], w['prev_price'], w['price_date']] for w in wl_items if w.get('price') is not None}
     new_state = update_state(state, holdings, out, watch=watch)
+    # 投資計畫書 v1：四池、警報（rules.json、plans.json 沒抄到就沿用上次的 plan）
+    rules = load_json(os.path.join(data_dir, 'rules.json'))
+    plans = load_json(os.path.join(data_dir, 'plans.json'))
+    for k in ('plan', 'plan_state'):
+        if k in state:
+            new_state[k] = state[k]
+    market = fetch_market(plans, errors) if alerts and plans is not None else None
+    plan = invest_plan.build(holdings, plans, rules, fx, now[:10], new_state, market, alerts and market is not None)
+    if plan:
+        out['plan'] = plan
+    if errors:
+        out['errors'] = errors
     if dry:
         print(dumps(out))
         return
@@ -338,6 +396,7 @@ def selftest():
     check('追蹤清單轉成持股格式', wi[0]['currency'] == 'USD' and wi[1]['currency'] == 'TWD' and wi[1]['shares'] == 0)
     st2 = update_state({'watch': {'DDD': [5, 4, '2026-01-02']}}, hs, s)
     check('這次沒讀追蹤清單就沿用上次的價格', st2['watch']['DDD'][0] == 5)
+    invest_plan.selftest(check)
     print('PASS' if ok else 'FAIL')
     return ok
 
@@ -352,4 +411,4 @@ if __name__ == '__main__':
         for pair in args[args.index('--expect') + 1].split(','):
             name, size = pair.split('=')
             expect[name] = int(size)
-    run(base, expect, dry='--dry-run' in args)
+    run(base, expect, dry='--dry-run' in args, alerts='--alerts' in args)

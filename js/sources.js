@@ -253,6 +253,18 @@ export function demoInvest() {
     updated: `${dateStr()} 07:30`, asOf: { tw: addDays(dateStr(), -1), us: addDays(dateStr(), -1) },
     totalTwd: 1234567, cathayTwd: 234567, schwabUsd: 33333.33, schwabTwd: 1000000, fx: 30,
     dayPct: -2.5, cathayDayPct: -1.1, schwabDayPct: -3.0, monthPct: 1.2, monthBase: addDays(dateStr(), -10), stalePrices: 0,
+    plan: {
+      evaluated: dateStr(),
+      pools: [
+        { key: 'broad', label: '大盤', pct: 0.33, target: 0.4, band: 0.05, dev: -0.07, out: true, split: { us: 0.05, tw: 0.28 } },
+        { key: 'conviction', label: '信念', pct: 0.44, target: 0.4, band: 0.05, dev: 0.04, out: false },
+        { key: 'swing', label: '波段／待處理', pct: 0.1, target: 0.08, band: 0.03, dev: 0.02, out: false },
+        { key: 'cash', label: '現金', pct: 0.13, target: 0.12, band: 0.03, dev: 0.01, out: false },
+      ],
+      alerts: [{ key: 'dd:DEMO', lvl: 'warn', title: '示範股 從 52 週高點 -26.0%', meta: '觸發兩步驟檢查', new: true, raised: dateStr(), since: dateStr() }],
+      extras: { lotto: { limitUsd: 500, usedUsd: 0, leftUsd: 500, year: Number(dateStr().slice(0, 4)) }, usdAccum: { usd: null, threshold: 3000, ready: false },
+        nextReview: `${dateStr().slice(0, 4)}-12-31`, sellPlan: { code: '示範', sold: 0, total: 60, batchesDone: 0, batches: 3, nextPrice: 100, deadline: '2027-06-30' } },
+    },
   };
 }
 
@@ -281,6 +293,40 @@ export function investView(inv, today, threshold) {
   if (age >= 3) alerts.push({ type: 'stale', title: `投資數字 ${age} 天沒更新`, level: 'info', meta: '辦公室電腦的 Claude 開著時，每天 07:30 的排程才會更新' });
   else if (inv.stalePrices > 0) alerts.push({ type: 'prices', title: `投資有 ${inv.stalePrices} 檔價格沒抓到`, level: 'info', meta: '沿用上一次的價格，總資產可能有落差' });
   return { num: wan(inv.totalTwd), text, alerts };
+}
+
+// 投資計畫書 v1：四池、觸發警報、小計（invest.json 的 plan，由 tools/invest_plan.py 算）
+// 警報只在觸發時出現；new＝今天第一次觸發或升級（早報只推播這些）
+const pp = (v, d = 1) => (typeof v === 'number' ? `${(v * 100).toFixed(d)}%` : '—');
+const pt = (v) => (typeof v === 'number' ? `${v > 0 ? '+' : v < 0 ? '−' : '±'}${Math.abs(v * 100).toFixed(1)} 點` : '—');
+
+export function planView(inv, today) {
+  const p = inv?.plan;
+  if (!p?.pools?.length) return null;
+  const pools = p.pools.map((x) => ({
+    key: x.key, label: x.label, pct: pp(x.pct), out: x.out,
+    target: x.target === null || x.target === undefined ? '—' : `目標 ${pp(x.target, 0)}（±${Math.round((x.band || 0) * 100)}）`,
+    dev: `偏離 ${pt(x.dev)}`, tone: x.out ? (x.dev > 0 ? 'over' : 'under') : '',
+    sub: x.split ? `SPYM ${pp(x.split.us)}・台股 ${pp(x.split.tw)}` : x.key === 'swing' ? '未歸池的持股暫列這裡' : '',
+  }));
+  const alerts = (p.alerts || []).map((a) => ({ key: a.key, title: a.title, meta: a.meta, lvl: a.lvl, isNew: !!a.new && a.raised === today, since: a.since }));
+  const ex = p.extras || {};
+  const stats = [];
+  if (ex.lotto) stats.push({ k: `樂透額度 ${ex.lotto.year}`, v: `US$${ex.lotto.leftUsd}`, s: `已用 US$${ex.lotto.usedUsd}／${ex.lotto.limitUsd}` });
+  if (ex.usdAccum) {
+    const u = ex.usdAccum;
+    const th = (u.threshold || 0).toLocaleString('en-US');
+    stats.push({ k: '美金累積', v: u.usd === null || u.usd === undefined ? '未回報' : `US$${Math.round(u.usd).toLocaleString('en-US')}`,
+      s: u.ready ? `已達 US$${th}，可以電匯嘉信` : `滿 US$${th} 電匯嘉信${u.asOf ? `（${shortDate(u.asOf)}）` : ''}`, tone: u.ready ? 'go' : '' });
+  }
+  if (ex.nextReview) stats.push({ k: '下次半年檢查', v: shortDate(ex.nextReview), s: `剩 ${diffDays(ex.nextReview, today)} 天` });
+  if (ex.sellPlan) {
+    const s = ex.sellPlan;
+    stats.push({ k: `${s.code} 賣出進度`, v: `${s.sold}／${s.total} 股`, s: s.nextPrice ? `第 ${s.batchesDone + 1} 批 $${s.nextPrice}・底線 ${shortDate(s.deadline)}` : '已賣完' });
+  }
+  const age = p.evaluated ? diffDays(today, p.evaluated) : null;
+  const note = p.evaluated ? `警報判斷於 ${shortDate(p.evaluated)} 07:30 同步（收盤價）${age >= 2 ? `・已 ${age} 天沒判斷` : ''}` : '警報還沒判斷過（下次 07:30 同步）';
+  return { pools, alerts, stats, note };
 }
 
 // ---------- 生活：旅行倒數＋TickTick 生活清單 ----------

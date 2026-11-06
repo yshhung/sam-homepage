@@ -183,6 +183,23 @@ h2::before { content: ""; width: 3px; height: 13px; background: var(--acc); bord
 .pill { font-size: 12px; color: var(--muted); }
 .pill.on { color: var(--amb); }
 
+/* 投資計畫：四池卡等寬等高；手機 2×2、大螢幕一列 4 張；小計同樣排法 */
+.plan-pools, .plan-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 10px; }
+@media (min-width: 760px) { .plan-pools, .plan-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; } }
+.pool, .pstat { background: linear-gradient(180deg, var(--panel2), var(--panel)); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; display: grid; align-content: start; gap: 2px; }
+.pool .k, .pstat .k { font-size: 11px; letter-spacing: .1em; color: var(--muted); }
+.pool .v { font-size: clamp(1.4rem, 3.4vw, 1.9rem); font-weight: 650; letter-spacing: -.02em; margin: 4px 0 2px; }
+.pstat .v { font-size: 1.1rem; font-weight: 650; margin: 4px 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pool .s, .pstat .s { font-size: 12px; color: var(--muted); line-height: 1.5; overflow-wrap: anywhere; }
+.pool.over, .pool.under { border-color: var(--amb); }
+.pool.over .v, .pool.under .v, .pool .dev.over, .pool .dev.under { color: var(--amb); }
+.pstat.go { border-color: var(--live); }
+.pstat.go .v { color: var(--live); }
+.plan-alerts { margin: 12px 0 0; }
+.plan-stats { margin-top: 12px; }
+.plan-note { margin: 10px 0 0; }
+.wk-card.plan[hidden], .wk-sec[hidden], .plan-alerts[hidden] { display: none; }
+
 .wk-foot { text-align: center; color: var(--muted); font-size: 12px; margin: 8px 0 0; }
 
 /* 新增按鈕：手機在右下角，大螢幕也一樣方便 */

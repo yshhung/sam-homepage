@@ -470,10 +470,15 @@ dash.calc('rule_usage', {
   description: '各題材或個股市值（台幣）÷總資產或美股帳戶（含嘉信現金、扣賣出選擇權）；次數與金額型規則照紀錄',
   fn: (rules, positions, totals) => {
     const t = totals[0];
-    return rules.map(r => {
+    // 停用的規則（active:false）不列；四池、底線、現金劇本等新規則顯示在首頁「投資計畫」，這裡只列上限、次數、金額
+    return rules.filter(r => r.active !== false && r.active !== 'false' && ['cap', 'count', 'amount'].includes(r.kind)).map(r => {
       let codes = r.codes; if (typeof codes === 'string') codes = JSON.parse(codes); codes = codes || [];
       if (r.kind === 'cap') {
-        const v = positions.filter(p => codes.includes(p.code)).reduce((a, p) => a + p.value_twd, 0);
+        const each = r.each === true || r.each === 'true';
+        const vals = codes.map(c => positions.filter(p => p.code === c).reduce((a, p) => a + p.value_twd, 0));
+        const top = each && vals.length ? codes[vals.indexOf(Math.max(...vals))] : null;
+        const v = each ? Math.max(0, ...vals) : positions.filter(p => codes.includes(p.code)).reduce((a, p) => a + p.value_twd, 0);
+        if (each && top) r = Object.assign({}, r, {label: r.label + '（最高：' + top + '）'});
         const base = r.base === 'us' ? t.us_twd : t.total_twd, share = v / base;
         return {key: r.key, label: r.label, kind: r.kind, value_twd: v, share, cap: Number(r.cap), cap_final: r.cap_final === null || r.cap_final === undefined ? null : Number(r.cap_final), note: r.note || ''};
       }

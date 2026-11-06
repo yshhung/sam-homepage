@@ -17,6 +17,10 @@
 - **投資**：每日同步把 OneDrive `投資資料/holdings.json`（持股，只在買賣時由 Claude 修改）和 `state.json`（最新價格、最近 70 天總資產）抄到雲端暫存，執行 `tools/invest_sync.py`，用公開收盤價（都不用登入）算出總資產、國泰、嘉信、今日與本月變動，寫回 `state.json` 和 `Sam Homepage/invest.json`。抄的時候會核對檔案大小，不對就不更新。`history.json` 是 11/4 以前的舊紀錄，不再更新。首頁只讀這個彙總檔，看不到股數、代號或帳號；持股檔不在 GitHub。
   - 總資產單日或本月變動超過「投資變動門檻」（Excel「設定」表，預設 2%）、數字超過 3 天沒更新、有價格沒抓到，都會列進重點。
   - 買賣或入金出金後，在 Claude App 告訴 Claude，由「首頁投資與旅行」技能改持股檔；隔天 07:30 首頁就會更新。
+- **投資計畫（四池與觸發警報，2026-11-06 投資計畫書 v1）**：首頁「投資計畫」區顯示四池（大盤／信念／波段・待處理／現金）目前比例、目標與偏離，超出容許區間標黃；下面列觸發中的警報（信念股從 52 週收盤高點 −25%、S&P 500 從 52 週收盤高點 −10%／−20%／−30%、VIX > 30、單一信念股 > 25%、現金低於底線），沒觸發就不顯示；最下面是樂透額度、美金累積、下次半年檢查、PLTR 賣出進度。警報也會列進今日重點。
+  - 計算在 `tools/invest_plan.py`（`invest_sync.py` 呼叫）：規則讀 `投資資料/rules.json`（kind：pool、cap＋each、drawdown、floor、budget、playbook、fx、schedule），歸池讀 `plans.json` 的 `pool`。
+  - 只有 07:30 每日同步帶 `--alerts` 才重新判斷警報（另抓 S&P 500、VIX 與信念股一年的日收盤，52 週高點用收盤高點）；早報、晚報沿用同步的結果。沒有新收盤（休市日）就不重算。
+  - 第一次觸發或升級到下一級的警報標 `new`，早報把它們併入推播；之後首頁持續顯示、不再推播，條件解除自動消失。
 - **投資頁**（`invest.html`，投資卡片的「詳細 →」）：原本 claude.ai「Sam的投資儀表板」整頁搬過來，分頁有總覽（總資產、目標進度、資產趨勢、配置、產業與集中度）、市場、持股、計畫、行事曆、交易紀錄。登入後直接讀 OneDrive「投資資料」（只讀），網頁裡沒有任何數字或代號；補進度標的、定期定額金額等私人設定放在 `投資資料/page_config.json`。圖表用本站的 `vendor/d3-7.9.0.min.js`（npm 官方 d3@7.9.0，已核對 sha512）。
 - **生活**：大數字是距離下一趟旅行的天數（`Sam Homepage/life.json`，行程確定或改變時由 Claude 更新；還在規劃中的旅行 3 週內會提醒還沒確定）。說明列出 TickTick「🏠我的家庭」「🏃我的生活」「📦生活瑣事」近 7 天的扣款、帳單與下一件事，直接用 ticktick.json，沒有另外一份資料。
 
@@ -147,5 +151,6 @@ powershell -ExecutionPolicy Bypass -File tools/serve.ps1
 | `tools/serve.ps1` | 本機測試用伺服器 |
 | `tools/make-template.ps1`、`tools/make-icons.ps1` | 重新產生 Excel 範本與圖示 |
 | `invest.html`、`invest.css`、`js/invest/` | 投資頁；`js/invest/page*.js` 是舊儀表板的頁面程式，`shim.js`、`load.js`、`data.js` 負責從 OneDrive 讀資料 |
+| `tools/invest_plan.py` | 投資計畫書的四池、觸發警報與小計（`invest_sync.py --selftest` 一起測） |
 | `tools/report_sync.py` | 把早報、晚報、週回顧整理的資料轉成投資頁「市場」分頁與首頁「新聞」區的檔（`--selftest` 跑測試） |
 | `tools/invest_sync.py` | 每天更新投資彙總（`--selftest` 只跑計算測試，`--dry-run` 只印結果不寫檔） |
