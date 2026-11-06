@@ -11,7 +11,7 @@
 抓不到的價格沿用上一次的值，並在 invest.json 的 stalePrices 記數量。
 
 投資計畫書 v1 的四池與觸發警報在 tools/invest_plan.py：有抄 rules.json、plans.json 就算四池；
-加 --alerts（只有 07:30 每日同步加）才另外抓 S&P 500、VIX 與信念股的一年收盤，重新判斷警報。
+加 --alerts（07:30 每日同步；早報用 --alerts-if-stale，同步今天沒判斷過才判斷）才另外抓 S&P 500、VIX 與信念股的一年收盤，重新判斷警報。
 
 用法：python tools/invest_sync.py [--base 資料夾] [--expect holdings.json=位元組,state.json=位元組] [--alerts] [--dry-run]
       python tools/invest_sync.py --selftest   （只跑計算測試，不連網、不讀寫檔案）
@@ -339,6 +339,8 @@ def run(base, expect=None, dry=False, alerts=False):
     for k in ('plan', 'plan_state'):
         if k in state:
             new_state[k] = state[k]
+    if alerts == 'if-stale':  # 早報的備援：07:30 同步今天沒判斷過才判斷
+        alerts = ((state.get('plan') or {}).get('evaluated') != now[:10])
     market = fetch_market(plans, errors) if alerts and plans is not None else None
     plan = invest_plan.build(holdings, plans, rules, fx, now[:10], new_state, market, alerts and market is not None)
     if plan:
@@ -411,4 +413,4 @@ if __name__ == '__main__':
         for pair in args[args.index('--expect') + 1].split(','):
             name, size = pair.split('=')
             expect[name] = int(size)
-    run(base, expect, dry='--dry-run' in args, alerts='--alerts' in args)
+    run(base, expect, dry='--dry-run' in args, alerts='if-stale' if '--alerts-if-stale' in args else '--alerts' in args)

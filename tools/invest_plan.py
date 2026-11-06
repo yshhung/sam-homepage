@@ -192,7 +192,8 @@ def build(holdings, plans, rules, fx, today, state, market=None, evaluate_alerts
         return prev or None
     pools, total = compute_pools(holdings, plans, rules, fx)
     plan = {'pools': pools, 'extras': compute_extras(holdings, plans, rules, today),
-            'alerts': [dict(a, new=False) for a in prev.get('alerts', [])],
+            # 沿用：當天升級的保留 new（早報要推播），隔天就不算 new
+            'alerts': [dict(a, new=bool(a.get('new')) and a.get('raised') == today) for a in prev.get('alerts', [])],
             'evaluated': prev.get('evaluated'), 'dataAsOf': prev.get('dataAsOf'), 'market': prev.get('market')}
     if evaluate_alerts and market is not None:
         asof = {'spx': (market.get('spx') or (None, None))[1],
@@ -255,7 +256,9 @@ def selftest(check):
     p4 = build(hs, plans, rules, 30, '2026-01-09', st, dict(mk, spx=(75.0, '2026-01-08', 100.0)), True)
     check('升級到下一級才標 new', [a['key'] for a in p4['alerts'] if a['new']] == ['spx'])
     p5 = build(hs, plans, rules, 30, '2026-01-09', st, None, False)
-    check('早晚報（不帶 --alerts）沿用警報、不標 new', len(p5['alerts']) == 5 and not any(a['new'] for a in p5['alerts']))
+    check('早晚報（不帶 --alerts）沿用警報、當天的 new 保留', len(p5['alerts']) == 5 and [a['key'] for a in p5['alerts'] if a['new']] == ['spx'])
+    p6 = build(hs, plans, rules, 30, '2026-01-10', st, None, False)
+    check('隔天沿用就不算 new', len(p6['alerts']) == 5 and not any(a['new'] for a in p6['alerts']))
     check('沒抄到規則檔就沿用上次', build(hs, None, None, 30, '2026-01-09', st) == st['plan'])
     hs.append({'code': 'BBB 2/20/2026 8.00 P', 'occ': 'BBB260220P00008000', 'kind': 'option', 'currency': 'USD', 'shares': -100, 'price': 0.1})
     check('Sell Put 擔保額從美金扣掉', put_collateral_usd(hs) == 800)
