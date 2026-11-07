@@ -130,7 +130,7 @@ function autoEntries(today) {
   return out;
 }
 
-// 沁耘：兩週沒有新內容就提醒；數字太久沒更新也提醒（排程只在這台電腦開著時跑）
+// 沁耘：兩週沒有新內容就提醒；數字太久沒更新也提醒（雲端同步每天 07:30 更新）
 function companyEntries(today) {
   const c = state.company;
   if (!c) return [];

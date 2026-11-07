@@ -290,7 +290,7 @@ export function investView(inv, today, threshold) {
       meta: `跟 ${inv.monthBase ? shortDate(inv.monthBase) : '上月底'} 比，含入金出金 · 超過 ${threshold}% 門檻` });
   }
   const age = inv.updated ? diffDays(today, inv.updated.slice(0, 10)) : 99;
-  if (age >= 3) alerts.push({ type: 'stale', title: `投資數字 ${age} 天沒更新`, level: 'info', meta: '辦公室電腦的 Claude 開著時，每天 07:30 的排程才會更新' });
+  if (age >= 3) alerts.push({ type: 'stale', title: `投資數字 ${age} 天沒更新`, level: 'info', meta: '每天 07:30 與 15:30 的雲端同步會更新；連續沒更新請到排程頁看那一次的執行紀錄' });
   else if (inv.stalePrices > 0) alerts.push({ type: 'prices', title: `投資有 ${inv.stalePrices} 檔價格沒抓到`, level: 'info', meta: '沿用上一次的價格，總資產可能有落差' });
   return { num: wan(inv.totalTwd), text, alerts };
 }
