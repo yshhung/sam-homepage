@@ -13,7 +13,8 @@ import { almanac, lunarDay } from './almanac.js';
 
 const $ = (id) => document.getElementById(id);
 
-const DOMAINS = ['工作', '沁耘', '和果', '投資', '生活'];
+// 四張，手機 2×2、電腦一列 4 張；信件不另外開卡，直接列在今日重點
+const DOMAINS = ['沁耘', '和果', '投資', '生活'];
 // 沁耘是公司（網站、曝光、課程），和果是日照中心
 const DOMAIN_OF = { 和果: '和果', 沁耘: '沁耘', 網站: '沁耘', 社群: '沁耘', 課程: '沁耘', 信件: '工作', 行程: '工作', 投資: '投資', 天氣: '生活', 旅行: '生活' };
 // TickTick 清單 → 卡片（清單定義見「待辦行程分流」技能）
@@ -424,10 +425,6 @@ function autoCard(domain) {
   if (domain === '生活') {
     const v = lifeView(state.life, state.ticktick, dateStr());
     if (v) return { num: v.num, text: v.text, link: v.link };
-  }
-  if (domain === '工作' && state.mail.length) {
-    const flagged = state.mail.filter((m) => m.flagged).length;
-    return { num: `${state.mail.length} 封`, text: `待回覆信件（${flagged} 封加旗標）` };
   }
   return null;
 }

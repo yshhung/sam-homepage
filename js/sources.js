@@ -500,19 +500,63 @@ function currentPosition() {
   });
 }
 
-// 座標換地名（BigDataCloud 免費服務，不用金鑰）；同一個座標記在這台裝置，不重複問
+// 座標換地名：先問 BigDataCloud（免費、不用金鑰），問不到就用下面內建的台灣地名表找最近的，
+// 再不行（例如出國）就顯示座標。成功的結果記在這台裝置，同一個座標不重複問。
 async function placeName(lat, lon) {
-  const key = `place:${lat},${lon}`;
+  const key = `place2:${lat},${lon}`;
   try { const hit = localStorage.getItem(key); if (hit) return hit; } catch { /* 無痕模式等 */ }
+  let name = '';
   try {
     const q = new URLSearchParams({ latitude: lat, longitude: lon, localityLanguage: 'zh-Hant' });
-    const r = await (await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?${q}`)).json();
-    const name = (r.city && r.locality && !r.locality.startsWith(r.city) ? `${r.city}${r.locality}` : r.locality || r.city || '').trim();
-    if (name) { try { localStorage.setItem(key, name); } catch { /* 存不了也沒關係 */ } }
-    return name || '目前位置';
-  } catch {
-    return '目前位置';
+    name = geoName(await (await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?${q}`)).json());
+  } catch { /* 改用內建地名表 */ }
+  if (name) { try { localStorage.setItem(key, name); } catch { /* 存不了也沒關係 */ } }
+  return name || nearestPlace(lat, lon);
+}
+
+// BigDataCloud 的回應 → 「新北市土城區」這種地名；city、locality 都空的時候，改用行政區清單裡最細的兩層
+export function geoName(r) {
+  if (!r) return '';
+  const city = (r.city || '').trim();
+  const loc = (r.locality || '').trim();
+  if (city && loc && !loc.startsWith(city) && !city.endsWith(loc)) return `${city}${loc}`;
+  if (loc || city) return loc || city;
+  const adm = (r.localityInfo?.administrative || [])
+    .filter((a) => a.name && a.adminLevel > 2 && /[\u4e00-\u9fff]/.test(a.name))
+    .sort((a, b) => a.adminLevel - b.adminLevel);
+  const pick = adm.slice(-2).map((a) => a.name);
+  if (pick.length === 2 && pick[1].startsWith(pick[0])) pick.shift();
+  return (pick.join('') || r.principalSubdivision || r.countryName || '').trim();
+}
+
+// 內建台灣地名（雙北桃竹與各縣市中心），地名服務連不到時用：8 公里內直接用這個名字，40 公里內加「附近」
+const TW_PLACES = [
+  ['新北土城', 24.972, 121.443], ['新北板橋', 25.011, 121.459], ['新北中和', 24.999, 121.499], ['新北永和', 25.008, 121.516],
+  ['新北三峽', 24.934, 121.369], ['新北樹林', 24.991, 121.425], ['新北鶯歌', 24.955, 121.354], ['新北新莊', 25.036, 121.45],
+  ['新北三重', 25.062, 121.488], ['新北蘆洲', 25.085, 121.474], ['新北新店', 24.968, 121.541], ['新北汐止', 25.063, 121.661],
+  ['新北淡水', 25.17, 121.441], ['新北林口', 25.077, 121.392], ['新北泰山', 25.059, 121.431], ['新北五股', 25.083, 121.438],
+  ['台北中正', 25.032, 121.518], ['台北大安', 25.026, 121.543], ['台北信義', 25.033, 121.567], ['台北中山', 25.064, 121.533],
+  ['台北松山', 25.05, 121.578], ['台北內湖', 25.069, 121.589], ['台北士林', 25.093, 121.525], ['台北北投', 25.132, 121.499],
+  ['台北萬華', 25.035, 121.5], ['台北文山', 24.99, 121.57], ['台北南港', 25.055, 121.607], ['台北大同', 25.063, 121.513],
+  ['桃園', 24.993, 121.301], ['桃園中壢', 24.954, 121.225], ['桃園龜山', 24.993, 121.338], ['桃園八德', 24.928, 121.284],
+  ['桃園蘆竹', 25.045, 121.292], ['桃園機場', 25.077, 121.232], ['基隆', 25.128, 121.739], ['宜蘭', 24.757, 121.753],
+  ['新竹', 24.804, 120.969], ['竹北', 24.839, 121.004], ['苗栗', 24.56, 120.821], ['台中', 24.148, 120.674],
+  ['彰化', 24.08, 120.538], ['南投', 23.909, 120.684], ['雲林斗六', 23.711, 120.543], ['嘉義', 23.48, 120.449],
+  ['台南', 22.999, 120.227], ['高雄', 22.627, 120.301], ['屏東', 22.669, 120.486], ['花蓮', 23.977, 121.604],
+  ['台東', 22.756, 121.144], ['澎湖馬公', 23.566, 119.586], ['金門', 24.436, 118.318],
+];
+export function nearestPlace(lat, lon) {
+  const rad = Math.PI / 180;
+  let best = null;
+  for (const [name, la, lo] of TW_PLACES) {
+    const x = (lo - lon) * rad * Math.cos(((la + lat) / 2) * rad);
+    const y = (la - lat) * rad;
+    const km = Math.sqrt(x * x + y * y) * 6371;
+    if (!best || km < best.km) best = { name, km };
   }
+  if (best && best.km <= 8) return best.name;
+  if (best && best.km <= 40) return `${best.name}附近`;
+  return `北緯 ${lat.toFixed(1)}°・東經 ${lon.toFixed(1)}°`;
 }
 
 export async function getLocation() {
