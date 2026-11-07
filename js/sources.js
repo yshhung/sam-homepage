@@ -197,7 +197,7 @@ export function demoHecho() {
 // ---------- TickTick 同步檔 ----------
 // Claude 每次改 TickTick 後會更新這個檔，每天 07:30 的排程也會再整理一次
 
-async function oneDriveJson(relPath) {
+export async function oneDriveJson(relPath) {
   const path = relPath.split('/').map(encodeURIComponent).join('/');
   try {
     return await (await graph(`/me/drive/root:/${path}:/content`, { raw: true })).json();

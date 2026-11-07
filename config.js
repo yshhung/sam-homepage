@@ -11,6 +11,8 @@ export const CONFIG = {
   companyStatsPath: 'Sam Homepage/company_stats.json',
   // TickTick 待辦：Claude 改完 TickTick 會更新；雲端排程每天 07:30、12:00、15:00、18:00、21:00 前後也會同步
   tickTickPath: 'Sam Homepage/ticktick.json',
+  // 沁耘網站與社群的歷史：每日同步（07:30）更新；沁耘頁（company.html）畫每月瀏覽、追蹤人數、每日觸及與 Google 商家
+  companyHistoryPath: 'Sam Homepage/company_history.json',
   // 投資彙總（總資產、國泰、嘉信、變動 %）：每天 07:30 排程用 tools/invest_sync.py 更新，沒有持股明細
   investPath: 'Sam Homepage/invest.json',
   // 天氣與營運警報：每日同步（07:30、12:30、15:30、18:30、21:30）寫第一個（颱風、停班停課、氣象署特報），
@@ -34,11 +36,11 @@ export const CONFIG = {
   mail: { importantDays: 3 },
 
   // 細節頁：舊的 claude.ai 儀表板之後不用了。投資連到首頁自己的投資頁；生活連下一趟旅行的頁面
+  // 舊版 claude.ai Homepage（頁尾連結；舊頁面搬完、確認不再需要後可以拿掉）
+  legacyHomepage: 'https://claude.ai/artifact/VdqsDF6LADCfMum6mdSSDe',
   detailLinks: {
     投資: 'invest.html',
-    工作: 'https://claude.ai/artifact/VdqsDF6LADCfMum6mdSSDe#work',
-    沁耘: 'https://claude.ai/artifact/VdqsDF6LADCfMum6mdSSDe#work',
-    和果: 'https://claude.ai/artifact/VdqsDF6LADCfMum6mdSSDe#work',
+    工作: 'company.html',
   },
 
   // 預設門檻（可在 Excel「設定」表裡改）

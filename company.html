@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- 安全政策跟首頁一樣：程式只能從本站載入，資料只能連到微軟 -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://graph.microsoft.com https://login.microsoftonline.com https://*.sharepoint.com; frame-src 'self' https://login.microsoftonline.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>沁耘網站與社群 · Sam's Homepage</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="company.css">
+  <script src="vendor/msal-browser-3.28.1.min.js"></script>
+</head>
+<body>
+  <main class="wk" id="app">
+    <header class="wk-head">
+      <div class="wk-head-l">
+        <a class="cp-back" href="./">← 首頁</a>
+        <h1 class="wk-title">沁耘 網站與社群</h1>
+        <p class="cp-take" id="take">—</p>
+      </div>
+      <div class="wk-head-r">
+        <div class="wk-status" id="status"><span class="wk-dot"></span><span id="status-text">載入中</span></div>
+      </div>
+    </header>
+    <div class="wk-banner" id="banner" hidden></div>
+
+    <section class="cp-kpis" id="kpis"></section>
+
+    <section class="wk-card" aria-labelledby="h-web">
+      <div class="cp-head"><h2 id="h-web">網站每月瀏覽與訪客</h2><span class="cp-note" id="web-note"></span></div>
+      <div class="cp-chart" id="chart-web"></div>
+      <div class="cp-legend"><span><i class="c1"></i>瀏覽</span><span><i class="c2"></i>訪客</span></div>
+    </section>
+
+    <section class="wk-card" aria-labelledby="h-fol">
+      <div class="cp-head"><h2 id="h-fol">追蹤人數（近 35 天）</h2></div>
+      <div class="cp-chart" id="chart-fol"></div>
+      <div class="cp-legend"><span><i class="c1"></i>Instagram</span><span><i class="c2"></i>Facebook</span></div>
+    </section>
+
+    <section class="wk-card" aria-labelledby="h-reach">
+      <div class="cp-head"><h2 id="h-reach">每日觸及與觀看（近 35 天）</h2></div>
+      <div class="cp-chart" id="chart-reach"></div>
+      <div class="cp-legend"><span><i class="c1"></i>Instagram 觸及</span><span><i class="c2"></i>Facebook 觀看</span></div>
+    </section>
+
+    <section class="wk-card" aria-labelledby="h-gbp">
+      <div class="cp-head"><h2 id="h-gbp">Google 商家（近 35 天）</h2></div>
+      <div class="cp-chart" id="chart-gbp"></div>
+      <div class="cp-legend"><span><i class="c1"></i>曝光</span><span><i class="c3"></i>點擊</span></div>
+    </section>
+
+    <p class="wk-foot" id="foot"></p>
+  </main>
+  <script type="module" src="js/company.js"></script>
+</body>
+</html>

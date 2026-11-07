@@ -1,0 +1,27 @@
+/* 沁耘頁：沿用首頁的深色風格 */
+.cp-back { display: inline-block; font-size: 13px; margin-bottom: 4px; }
+.cp-take { margin: 0; color: var(--muted); font-size: 14px; }
+.cp-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (min-width: 760px) { .cp-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; } }
+.cp-kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; display: grid; gap: 2px; align-content: start; }
+.cp-kpi .k { font-size: 11px; letter-spacing: .1em; color: var(--muted); }
+.cp-kpi .v { font-size: clamp(1.3rem, 5vw, 1.8rem); font-weight: 650; letter-spacing: -.02em; }
+.cp-kpi .s { font-size: 12px; color: var(--muted); }
+.cp-kpi .s.up { color: var(--live); }
+.cp-kpi .s.down { color: var(--bad); }
+.cp-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px; }
+.cp-head h2 { margin: 0; font-size: 16px; font-weight: 500; }
+.cp-note { font-size: 12px; color: var(--muted); }
+.cp-chart { width: 100%; min-height: 120px; }
+.cp-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.cp-chart .axis { stroke: var(--line); stroke-width: 1; }
+.cp-chart .grid { stroke: var(--line); stroke-width: 1; stroke-dasharray: 2 4; }
+.cp-chart text { fill: var(--muted); font-size: 11px; font-family: var(--sans); }
+.cp-chart text.val { fill: var(--fg); font-size: 11px; }
+.cp-chart .b1 { fill: var(--acc); } .cp-chart .b2 { fill: var(--live); } .cp-chart .b3 { fill: var(--amb); }
+.cp-chart .l1 { stroke: var(--acc); } .cp-chart .l2 { stroke: var(--live); } .cp-chart .l3 { stroke: var(--amb); }
+.cp-chart path.line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.cp-chart .none { fill: var(--muted); font-size: 13px; }
+.cp-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); }
+.cp-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.cp-legend .c1 { background: var(--acc); } .cp-legend .c2 { background: var(--live); } .cp-legend .c3 { background: var(--amb); }
