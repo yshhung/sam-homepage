@@ -268,3 +268,11 @@ body { -webkit-text-size-adjust: 100%; overflow-x: hidden; }
   .mk-tabs::-webkit-scrollbar { display: none; }
   .mk-tabs button { flex: 1 0 auto; padding: 8px 2px; font-size: 13px; }
 }
+/* 手機上總覽的四格數字一列兩格、每格很窄：大數字跟著螢幕縮小，小字可以換行，不用「…」截掉 */
+@media (max-width: 640px) {
+  .sd-kpis { gap: 8px; }
+  .sd-kpi { padding: 10px 12px; }
+  .sd-kpi .sd-v { font-size: clamp(1rem, 5.2vw, 1.3rem); white-space: normal; overflow: visible; text-overflow: clip; }
+  .sd-kpi .sd-v small { display: inline-block; margin-left: 6px; white-space: nowrap; }
+  .sd-kpi .sd-s, .sd-kpi .sd-s span { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+}
