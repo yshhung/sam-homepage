@@ -236,3 +236,25 @@ body { -webkit-text-size-adjust: 100%; overflow-x: hidden; }
 .sd-card h2::before { display: none; }
 .sd-sub { letter-spacing: .02em; text-transform: none; }
 .sd-live { box-shadow: none; }
+
+/* 計畫分頁：四池（從首頁搬過來）。手機 2×2、大螢幕一列 4 張 */
+.sd-card[hidden], .pools-alerts[hidden] { display: none; }
+.sd-cnt { font-size: 12px; color: var(--mut); font-weight: 400; }
+.pools-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 10px; }
+@media (min-width: 760px) { .pools-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; } }
+.pool, .pstat { background: linear-gradient(180deg, var(--panel2), var(--panel)); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; display: grid; align-content: start; gap: 2px; }
+.pool .k, .pstat .k { font-size: 11px; letter-spacing: .1em; color: var(--mut); }
+.pool .v { font-size: clamp(1.4rem, 3.4vw, 1.9rem); font-weight: 650; letter-spacing: -.02em; margin: 4px 0 2px; }
+.pstat .v { font-size: 1.1rem; font-weight: 650; margin: 4px 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pool .s, .pstat .s, .pa .s { font-size: 12px; color: var(--mut); line-height: 1.5; overflow-wrap: anywhere; }
+.pool.over, .pool.under { border-color: var(--amb); }
+.pool.over .v, .pool.under .v, .pool .dev.over, .pool .dev.under { color: var(--amb); }
+.pstat.go { border-color: var(--up); }
+.pstat.go .v { color: var(--up); }
+.pools-alerts { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.pa { border: 1px solid var(--line); border-left: 3px solid var(--amb); border-radius: 10px; padding: 10px 12px; background: var(--panel2); }
+.pa.bad { border-left-color: var(--down); }
+.pa-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 14px; }
+.pa .chip { font-size: 11px; color: var(--mut); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
+.pools-stats { margin-top: 12px; }
+.pools-note { margin: 10px 0 0; }

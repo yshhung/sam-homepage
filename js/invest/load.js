@@ -1,6 +1,7 @@
 // 投資頁：登入後從 OneDrive「投資資料」讀檔（只讀），交給舊版儀表板程式畫出來
 import { getAccount, graph, GraphError, initAuth, isConfigured, login } from '../auth.js';
 import { buildDatasets } from './data.js';
+import { renderPools } from './pools.js';
 
 const BASE = '投資資料';
 const FILES = {
@@ -85,6 +86,7 @@ async function start() {
     f.invest = invest;
     f.reports = reports;
     if (!f.holdings) { banner('OneDrive 的「投資資料/holdings.json」讀不到。'); return; }
+    renderPools(invest);
     const cfg = f.config || {};
     window.dash.__load(buildDatasets(f), {
       exclude: cfg.exclude || [], catchupTw: cfg.catchupTw || null, catchupUs: cfg.catchupUs || null, trancheTwd: cfg.trancheTwd || null,

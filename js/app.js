@@ -207,7 +207,6 @@ function render() {
 
   renderStrip(today);
   renderDomains(focus);
-  renderPlan(today);
   renderNews(today);
 
   const foot = [];
@@ -361,6 +360,7 @@ function renderDomains(focus) {
       el('div', { class: 'd-head' }, el('h2', {}, d)),
       el('div', { class: 'd-num' }, auto?.num || c.數字 || '—'),
       auto ? el('p', { class: 'd-text auto' }, auto.text) : null,
+      auto?.plan ? el('a', { class: `d-plan ${auto.plan.warn ? 'warn' : ''}`, href: 'invest.html#plans' }, auto.plan.text) : null,
       c.說明 && !c.說明.startsWith('在這裡寫一句') ? el('p', { class: 'd-text' }, c.說明) : null,
       d === '和果' && state.hecho ? el('button', { class: 'act d-ask', type: 'button', title: '複製最近的數字（沒有姓名），打開 Claude', onclick: askHecho }, '問 AI') : null,
       el('div', { class: 'd-foot' },
@@ -369,30 +369,6 @@ function renderDomains(focus) {
         link ? (/^https?:/.test(link) ? el('a', { href: link, target: '_blank', rel: 'noopener' }, '詳細 ↗') : el('a', { href: link }, '詳細 →')) : null));
   });
   $('domains').replaceChildren(...cards);
-}
-
-// 投資計畫：四池（等寬等高、手機 2×2、大螢幕一列 4 張）、觸發中的警報、小計
-function renderPlan(today) {
-  const v = planView(state.invest, today);
-  $('plan-sec').hidden = $('plan').hidden = !v;
-  if (!v) return;
-  const pools = v.pools.map((x) => el('div', { class: `pool ${x.tone}` },
-    el('div', { class: 'k' }, x.label),
-    el('div', { class: 'v' }, x.pct),
-    el('div', { class: 's' }, x.target),
-    el('div', { class: `s dev ${x.tone}` }, x.out ? `${x.dev}・超出區間` : x.dev),
-    el('div', { class: 's' }, x.sub || '\u00a0')));
-  const alerts = v.alerts.map((a) => el('li', { class: `f-row ${a.lvl === 'risk' ? 'bad' : 'warn'}` },
-    el('div', { class: 'f-body' },
-      el('div', { class: 'f-top' }, el('span', { class: 'chip' }, a.isNew ? '新觸發' : `${shortDate(a.since)} 起`), el('span', { class: 'f-title' }, a.title)),
-      el('div', { class: 'f-meta' }, a.meta))));
-  const stats = v.stats.map((x) => el('div', { class: `pstat ${x.tone || ''}` }, el('div', { class: 'k' }, x.k), el('div', { class: 'v' }, x.v), el('div', { class: 's' }, x.s)));
-  $('plan-pools').replaceChildren(...pools);
-  $('plan-alerts').hidden = !alerts.length;
-  $('plan-alerts').replaceChildren(...alerts);
-  $('plan-stats').replaceChildren(...stats);
-  $('plan-note').textContent = v.note;
-  $('plan-count').textContent = v.alerts.length ? `${v.alerts.length} 個警報觸發中` : '沒有觸發';
 }
 
 // 新聞：早報、晚報整理的，點標題開原文（新分頁）
@@ -442,7 +418,8 @@ function autoCard(domain) {
   }
   if (domain === '投資') {
     const v = investView(state.invest, dateStr(), state.settings.投資變動門檻);
-    if (v) return { num: v.num, text: v.text };
+    // 四池只留一句狀態，點了打開投資頁「計畫」分頁看完整的四池與警報
+    if (v) return { num: v.num, text: v.text, plan: planView(state.invest, dateStr())?.summary };
   }
   if (domain === '生活') {
     const v = lifeView(state.life, state.ticktick, dateStr());

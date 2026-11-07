@@ -326,7 +326,12 @@ export function planView(inv, today) {
   }
   const age = p.evaluated ? diffDays(today, p.evaluated) : null;
   const note = p.evaluated ? `警報判斷於 ${shortDate(p.evaluated)} 07:30 同步（收盤價）${age >= 2 ? `・已 ${age} 天沒判斷` : ''}` : '警報還沒判斷過（下次 07:30 同步）';
-  return { pools, alerts, stats, note };
+  // 首頁投資卡的一句話：有池子超出區間或有警報才標黃
+  const off = p.pools.filter((x) => x.out);
+  const parts = off.map((x) => `${x.label}${x.dev > 0 ? '偏高' : '偏低'} ${pt(x.dev)}`);
+  if (alerts.length) parts.push(`${alerts.length} 個警報觸發中`);
+  const summary = parts.length ? { text: `⚠️ 四池：${parts.join('、')}`, warn: true } : { text: '四池都在區間內，沒有警報', warn: false };
+  return { pools, alerts, stats, note, summary };
 }
 
 // ---------- 生活：旅行倒數＋TickTick 生活清單 ----------

@@ -470,7 +470,7 @@ dash.calc('rule_usage', {
   description: '各題材或個股市值（台幣）÷總資產或美股帳戶（含嘉信現金、扣賣出選擇權）；次數與金額型規則照紀錄',
   fn: (rules, positions, totals) => {
     const t = totals[0];
-    // 停用的規則（active:false）不列；四池、底線、現金劇本等新規則顯示在首頁「投資計畫」，這裡只列上限、次數、金額
+    // 停用的規則（active:false）不列；四池、底線、現金劇本等新規則顯示在上面的「四池配置」，這裡只列上限、次數、金額
     return rules.filter(r => r.active !== false && r.active !== 'false' && ['cap', 'count', 'amount'].includes(r.kind)).map(r => {
       let codes = r.codes; if (typeof codes === 'string') codes = JSON.parse(codes); codes = codes || [];
       if (r.kind === 'cap') {
