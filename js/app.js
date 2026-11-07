@@ -137,7 +137,7 @@ function companyEntries(today) {
   const out = [];
   const ck = (type, cat, title, meta, level, sort) => ({ key: `company:${type}`, cat, title, meta, level, sort });
   const age = c.updated ? diffDays(today, c.updated.slice(0, 10)) : 99;
-  if (age >= 3) out.push(ck('stale', '沁耘', `網站與社群數字 ${age} 天沒更新`, '辦公室電腦的 Claude 開著時，排程才會更新', 'info', 0.8));
+  if (age >= 3) out.push(ck('stale', '沁耘', `網站與社群數字 ${age} 天沒更新`, '每天 07:30 的雲端同步會更新；連續沒更新請到排程頁看那一次的執行紀錄', 'info', 0.8));
   const w = c.website || {};
   const s = c.social || {};
   if (w.posts14d === 0) out.push(ck('web', '網站', '網站兩週沒有新文章', `${w.domain || '網站'}：近 14 天瀏覽 ${w.views14d ?? '—'} 次`, 'info', 0.75));

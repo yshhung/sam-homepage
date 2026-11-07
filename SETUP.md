@@ -9,12 +9,13 @@
 
 想讓某封信出現在今日重點，在 Outlook 幫它加旗標就好。
 
-- **每日同步**：claude.ai 的雲端排程「Sam 首頁：每日同步（07:30）」每天早上 07:30 左右在雲端執行（不用開任何電腦），更新 OneDrive `Sam Homepage/` 裡的 ticktick.json、company_stats.json、invest.json。它跑在雲端環境「Sam 首頁同步」，網路只放行證交所、櫃買中心、Yahoo Finance、jsDelivr、currency-api 五個網址，連接器只接 Microsoft 365、TickTick、WordPress.com、Metricool。
-- **TickTick 白天同步**（2026-11-07 加）：claude.ai 雲端排程「Sam 首頁：TickTick 同步（12／15／18／21 點）」每天 11:43、14:43、17:43、20:43 在「Sam 首頁同步」環境執行，只做每日同步指示（`投資資料/報告指示/同步.md`）的 Part A，重寫 `ticktick.json`（`by` 寫「TickTick 同步」），不推播、不碰其他檔。這個排程要掛 Microsoft 365 與 TickTick 兩個連接器（在 claude.ai 的排程設定裡加）。
+- **每日同步**（claude.ai 雲端排程「Sam 首頁：每日同步」，跑在雲端環境「Sam 首頁同步」，不用開任何電腦）：每天台北 07:30、12:30、15:30、18:30、21:30 各跑一次，工作指示都在 OneDrive `投資資料/報告指示/同步.md`（排程只負責叫它去讀這個檔，要改做法就改這個檔）。07:30 全做：TickTick（`ticktick.json`）、網站與社群（`company_stats.json`、`company_history.json`）、價格與總資產與四池與計畫書警報（`invest.json`）、天氣警報（`alerts_weather.json`）；12:30、18:30、21:30 只做 TickTick 與天氣警報；15:30（台股收盤後）另外更新價格與總資產（不重新判斷計畫書警報）。這個環境的網路只放行證交所、櫃買中心、Yahoo Finance、jsDelivr、currency-api，加上天氣警報要用的 `opendata.cwa.gov.tw`、`www.dgpa.gov.tw`；連接器接 Microsoft 365、TickTick、WordPress.com、Metricool。
+- **天氣與營運警報**（2026-11-08 加，取代舊的「天氣加報」與「生活晨間」排程；規則在 `投資資料/報告指示/警報.md`）：天氣（颱風五階段、新北停班停課、氣象署特報）由每日同步五次檢查，寫 `Sam Homepage/alerts_weather.json`；營運（停水停電、空品、疫情、道路，颱風期間晚報另查明天停班停課）由早報、晚報檢查，寫 `alerts_ops.json`。首頁把兩個檔放進今日重點：紅的（risk）排最上面、黃的（warn）排在前面、ok 不顯示、過了 `until` 的不顯示，檔案超過 30 小時沒更新會提醒。只有新出現的紅色警報才推播。格式：`{updated, by, alerts:[{tag, lvl, title, text?, until?, src?, url?}]}`。舊的「天氣加報」（22:55、05:55）與「停班停課場」（20:15）排程確認新的跑通後再關閉。
 - **早報、晚報、週回顧**（claude.ai 雲端排程，跑在可以連任何網站的「Sam 報告」環境）：早報每天 08:50（美股收盤、盤後、台股盤前）、晚報每天冬令 22:05／夏令 21:05（台股盤後、三大法人、美股盤前、今晚時程、Cover Call、事件行事曆，週六不跑）、週回顧每週日 03:03（本週回顧、下週行事曆、集中度）。各自更新價格與總資產（`tools/invest_sync.py`），把市場資料寫進 OneDrive `投資資料/市場/<報別>/`（`tools/report_sync.py`），並推播一則。早報、晚報另外寫 `news_<星期幾 1～7>.json`（財經＋生活新聞），每週同一天自動蓋掉舊檔，不用另外刪；也寫 `news_digest.json`（摘要，句子裡的連結只留新聞列過的網址）。摘要的類別、順序、哪些先看都由 `報告指示/早報.md`、`晚報.md` 決定，首頁程式不寫死：`news_digest` 每筆是 `{cat, text, more?, tag?}`，照出現的順序顯示（最多 8 類、類別名稱最長 8 字），同一類寫多筆就合併；`text` 一定顯示，`more` 預設收起來、點「更多」才展開，`tag` 是額外的小標籤（最長 12 字，例如「持股」「日照」）；台股／美股／總經／持股／財經用藍色、其他類別用綠色。首頁「新聞」區顯示最新一份摘要（最新那份缺的類別用 24 小時內另一份補，位置照它在那份裡的前後順序），7 天內的新聞列表收在下面，點了開原文。完整的工作指示放在 OneDrive `投資資料/報告指示/*.md`（私人，不在 GitHub），要改報告內容就改那三個檔。
-- **沁耘網站與社群**：每日同步從 WordPress.com（qinyunhealth.com）和 Metricool（hecho.daycare 的 IG、FB、Google 商家）抓數字，寫進 OneDrive 的 `Sam Homepage/company_stats.json`。首頁只讀這個檔，網頁裡不存任何 WordPress 或 Metricool 的權杖。
+- **沁耘網站與社群**：每日同步 07:30 從 WordPress.com（qinyunhealth.com）和 Metricool（hecho.daycare 的 IG、FB、Google 商家）抓數字，寫進 OneDrive 的 `Sam Homepage/company_stats.json`（本月數字）與 `company_history.json`（網站每月、社群每日的歷史，最多留 24 個月與 150 天）。首頁只讀這兩個檔，網頁裡不存任何 WordPress 或 Metricool 的權杖。
   - 工作卡片顯示沁耘網站本月瀏覽（電腦上另有訪客、文章數，以及 IG、FB 追蹤人數）。
   - 網站兩週沒有新文章、IG 或 FB 兩週沒發文、數字超過 3 天沒更新，都會列進重點。
+  - **沁耘頁**（`company.html`，工作卡片的「詳細 →」；取代舊工作儀表板的網站與社群部分）：本月瀏覽、訪客、IG／FB 追蹤、網站每月瀏覽與訪客、追蹤人數與每日觸及（近 35 天）、Google 商家曝光與點擊。和果的出席、營收、交班趨勢不在首頁，以 YunCare 為主。
 - **投資**：每日同步把 OneDrive `投資資料/holdings.json`（持股，只在買賣時由 Claude 修改）和 `state.json`（最新價格、最近 70 天總資產）抄到雲端暫存，執行 `tools/invest_sync.py`，用公開收盤價（都不用登入）算出總資產、國泰、嘉信、今日與本月變動，寫回 `state.json` 和 `Sam Homepage/invest.json`。抄的時候會核對檔案大小，不對就不更新。`history.json` 是 11/4 以前的舊紀錄，不再更新。首頁只讀這個彙總檔，看不到股數、代號或帳號；持股檔不在 GitHub。
   - 總資產單日或本月變動超過「投資變動門檻」（Excel「設定」表，預設 2%）、數字超過 3 天沒更新、有價格沒抓到，都會列進重點。
   - 買賣或入金出金後，在 Claude App 告訴 Claude，由「首頁投資與旅行」技能改持股檔；隔天 07:30 首頁就會更新。
@@ -134,9 +135,10 @@ powershell -ExecutionPolicy Bypass -File tools/serve.ps1
 
 提醒類（和果、天氣、匯率、社群）沒有「完成」按鈕：情況解除了就會自動消失。
 
-**同步檔**（都在 OneDrive 的 Sam Homepage 資料夾，首頁只讀）：
+**同步檔**（都在 OneDrive 的 Sam Homepage 資料夾，首頁只讀；每個檔由哪個排程寫，見上面各項）：
 - ticktick.json：TickTick 逾期與 7 天內到期的待辦，只有標題、清單、日期時間、優先順序，不含備註
-- company_stats.json：沁耘網站與社群數字
+- company_stats.json、company_history.json：沁耘網站與社群的本月數字與歷史
+- alerts_weather.json、alerts_ops.json：天氣與營運警報（只有標題、一句提醒、來源連結）
 - invest.json：投資彙總（總資產、國泰、嘉信、變動 %），沒有持股明細
 - life.json：旅行（名稱、日期、地點、確定或規劃中、一句提醒）
 - SamHomepage.xlsx：卡片說明與門檻
@@ -151,6 +153,7 @@ powershell -ExecutionPolicy Bypass -File tools/serve.ps1
 | `template/SamHomepage.xlsx` | 第一次登入時上傳到 OneDrive 的空白資料表 |
 | `tools/serve.ps1` | 本機測試用伺服器 |
 | `tools/make-template.ps1`、`tools/make-icons.ps1` | 重新產生 Excel 範本與圖示 |
+| `company.html`、`company.css`、`js/company.js`、`js/company-data.js` | 沁耘頁（網站與社群趨勢）；`company-data.js` 是純資料整理，`tests/parse-test.html` 測它 |
 | `invest.html`、`invest.css`、`js/invest/` | 投資頁；`js/invest/page*.js` 是舊儀表板的頁面程式，`shim.js`、`load.js`、`data.js` 負責從 OneDrive 讀資料 |
 | `tools/invest_plan.py` | 投資計畫書的四池、觸發警報與小計（`invest_sync.py --selftest` 一起測） |
 | `tools/report_sync.py` | 把早報、晚報、週回顧整理的資料轉成投資頁「市場」分頁與首頁「新聞」區的檔（`--selftest` 跑測試） |

@@ -195,7 +195,7 @@ export function demoHecho() {
 }
 
 // ---------- TickTick 同步檔 ----------
-// Claude 每次改 TickTick 後會更新這個檔，每天 07:30 的排程也會再整理一次
+// Claude 每次改 TickTick 後會更新這個檔；雲端同步每天 07:30、12:30、15:30、18:30、21:30 也會整理一次
 
 export async function oneDriveJson(relPath) {
   const path = relPath.split('/').map(encodeURIComponent).join('/');
