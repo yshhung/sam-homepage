@@ -11,7 +11,7 @@
 <script src="../vendor/lunar-javascript-1.7.7.js"></script>
 <script type="module">
 import { almanac, almanacText, lunarDay, toTrad } from '../js/almanac.js';
-import { digestView, eventDays, hechoSummary, investView, lifeView, newsView, parseCsv } from '../js/sources.js';
+import { alertsView, digestView, eventDays, hechoSummary, investView, lifeView, newsView, parseCsv } from '../js/sources.js';
 
 const out = document.getElementById('out');
 let failed = 0;
@@ -114,6 +114,26 @@ check('摘要最多 8 類', dv3 && dv3.items.length === 8);
 check('摘要空白的 text、沒類別的略過', digestView([{ by: '早報', at: '2026-01-08T08:50:00+08:00', items: [{ cat: '台股', text: '  ' }, { cat: '', text: 'x' }] }], nnow) === null);
 check('摘要超過 3 天不顯示', digestView([{ by: '早報', at: '2026-01-01T08:50:00+08:00', items: [{ cat: '台股', text: 'x' }] }], nnow) === null);
 check('摘要沒有資料不會壞', digestView(null, nnow) === null);
+
+// 天氣與營運警報：只顯示 risk、warn；過期的、沒標題的、ok 的不顯示；檔太久沒更新要提醒；兩個檔合併、同標題去重
+const anow = new Date('2026-11-08T12:00:00+08:00');
+const av = alertsView([
+  { path: 'Sam Homepage/alerts_weather.json', updated: '2026-11-08 07:35', by: '每日同步', alerts: [
+    { tag: '海上颱風警報', lvl: 'risk', title: '示範颱風海上警報生效', text: '北部風雨最大在晚上', until: '2026-11-09', src: '中央氣象署', url: 'https://example.test/t' },
+    { tag: '低溫警戒', lvl: 'warn', title: '低溫特報生效', until: '2026-11-07' },
+    { tag: '停班停課', lvl: 'ok', title: '今天正常上班上課' },
+    { tag: '強風特報', lvl: 'warn', title: '強風特報生效', url: 'javascript:alert(1)' },
+    { lvl: 'risk' },
+  ] },
+  { path: 'Sam Homepage/alerts_ops.json', updated: '2026-11-07 05:00', by: '早報', alerts: [
+    { tag: '停水停電', lvl: 'warn', title: '土城明日停水', text: '09:00–17:00 提前儲水' },
+    { tag: '強風特報', lvl: 'warn', title: '強風特報生效' },
+  ] },
+], '2026-11-08', anow);
+check('警報：只留 risk、warn，過期的與 ok 的不顯示', av.entries.map((e) => e.title).join('|') === '示範颱風海上警報生效|強風特報生效|土城明日停水', JSON.stringify(av.entries.map((e) => e.title)));
+check('警報：壞網址拿掉、好網址留著、同標題去重', av.entries[0].url === 'https://example.test/t' && av.entries[1].url === '' && av.entries.length === 3);
+check('警報：超過 30 小時沒更新的檔要提醒', av.stale.length === 1 && av.stale[0].name.includes('ops') && av.stale[0].hours >= 30, JSON.stringify(av.stale));
+check('警報：空的、沒檔都不會壞', alertsView([], '2026-11-08', anow).entries.length === 0 && alertsView(null, '2026-11-08', anow).entries.length === 0 && alertsView([{ alerts: [] }], '2026-11-08', anow).entries.length === 0);
 
 // 農民曆（套件離線計算；春節日期是公開的固定資料）
 check('農曆：2026/2/17 是正月初一', almanac('2026-02-17')?.lunar === '正月初一', JSON.stringify(almanac('2026-02-17')));

@@ -334,6 +334,45 @@ export function planView(inv, today) {
   return { pools, alerts, stats, note, summary };
 }
 
+// ---------- 天氣與營運警報 ----------
+// 每日同步一天 5 次寫 alerts_weather.json（颱風、停班停課、氣象署特報）；早報、晚報寫 alerts_ops.json（停水停電、空品、疫情、道路）。
+// 格式：{updated:"YYYY-MM-DD HH:MM", by, alerts:[{tag, lvl:"risk|warn|ok", title, text?, until?:"YYYY-MM-DD", src?, url?}]}
+// 沒有警報就是空陣列。首頁只顯示 risk（紅）與 warn（黃），ok 不顯示；until 過了就不顯示；檔太久沒更新會提醒。
+
+export async function getAlerts() {
+  const files = await Promise.all(CONFIG.alertsPaths.map((p) => oneDriveJson(p)));
+  return files.map((f, i) => (f && typeof f === 'object' ? { ...f, path: CONFIG.alertsPaths[i] } : null)).filter(Boolean);
+}
+
+export function demoAlerts() {
+  const t = dateStr();
+  return [{ updated: `${t} 07:35`, by: '示範', path: 'demo', alerts: [
+    { tag: '低溫警戒', lvl: 'warn', title: '示範：低溫特報生效', text: '明晨新北最低 9°C，長輩保暖、接送加衣物', until: addDays(t, 1), src: '中央氣象署', url: 'https://www.cwa.gov.tw/' },
+  ] }];
+}
+
+const ALERT_STALE_HOURS = 30;
+export function alertsView(files, today, now = new Date()) {
+  const entries = [];
+  const stale = [];
+  const seen = new Set();
+  for (const f of Array.isArray(files) ? files : []) {
+    if (!f || !Array.isArray(f.alerts)) continue;
+    const at = Date.parse(String(f.updated || '').replace(' ', 'T') + '+08:00');
+    if (Number.isFinite(at) && now.getTime() - at > ALERT_STALE_HOURS * 3600e3) stale.push({ name: f.path || '', hours: Math.floor((now.getTime() - at) / 3600e3), by: f.by || '' });
+    for (const a of f.alerts) {
+      if (!a || !a.title || (a.lvl !== 'risk' && a.lvl !== 'warn')) continue;
+      if (a.until && /^\d{4}-\d{2}-\d{2}$/.test(a.until) && a.until < today) continue;
+      const tag = String(a.tag || '警報').slice(0, 8);
+      const key = `${tag}:${a.title}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      entries.push({ key, tag, lvl: a.lvl, title: String(a.title).slice(0, 40), text: String(a.text || '').slice(0, 80), src: String(a.src || ''), url: /^https?:\/\//.test(a.url || '') ? a.url : '' });
+    }
+  }
+  return { entries, stale };
+}
+
 // ---------- 生活：旅行倒數＋TickTick 生活清單 ----------
 
 export const LIFE_LISTS = ['🏠我的家庭', '🏃我的生活', '📦生活瑣事'];

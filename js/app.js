@@ -5,7 +5,7 @@ import { getAccount, initAuth, isConfigured, login, logout } from './auth.js';
 import { DemoStore, ExcelStore } from './store.js';
 import {
   demoCalendar, demoCompany, demoHecho, demoInvest, demoLife, demoMail, demoMonthDays, demoNews, demoTickTick,
-  getCalendar, getCompany, getFx, getHecho, getInvest, getLife, getLocation, getMail, getMonthDays, getNews, getTickTick, getWeather, hechoSummary,
+  alertsView, demoAlerts, getAlerts, getCalendar, getCompany, getFx, getHecho, getInvest, getLife, getLocation, getMail, getMonthDays, getNews, getTickTick, getWeather, hechoSummary,
   digestView, investView, lifeView, newsView, planView,
 } from './sources.js';
 import { addDays, dateStr, diffDays, el, relDay, shortDate, timeStr, weekday } from './util.js';
@@ -25,7 +25,7 @@ const TICKTICK_WEB = 'https://ticktick.com/webapp/';
 const state = {
   store: null,
   cards: [], settings: { ...CONFIG.defaults },
-  events: [], monthDays: [], weather: null, fx: null, mail: [], hecho: null, company: null, ticktick: null, invest: null, life: null, news: [], digests: [],
+  events: [], alerts: [], monthDays: [], weather: null, fx: null, mail: [], hecho: null, company: null, ticktick: null, invest: null, life: null, news: [], digests: [],
   errors: {}, syncedAt: null, loading: false,
   showUpcoming: false, showAllNews: false, showAllFocus: false, showNewsList: false, openMore: new Set(),
 };
@@ -107,6 +107,12 @@ function autoEntries(today) {
     });
   }
 
+  // 天氣與營運警報（颱風、停班停課、特報、停水停電、空品、疫情、道路）：紅的排最上面，黃的排在前面
+  const al = alertsView(state.alerts, today);
+  for (const a of al.entries) {
+    out.push({ key: `alert:${a.key}`, cat: a.tag, domain: '工作', title: a.title, meta: [a.text, a.src].filter(Boolean).join(' · '), level: a.lvl === 'risk' ? 'bad' : 'warn', link: a.url || undefined, linkLabel: '看公告', sort: a.lvl === 'risk' ? -1.5 : 0.05 });
+  }
+  for (const f of al.stale) out.push({ key: `alert:stale:${f.name}`, cat: '警報', domain: '工作', title: `${f.name.includes('weather') ? '天氣' : '營運'}警報 ${f.hours} 小時沒更新`, meta: '下一次同步或報告會再更新；颱風期間請自己看氣象署公告', level: 'info', sort: 0.8 });
   out.push(...hechoEntries(today));
   out.push(...companyEntries(today));
 
@@ -530,7 +536,7 @@ async function settle(name, p) {
     state.errors[name] = {
       data: `卡片與門檻：${err.message}`, calendar: '行事曆抓不到', weather: '天氣抓不到', fx: '匯率抓不到',
       mail: '信件抓不到', hecho: `和果資料抓不到（${err.message}）`, company: '網站與社群數字抓不到', ticktick: 'TickTick 同步檔抓不到',
-      invest: '投資數字抓不到', life: '旅行資料抓不到', news: '新聞抓不到', month: '本月行程抓不到',
+      invest: '投資數字抓不到', life: '旅行資料抓不到', news: '新聞抓不到', month: '本月行程抓不到', alerts: '天氣與營運警報抓不到',
     }[name];
     return undefined;
   }
@@ -543,7 +549,7 @@ async function refresh() {
   lastRefresh = Date.now();
   renderStatus();
   const live = state.store.mode === 'live';
-  const [db, events, weather, fx, mail, hecho, company, ticktick, invest, life, news, monthDays] = await Promise.all([
+  const [db, events, weather, fx, mail, hecho, company, ticktick, invest, life, news, monthDays, alerts] = await Promise.all([
     settle('data', state.store.load()),
     live ? settle('calendar', getCalendar()) : Promise.resolve(demoCalendar()),
     settle('weather', getLocation().then(getWeather)),
@@ -556,10 +562,12 @@ async function refresh() {
     live ? settle('life', getLife()) : Promise.resolve(demoLife()),
     live ? settle('news', getNews()) : Promise.resolve(demoNews()),
     live ? settle('month', getMonthDays()) : Promise.resolve(demoMonthDays()),
+    live ? settle('alerts', getAlerts()) : Promise.resolve(demoAlerts()),
   ]);
   if (db) Object.assign(state, db);
   if (events) state.events = events;
   if (monthDays) state.monthDays = monthDays;
+  if (alerts) state.alerts = alerts;
   if (weather) state.weather = weather;
   if (fx) state.fx = fx;
   if (mail) state.mail = mail;

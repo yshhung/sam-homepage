@@ -13,6 +13,9 @@ export const CONFIG = {
   tickTickPath: 'Sam Homepage/ticktick.json',
   // 投資彙總（總資產、國泰、嘉信、變動 %）：每天 07:30 排程用 tools/invest_sync.py 更新，沒有持股明細
   investPath: 'Sam Homepage/invest.json',
+  // 天氣與營運警報：每日同步（07:30、12:30、15:30、18:30、21:30）寫第一個（颱風、停班停課、氣象署特報），
+  // 早報與晚報寫第二個（停水停電、空品、疫情、道路）；各寫各的檔，首頁兩個都讀
+  alertsPaths: ['Sam Homepage/alerts_weather.json', 'Sam Homepage/alerts_ops.json'],
   // 旅行：行程確定或改變時由 Claude 更新
   lifePath: 'Sam Homepage/life.json',
 
