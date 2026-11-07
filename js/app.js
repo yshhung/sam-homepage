@@ -27,7 +27,7 @@ const state = {
   cards: [], settings: { ...CONFIG.defaults },
   events: [], monthDays: [], weather: null, fx: null, mail: [], hecho: null, company: null, ticktick: null, invest: null, life: null, news: [], digests: [],
   errors: {}, syncedAt: null, loading: false,
-  showUpcoming: false, showAllNews: false, showAllFocus: false, showNewsList: false,
+  showUpcoming: false, showAllNews: false, showAllFocus: false, showNewsList: false, openMore: new Set(),
 };
 
 // ---------- 組出今日重點 ----------
@@ -391,9 +391,18 @@ function renderNews(today) {
   $('news-h').textContent = dg ? '新聞摘要' : '早報、晚報整理的新聞';
   $('news-count').textContent = dg ? `${dg.by} · ${dayLabel(dg.day)} ${dg.time}` : items.length ? String(items.length) : '';
   $('news-digest').hidden = !dg;
-  $('news-digest').replaceChildren(...(dg ? dg.items.map((it) => el('div', { class: `n-dig ${it.cat === '生活' ? 'life' : 'fin'}` },
-    el('span', { class: 'chip' }, it.from ? `${it.cat} · ${it.from}` : it.cat),
-    el('p', {}, ...it.parts.map((p) => (p.url ? el('a', { href: p.url, target: '_blank', rel: 'noopener noreferrer' }, p.text) : p.text))))) : []));
+  const linkNodes = (parts) => parts.map((p) => (p.url ? el('a', { href: p.url, target: '_blank', rel: 'noopener noreferrer' }, p.text) : p.text));
+  // 分類、順序、哪些先看都由早報／晚報指示決定；有「更多」的類別預設收起來，點了才展開（只記在這次畫面）
+  $('news-digest').replaceChildren(...(dg ? dg.items.map((it) => {
+    const open = state.openMore.has(it.cat);
+    return el('div', { class: `n-dig ${it.tone}` },
+      el('div', { class: 'n-chips' },
+        el('span', { class: 'chip' }, it.from ? `${it.cat} · ${it.from}` : it.cat),
+        it.tag ? el('span', { class: 'chip mine' }, it.tag) : null),
+      el('p', {}, ...linkNodes(it.parts)),
+      it.more && open ? el('p', { class: 'n-more' }, ...linkNodes(it.more)) : null,
+      it.more ? el('button', { class: 'link-btn n-more-btn', type: 'button', onclick: () => { if (open) state.openMore.delete(it.cat); else state.openMore.add(it.cat); render(); } }, open ? '▾ 收起' : '▸ 更多') : null);
+  }) : []));
   const listOpen = !dg || state.showNewsList;
   $('news-list').hidden = !listOpen;
   const toggle = $('btn-news-list');

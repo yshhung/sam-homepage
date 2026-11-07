@@ -9,7 +9,7 @@
   輸出：<輸出資料夾>/mk_tiles.json、mk_notes.json、fin_news.json、inv_brief.json，有 Cover Call 表才有 cc_ref.json；
         早報、晚報另外寫 news_<星期幾 1～7>.json（財經＋生活新聞），給首頁的「新聞」區；
         每週同一天會蓋掉上週那天的檔，所以首頁永遠有最近 7 天的新聞，不用另外刪；
-        data.json 有 news_digest（各類別一段摘要）時另外寫 news_digest.json，首頁顯示最新一份，
+        data.json 有 news_digest（各類別一段摘要，類別與順序由報告指示決定）時另外寫 news_digest.json，首頁顯示最新一份，
         摘要裡的連結只留本報新聞列過的網址（AI 自己生出來的網址會變成純文字）
         最後一行印出 BYTES {檔名: 位元組數}
 """
@@ -50,7 +50,9 @@ def text_items(b):
     return out
 
 
-DIGEST_CATS = ('台股', '美股', '總經', '生活')
+DIGEST_MAX_CATS = 8   # 最多幾個類別
+DIGEST_CAT_LEN = 8    # 類別名稱最長幾個字
+DIGEST_TAG_LEN = 12   # 小標籤最長幾個字
 LINK = re.compile(r'\[([^\]\n]+)\]\(([^)\s]+)\)')
 
 
@@ -59,16 +61,45 @@ def norm_url(u):
 
 
 def digest(data, urls):
-    """news_digest → [{cat, text}]：類別照固定順序、空的不留、連結只留新聞列過的網址"""
+    """news_digest → [{cat, text, more?, tag?}]。
+    類別名稱與順序由報告指示決定（照 data.json 裡出現的順序，不認識的名稱也留；最多 8 類、名稱最長 8 字）。
+    text 一定顯示；more 是首頁預設收起來的「更多」；tag 是額外的小標籤（最長 12 字，例如「持股」「長照」）。
+    同一類寫多筆就合併成一段。空的不留，連結只留新聞列過的網址。"""
     ok = {norm_url(u) for u in urls}
     def fix(m):
         text, url = m.group(1), m.group(2)
         return m.group(0) if url.startswith(('https://', 'http://')) and norm_url(url) in ok else text
-    by = {}
+    def clean(v):
+        return LINK.sub(fix, str(v or '').strip())
+    cats, by = [], {}
     for it in data.get('news_digest') or []:
-        if isinstance(it, dict) and it.get('cat') in DIGEST_CATS and str(it.get('text') or '').strip():
-            by.setdefault(it['cat'], []).append(LINK.sub(fix, str(it['text']).strip()))
-    return [{'cat': c, 'text': '\n'.join(by[c])} for c in DIGEST_CATS if c in by]
+        if not isinstance(it, dict):
+            continue
+        cat = str(it.get('cat') or '').strip()[:DIGEST_CAT_LEN]
+        text = clean(it.get('text'))
+        if not cat or not text:
+            continue
+        if cat not in by:
+            if len(cats) >= DIGEST_MAX_CATS:
+                continue
+            cats.append(cat)
+            by[cat] = {'text': [], 'more': [], 'tag': ''}
+        by[cat]['text'].append(text)
+        more = clean(it.get('more'))
+        if more:
+            by[cat]['more'].append(more)
+        tag = str(it.get('tag') or '').strip()[:DIGEST_TAG_LEN]
+        if tag and not by[cat]['tag']:
+            by[cat]['tag'] = tag
+    out = []
+    for c in cats:
+        row = {'cat': c, 'text': '\n'.join(by[c]['text'])}
+        if by[c]['more']:
+            row['more'] = '\n'.join(by[c]['more'])
+        if by[c]['tag']:
+            row['tag'] = by[c]['tag']
+        out.append(row)
+    return out
 
 
 def convert(slot, data, now):
@@ -174,7 +205,9 @@ def selftest():
         'news_digest': [
             {'cat': '生活', 'text': '假生活摘要[L](https://example.test/l/)。'},
             {'cat': '台股', 'text': '假台股摘要[A](https://example.test/a?x=1)，[編的](https://example.test/fake)，[壞](javascript:alert)。'},
-            {'cat': '其他', 'text': '不該出現'}, {'cat': '美股', 'text': '  '},
+            {'cat': '長照', 'text': '長照一句。', 'more': '長照更多[A](https://example.test/a)。', 'tag': '日照'},
+            {'cat': '長照', 'text': '長照第二筆。', 'tag': '被忽略'},
+            {'cat': '美股', 'text': '  '}, {'cat': '', 'text': '沒類別'}, {'cat': '很長很長很長很長很長的類別', 'text': '名稱會被截短'},
         ],
         'invest': [
             {'t': 'watch', 'title': '今日觀察', 'items': [{'lvl': 'look', 'text': '假觀察'}]},
@@ -199,9 +232,14 @@ def selftest():
     hn = out.get('news_1.json')  # 2026-01-05 是週一
     check('首頁新聞檔：財經＋生活、只留 http 網址', hn is not None and [(r['cat'], r['title']) for r in hn] == [('財經', 'A'), ('生活', 'L')])
     dg = out.get('news_digest.json')
-    check('摘要：類別照順序、去掉空的與不認識的', dg and dg['by'] == '早報' and [r['cat'] for r in dg['items']] == ['台股', '生活'])
-    check('摘要：只留新聞列過的網址', dg and dg['items'][0]['text'] == '假台股摘要[A](https://example.test/a?x=1)，編的，壞。'
-          and '[L](https://example.test/l/)' in dg['items'][1]['text'])
+    check('摘要：類別照檔案裡的順序、去掉空的與沒類別的、名稱截短', dg and dg['by'] == '早報' and [r['cat'] for r in dg['items']] == ['生活', '台股', '長照', '很長很長很長很長'])
+    check('摘要：只留新聞列過的網址', dg and dg['items'][1]['text'] == '假台股摘要[A](https://example.test/a?x=1)，編的，壞。'
+          and '[L](https://example.test/l/)' in dg['items'][0]['text'])
+    cl = next((r for r in (dg or {}).get('items', []) if r['cat'] == '長照'), {})
+    check('摘要：同類合併、more 與 tag 帶出來（tag 取第一個）', cl.get('text') == '長照一句。\n長照第二筆。' and cl.get('more') == '長照更多[A](https://example.test/a)。' and cl.get('tag') == '日照')
+    check('摘要：沒有 more、tag 的類別不寫這兩欄', dg and 'more' not in dg['items'][0] and 'tag' not in dg['items'][0])
+    many = convert('早報', {**data, 'news_digest': [{'cat': f'類{i}', 'text': 'x'} for i in range(12)]}, now)['news_digest.json']['items']
+    check('摘要：最多 8 類', len(many) == 8)
     check('沒寫摘要就不寫摘要檔', 'news_digest.json' not in convert('晚報', {**data, 'news_digest': []}, now))
     check('週回顧不寫首頁新聞檔', not any(k.startswith('news_') for k in convert('週回顧', data, now)))
     print('PASS' if ok else 'FAIL')

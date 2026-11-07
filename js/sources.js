@@ -421,10 +421,11 @@ export function demoNews() {
   const digest = {
     by: '早報', at: `${t}T08:50:00+08:00`,
     items: [
+      { cat: '長照', tag: '日照', text: '示範：[某項長照補助上路](https://example.com/)，申請方式簡化。', more: '示範：另有[照服員薪資新制](https://example.com/)，下月起適用。' },
+      { cat: '生活', text: '示範：本週物價小幅上漲，基本工資明年調整。' },
+      { cat: '美股', tag: '持股', text: '示範：某持股[公布財報](https://example.com/)，盤後上漲。', more: '示範：費半收漲 1%，AI 族群走強。' },
       { cat: '台股', text: '示範：某指數[收漲 1%](https://example.com/)，電子股帶動。' },
-      { cat: '美股', text: '示範：某公司[公布財報](https://example.com/)，盤後上漲；另一檔持平。' },
       { cat: '總經', text: '示範：今晚公布某項經濟數據，市場預期持平。' },
-      { cat: '生活', text: '示範：[某項長照補助上路](https://example.com/)，申請方式簡化。' },
     ],
   };
   return { digests: [digest], rows: [
@@ -434,32 +435,56 @@ export function demoNews() {
   ] };
 }
 
-// 摘要：取最新一份（3 天內）；最新那份沒有的類別（例如晚報沒有生活），用 24 小時內另一份補上並標出是哪份；
-// 類別照固定順序；[文字](網址) 拆成文字與連結（只認 http(s)）
-const DIGEST_CATS = ['台股', '美股', '總經', '生活'];
+// 摘要：取最新一份（3 天內）。類別、順序、哪些先看、哪些收起來，全部由報告指示（早報.md、晚報.md）決定，程式不寫死：
+//   items: [{cat, text, more?, tag?}]，照檔案裡出現的順序顯示；同一個 cat 寫多筆就合併成一段。
+//   text 一定顯示；more 是「更多」（預設收起來，點了才展開）；tag 是額外的小標籤，例如「持股」「長照」。
+// 最新那份沒有的類別（例如晚報沒有生活），用 24 小時內另一份補上並標出是哪份，位置照它在那份裡的前後順序插進去。
+// [文字](網址) 拆成文字與連結（只認 http(s)）；顏色：台股、美股、總經、持股、財經 用藍，其他用綠。
+const DIGEST_FIN = ['台股', '美股', '總經', '持股', '財經'];
+const DIGEST_MAX_CATS = 8;
 const LINK_RE = /\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g;
+function linkParts(raw) {
+  const text = String(raw || '').trim().replace(/\[([^\]\n]+)\]\((?!https?:\/\/)[^)\s]*\)/g, '$1');
+  const parts = [];
+  let last = 0;
+  for (const m of text.matchAll(LINK_RE)) {
+    if (m.index > last) parts.push({ text: text.slice(last, m.index) });
+    parts.push({ text: m[1], url: m[2] });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push({ text: text.slice(last) });
+  return parts;
+}
+const joinText = (rows, key) => rows.map((it) => String(it[key] || '').trim()).filter(Boolean).join('\n');
 export function digestView(digests, now = new Date()) {
   const all = (Array.isArray(digests) ? digests : [])
     .filter((x) => x && Array.isArray(x.items) && x.items.length && Date.parse(x.at) >= now.getTime() - 3 * 86400000)
     .sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
   const d = all[0];
   if (!d) return null;
-  const items = DIGEST_CATS.map((cat) => {
-    const has = (x) => x.items.some((it) => it && it.cat === cat && String(it.text || '').trim());
-    const src = has(d) ? d : all.find((x) => has(x) && Date.parse(d.at) - Date.parse(x.at) <= 86400000);
-    if (!src) return null;
-    const text = src.items.filter((it) => it && it.cat === cat).map((it) => String(it.text || '').trim()).filter(Boolean).join('\n')
-      .replace(/\[([^\]\n]+)\]\((?!https?:\/\/)[^)\s]*\)/g, '$1');
-    if (!text) return null;
-    const parts = [];
-    let last = 0;
-    for (const m of text.matchAll(LINK_RE)) {
-      if (m.index > last) parts.push({ text: text.slice(last, m.index) });
-      parts.push({ text: m[1], url: m[2] });
-      last = m.index + m[0].length;
+  const rowsOf = (x, cat) => x.items.filter((it) => it && String(it.cat || '').trim().slice(0, 8) === cat && String(it.text || '').trim());
+  const catsOf = (x) => [...new Set(x.items.filter((it) => it && String(it.text || '').trim()).map((it) => String(it.cat || '').trim().slice(0, 8)).filter(Boolean))];
+  const order = catsOf(d).slice(0, DIGEST_MAX_CATS);
+  const from = new Map(order.map((c) => [c, d]));
+  for (const x of all.slice(1)) {
+    if (Date.parse(d.at) - Date.parse(x.at) > 86400000) continue;
+    let prev = null;
+    for (const c of catsOf(x)) {
+      if (!from.has(c) && order.length < DIGEST_MAX_CATS) {
+        order.splice(prev === null ? 0 : order.indexOf(prev) + 1, 0, c);
+        from.set(c, x);
+      }
+      if (from.has(c)) prev = c;
     }
-    if (last < text.length) parts.push({ text: text.slice(last) });
-    return { cat, parts, from: src === d ? '' : src.by || '' };
+  }
+  const items = order.map((cat) => {
+    const src = from.get(cat);
+    const rows = rowsOf(src, cat);
+    const parts = linkParts(joinText(rows, 'text'));
+    if (!parts.length) return null;
+    const more = linkParts(joinText(rows, 'more'));
+    const tag = rows.map((it) => String(it.tag || '').trim().slice(0, 12)).find(Boolean) || '';
+    return { cat, parts, more: more.length ? more : null, tag, tone: DIGEST_FIN.includes(cat) ? 'fin' : 'life', from: src === d ? '' : src.by || '' };
   }).filter(Boolean);
   if (!items.length) return null;
   const at = new Date(d.at);

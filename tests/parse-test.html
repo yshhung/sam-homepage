@@ -87,24 +87,31 @@ check('新聞只留 7 天內、新的在前、同網址留最新', nv.map((n) =>
 check('新聞帶日期與分類', nv[0].day === '2026-01-08' && nv[0].cat === '生活' && nv[1].by === '晚報');
 check('新聞沒有資料不會壞', newsView(null, nnow).length === 0);
 
-// 新聞摘要：取 3 天內最新一份、類別照順序、[文字](網址) 拆成連結、非 http 不當連結
+// 新聞摘要：取 3 天內最新一份、類別與順序照檔案（不寫死）、[文字](網址) 拆成連結、非 http 不當連結
 const dv = digestView([
   { by: '晚報', at: '2026-01-07T22:05:00+08:00', items: [{ cat: '台股', text: '舊的' }] },
   { by: '早報', at: '2026-01-08T08:50:00+08:00', items: [
     { cat: '生活', text: '生活[一則](https://example.test/l)。' },
     { cat: '台股', text: '台股[甲](https://example.test/a)與[乙](javascript:x)。' },
-    { cat: '其他', text: '不顯示' },
+    { cat: '長照', text: '長照第一句。', more: '長照更多[丙](https://example.test/c)。', tag: '日照' },
   ] },
 ], nnow);
 check('摘要取最新一份', dv && dv.by === '早報' && dv.time === '08:50', JSON.stringify(dv));
-check('摘要類別照順序', dv && dv.items.map((i) => i.cat).join('|') === '台股|生活');
-check('摘要連結拆開、壞網址留文字', dv && JSON.stringify(dv.items[0].parts) === JSON.stringify([
-  { text: '台股' }, { text: '甲', url: 'https://example.test/a' }, { text: '與乙。' }]), JSON.stringify(dv && dv.items[0].parts));
+check('摘要類別照檔案順序、不認識的名稱也顯示', dv && dv.items.map((i) => i.cat).join('|') === '生活|台股|長照');
+check('摘要連結拆開、壞網址留文字', dv && JSON.stringify(dv.items[1].parts) === JSON.stringify([
+  { text: '台股' }, { text: '甲', url: 'https://example.test/a' }, { text: '與乙。' }]), JSON.stringify(dv && dv.items[1].parts));
+check('摘要：more 與 tag 帶出來、沒寫的是 null／空', dv && dv.items[2].tag === '日照' && dv.items[2].more.length === 3 && dv.items[2].more[1].url === 'https://example.test/c'
+  && dv.items[0].more === null && dv.items[0].tag === '');
+check('摘要顏色：台股用藍、其他用綠', dv && dv.items[1].tone === 'fin' && dv.items[0].tone === 'life' && dv.items[2].tone === 'life');
 const dv2 = digestView([
-  { by: '早報', at: '2026-01-08T08:50:00+08:00', items: [{ cat: '生活', text: '早上的生活' }, { cat: '台股', text: '早上的台股' }] },
-  { by: '晚報', at: '2026-01-08T22:05:00+08:00', items: [{ cat: '台股', text: '晚上的台股' }] },
+  { by: '早報', at: '2026-01-08T08:50:00+08:00', items: [{ cat: '長照', text: '早上的長照' }, { cat: '生活', text: '早上的生活' }, { cat: '台股', text: '早上的台股' }, { cat: '美股', text: '早上的美股' }] },
+  { by: '晚報', at: '2026-01-08T22:05:00+08:00', items: [{ cat: '台股', text: '晚上的台股' }, { cat: '總經', text: '晚上的總經' }] },
 ], new Date('2026-01-08T23:00:00+08:00'));
-check('晚報沒有的類別用早報補、標出來源', dv2 && dv2.by === '晚報' && dv2.items.map((i) => `${i.cat}:${i.parts[0].text}:${i.from}`).join('|') === '台股:晚上的台股:|生活:早上的生活:早報', JSON.stringify(dv2));
+check('晚報沒有的類別用早報補、標出來源，位置照早報的前後順序', dv2 && dv2.by === '晚報'
+  && dv2.items.map((i) => `${i.cat}:${i.parts[0].text}:${i.from}`).join('|') === '長照:早上的長照:早報|生活:早上的生活:早報|台股:晚上的台股:|美股:早上的美股:早報|總經:晚上的總經:', JSON.stringify(dv2 && dv2.items.map((i) => i.cat)));
+const dv3 = digestView([{ by: '早報', at: '2026-01-08T08:50:00+08:00', items: Array.from({ length: 12 }, (_, i) => ({ cat: `類${i}`, text: 'x' })) }], nnow);
+check('摘要最多 8 類', dv3 && dv3.items.length === 8);
+check('摘要空白的 text、沒類別的略過', digestView([{ by: '早報', at: '2026-01-08T08:50:00+08:00', items: [{ cat: '台股', text: '  ' }, { cat: '', text: 'x' }] }], nnow) === null);
 check('摘要超過 3 天不顯示', digestView([{ by: '早報', at: '2026-01-01T08:50:00+08:00', items: [{ cat: '台股', text: 'x' }] }], nnow) === null);
 check('摘要沒有資料不會壞', digestView(null, nnow) === null);
 
