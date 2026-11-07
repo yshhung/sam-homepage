@@ -57,7 +57,7 @@ function tickTickEntries(today) {
     (n <= lead ? focus : upcoming).push(e);
   }
   const age = t.updated ? diffDays(today, t.updated.slice(0, 10)) : 99;
-  if (age >= 2) focus.push({ key: 'tt:stale', cat: 'TickTick', domain: '工作', title: `TickTick 待辦 ${age} 天沒同步`, meta: '在 Claude App 改過待辦，或等每天 07:30 的備援同步', level: 'info', sort: 0.85 });
+  if (age >= 2) focus.push({ key: 'tt:stale', cat: 'TickTick', domain: '工作', title: `TickTick 待辦 ${age} 天沒同步`, meta: '在 Claude App 改過待辦，或等下一次同步（每天 07:30、12:00、15:00、18:00、21:00 前後）', level: 'info', sort: 0.85 });
   return { focus, upcoming };
 }
 

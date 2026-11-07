@@ -9,7 +9,7 @@ export const CONFIG = {
 
   // 沁耘網站與社群數字：由這台電腦上的排程每天更新（WordPress.com、Metricool）
   companyStatsPath: 'Sam Homepage/company_stats.json',
-  // TickTick 待辦：Claude 改完 TickTick 會更新，每天 07:30 排程備援
+  // TickTick 待辦：Claude 改完 TickTick 會更新；雲端排程每天 07:30、12:00、15:00、18:00、21:00 前後也會同步
   tickTickPath: 'Sam Homepage/ticktick.json',
   // 投資彙總（總資產、國泰、嘉信、變動 %）：每天 07:30 排程用 tools/invest_sync.py 更新，沒有持股明細
   investPath: 'Sam Homepage/invest.json',

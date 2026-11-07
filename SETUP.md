@@ -10,6 +10,7 @@
 想讓某封信出現在今日重點，在 Outlook 幫它加旗標就好。
 
 - **每日同步**：claude.ai 的雲端排程「Sam 首頁：每日同步（07:30）」每天早上 07:30 左右在雲端執行（不用開任何電腦），更新 OneDrive `Sam Homepage/` 裡的 ticktick.json、company_stats.json、invest.json。它跑在雲端環境「Sam 首頁同步」，網路只放行證交所、櫃買中心、Yahoo Finance、jsDelivr、currency-api 五個網址，連接器只接 Microsoft 365、TickTick、WordPress.com、Metricool。
+- **TickTick 白天同步**（2026-11-07 加）：claude.ai 雲端排程「Sam 首頁：TickTick 同步（12／15／18／21 點）」每天 11:43、14:43、17:43、20:43 在「Sam 首頁同步」環境執行，只做每日同步指示（`投資資料/報告指示/同步.md`）的 Part A，重寫 `ticktick.json`（`by` 寫「TickTick 同步」），不推播、不碰其他檔。這個排程要掛 Microsoft 365 與 TickTick 兩個連接器（在 claude.ai 的排程設定裡加）。
 - **早報、晚報、週回顧**（claude.ai 雲端排程，跑在可以連任何網站的「Sam 報告」環境）：早報每天 08:50（美股收盤、盤後、台股盤前）、晚報每天冬令 22:05／夏令 21:05（台股盤後、三大法人、美股盤前、今晚時程、Cover Call、事件行事曆，週六不跑）、週回顧每週日 03:03（本週回顧、下週行事曆、集中度）。各自更新價格與總資產（`tools/invest_sync.py`），把市場資料寫進 OneDrive `投資資料/市場/<報別>/`（`tools/report_sync.py`），並推播一則。早報、晚報另外寫 `news_<星期幾 1～7>.json`（財經＋生活新聞），每週同一天自動蓋掉舊檔，不用另外刪；也寫 `news_digest.json`（台股／美股／總經／生活各一段摘要，句子裡的連結只留新聞列過的網址）。首頁「新聞」區顯示最新一份摘要（最新那份缺的類別用 24 小時內另一份補），7 天內的新聞列表收在下面，點了開原文。完整的工作指示放在 OneDrive `投資資料/報告指示/*.md`（私人，不在 GitHub），要改報告內容就改那三個檔。
 - **沁耘網站與社群**：每日同步從 WordPress.com（qinyunhealth.com）和 Metricool（hecho.daycare 的 IG、FB、Google 商家）抓數字，寫進 OneDrive 的 `Sam Homepage/company_stats.json`。首頁只讀這個檔，網頁裡不存任何 WordPress 或 Metricool 的權杖。
   - 工作卡片顯示沁耘網站本月瀏覽（電腦上另有訪客、文章數，以及 IG、FB 追蹤人數）。
@@ -125,7 +126,7 @@ powershell -ExecutionPolicy Bypass -File tools/serve.ps1
 
 | 想做的事 | 在哪裡做 | 首頁什麼時候更新 |
 |---|---|---|
-| 新增、完成、改期待辦 | 在 Claude App 說，或直接在 TickTick 裡改 | 透過 Claude 改的：Claude 改完會順手更新同步檔，下次打開首頁就是新的。直接在 TickTick 改的：每天 07:30 的雲端每日同步補上 |
+| 新增、完成、改期待辦 | 在 Claude App 說，或直接在 TickTick 裡改 | 透過 Claude 改的：Claude 改完會順手更新同步檔，下次打開首頁就是新的。直接在 TickTick 改的：雲端排程每天 07:30、12:00、15:00、18:00、21:00 前後同步，最慢約 3 小時（晚上 21:00 之後的等隔天 07:30） |
 | 排行程 | Claude App 或 Outlook | 下次打開首頁 |
 | 信件不要再出現 | 在 Outlook 取消旗標或標成完成 | 下次打開首頁 |
 | 處理某件事 | 首頁上按「問 Claude」，會複製內容並打開 Claude | — |
