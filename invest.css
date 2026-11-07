@@ -258,3 +258,13 @@ body { -webkit-text-size-adjust: 100%; overflow-x: hidden; }
 .pa .chip { font-size: 11px; color: var(--mut); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
 .pools-stats { margin-top: 12px; }
 .pools-note { margin: 10px 0 0; }
+
+/* 手機與電腦都留左右邊距（原本靠 claude.ai 外框留白，搬過來後內容貼齊螢幕邊緣）；跟首頁一樣至少 16px，也避開瀏海 */
+.sd { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); box-sizing: border-box; }
+@media (min-width: 760px) { .sd { padding-left: max(24px, env(safe-area-inset-left)); padding-right: max(24px, env(safe-area-inset-right)); } }
+/* 手機上六個分頁擠在一列：字小一點、左右不留空，不用左右滑 */
+@media (max-width: 640px) {
+  .mk-tabs { overflow-x: auto; scrollbar-width: none; }
+  .mk-tabs::-webkit-scrollbar { display: none; }
+  .mk-tabs button { flex: 1 0 auto; padding: 8px 2px; font-size: 13px; }
+}
