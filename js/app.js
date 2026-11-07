@@ -13,12 +13,13 @@ import { almanac, lunarDay } from './almanac.js';
 
 const $ = (id) => document.getElementById(id);
 
-// 四張，手機 2×2、電腦一列 4 張；信件不另外開卡，直接列在今日重點
-const DOMAINS = ['沁耘', '和果', '投資', '生活'];
-// 沁耘是公司（網站、曝光、課程），和果是日照中心
-const DOMAIN_OF = { 和果: '和果', 沁耘: '沁耘', 網站: '沁耘', 社群: '沁耘', 課程: '沁耘', 信件: '工作', 行程: '工作', 投資: '投資', 天氣: '生活', 旅行: '生活' };
+// 三張一列：生活、投資、工作。工作＝沁耘（公司：網站、曝光、課程）＋和果（日照中心）＋信件、行程
+const DOMAINS = ['生活', '投資', '工作'];
+const DOMAIN_OF = { 和果: '工作', 沁耘: '工作', 網站: '工作', 社群: '工作', 課程: '工作', 信件: '工作', 行程: '工作', 投資: '投資', 天氣: '生活', 旅行: '生活' };
 // TickTick 清單 → 卡片（清單定義見「待辦行程分流」技能）
-const LIST_DOMAIN = { '💼公司營運': '沁耘', '🦄未來拓展': '沁耘', '🏫社區長照營運': '和果', '🏠我的家庭': '生活', '🏃我的生活': '生活', '📦生活瑣事': '生活' };
+const LIST_DOMAIN = { '💼公司營運': '工作', '🦄未來拓展': '工作', '🏫社區長照營運': '工作', '🏠我的家庭': '生活', '🏃我的生活': '生活', '📦生活瑣事': '生活' };
+// Excel「卡片」表裡這幾列的說明都顯示在工作卡
+const CARD_ROWS = { 工作: ['工作', '沁耘', '和果'] };
 const TICKTICK_WEB = 'https://ticktick.com/webapp/';
 
 const state = {
@@ -353,21 +354,27 @@ function tile(k, v, s, tone = '') {
 
 function renderDomains(focus) {
   const cards = DOMAINS.map((d) => {
-    const c = state.cards.find((x) => x.領域 === d) || { 領域: d, 數字: '—', 說明: '' };
+    const rows = (CARD_ROWS[d] || [d]).map((k) => state.cards.find((x) => x.領域 === k)).filter(Boolean);
+    const notes = rows.map((r) => r.說明).filter((t) => t && !t.startsWith('在這裡寫一句'));
     const n = focus.filter((e) => domainOf(e) === d).length;
     const auto = autoCard(d);
     const link = auto?.link || CONFIG.detailLinks[d];
     return el('article', { class: 'domain' },
       el('div', { class: 'd-head' }, el('h2', {}, d)),
-      el('div', { class: 'd-num' }, auto?.num || c.數字 || '—'),
-      auto ? el('p', { class: 'd-text auto' }, auto.text) : null,
-      auto?.plan ? el('a', { class: `d-plan ${auto.plan.warn ? 'warn' : ''}`, href: 'invest.html#plans' }, auto.plan.text) : null,
-      c.說明 && !c.說明.startsWith('在這裡寫一句') ? el('p', { class: 'd-text' }, c.說明) : null,
-      d === '和果' && state.hecho ? el('button', { class: 'act d-ask', type: 'button', title: '複製最近的數字（沒有姓名），打開 Claude', onclick: askHecho }, '問 AI') : null,
+      auto?.stats
+        ? el('div', { class: 'd-stats' }, ...auto.stats.map((x) => el('div', { class: 'd-stat' }, el('div', { class: 'd-num' }, x.v), el('div', { class: 'd-k' }, x.k))))
+        : el('div', { class: 'd-num' }, auto?.num || rows[0]?.數字 || '—'),
+      auto?.text ? el('p', { class: 'd-text auto' }, auto.text) : null,
+      // 手機上卡片窄，四池只顯示「⚠️ 四池」，有問題才出現
+      auto?.plan ? el('a', { class: `d-plan ${auto.plan.warn ? 'warn' : 'ok'}`, href: 'invest.html#plans' },
+        el('span', { class: 'd-long' }, auto.plan.text), el('span', { class: 'd-short' }, '⚠️ 四池')) : null,
+      ...notes.map((t) => el('p', { class: 'd-text' }, t)),
+      d === '工作' && state.hecho ? el('button', { class: 'act d-ask', type: 'button', title: '複製最近的數字（沒有姓名），打開 Claude', onclick: askHecho }, '問 AI') : null,
       el('div', { class: 'd-foot' },
         el('span', { class: n ? 'pill on' : 'pill' }, n ? `${n} 件重點` : '沒有重點'),
         // 首頁自己的頁面（例如投資頁）在同一個畫面打開；外部連結開新分頁
-        link ? (/^https?:/.test(link) ? el('a', { href: link, target: '_blank', rel: 'noopener' }, '詳細 ↗') : el('a', { href: link }, '詳細 →')) : null));
+        link ? (/^https?:/.test(link) ? el('a', { href: link, target: '_blank', rel: 'noopener' }, '詳細 ↗') : el('a', { href: link }, '詳細 →'))
+          : el('span', { 'aria-hidden': 'true' }, '\u00a0'))); // 沒有連結也留位置，三張的最下面一行才對齊
   });
   $('domains').replaceChildren(...cards);
 }
@@ -405,17 +412,21 @@ function renderNews(today) {
 
 // 有即時資料的領域，數字自動填；Excel「卡片」表寫的說明照樣顯示在下面
 function autoCard(domain) {
-  if (domain === '沁耘' && state.company?.website) {
-    const { website: w, social: s = {} } = state.company;
-    const parts = [`網站本月 ${w.visitors} 位訪客、${w.posts} 篇文章（上月瀏覽 ${w.prevViews}）`];
-    parts.push(`IG ${s.igFollowers ?? '—'}・FB ${s.fbFollowers ?? '—'} 人追蹤`);
-    return { num: `${w.views} 瀏覽`, text: parts.join('；') };
-  }
-  if (domain === '和果' && state.hecho?.month?.rate) {
-    const { month, latest } = state.hecho;
-    const parts = [`和果 ${month.label} 出席率 · 每日平均 ${month.avg} 人`];
-    if (latest?.expected) parts.push(`${shortDate(latest.date)} 實到 ${latest.present ?? '未點名'}／${latest.expected}`);
-    return { num: `${Math.round(month.rate * 100)}%`, text: parts.join('；') };
+  // 工作：和果本月出席率、沁耘網站本月瀏覽並排；說明一行和果、一行沁耘
+  if (domain === '工作' && (state.company?.website || state.hecho?.month?.rate)) {
+    const stats = [];
+    const parts = [];
+    if (state.hecho?.month?.rate) {
+      const { month, latest } = state.hecho;
+      stats.push({ k: '和果出席', v: `${Math.round(month.rate * 100)}%` });
+      parts.push(`和果 ${month.label} 每日平均 ${month.avg} 人${latest?.expected ? `，${shortDate(latest.date)} 實到 ${latest.present ?? '未點名'}／${latest.expected}` : ''}`);
+    }
+    if (state.company?.website) {
+      const { website: w, social: so = {} } = state.company;
+      stats.push({ k: '網站瀏覽', v: String(w.views) });
+      parts.push(`沁耘網站 ${w.visitors} 位訪客、${w.posts} 篇文章；IG ${so.igFollowers ?? '—'}・FB ${so.fbFollowers ?? '—'} 人追蹤`);
+    }
+    return { stats, text: parts.join('；') };
   }
   if (domain === '投資') {
     const v = investView(state.invest, dateStr(), state.settings.投資變動門檻);
