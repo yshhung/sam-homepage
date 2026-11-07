@@ -500,18 +500,36 @@ function currentPosition() {
   });
 }
 
-// 座標換地名：先問 BigDataCloud（免費、不用金鑰），問不到就用下面內建的台灣地名表找最近的，
-// 再不行（例如出國）就顯示座標。成功的結果記在這台裝置，同一個座標不重複問。
+// 座標換地名：先問 BigDataCloud，再問 OpenStreetMap（Nominatim，全世界都有，出國也查得到），
+// 兩個都免費、不用金鑰；都連不到才用下面內建的台灣地名表，最後才顯示座標。
+// 這兩個服務要看到「從哪個網站來的」才肯回答，所以這兩個請求送出本站網址（只有網域，不含路徑）。
+// 成功的結果記在這台裝置，同一個座標不重複問。
 async function placeName(lat, lon) {
-  const key = `place2:${lat},${lon}`;
+  const key = `place3:${lat},${lon}`;
   try { const hit = localStorage.getItem(key); if (hit) return hit; } catch { /* 無痕模式等 */ }
-  let name = '';
-  try {
-    const q = new URLSearchParams({ latitude: lat, longitude: lon, localityLanguage: 'zh-Hant' });
-    name = geoName(await (await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?${q}`)).json());
-  } catch { /* 改用內建地名表 */ }
+  const ask = async (url, pick) => {
+    try {
+      const r = await fetch(url, { referrerPolicy: 'origin' });
+      return r.ok ? pick(await r.json()) : '';
+    } catch { return ''; }
+  };
+  const q1 = new URLSearchParams({ latitude: lat, longitude: lon, localityLanguage: 'zh-Hant' });
+  const q2 = new URLSearchParams({ lat, lon, format: 'jsonv2', zoom: '14', 'accept-language': 'zh-TW,zh,en' });
+  const name = await ask(`https://api.bigdatacloud.net/data/reverse-geocode-client?${q1}`, geoName)
+    || await ask(`https://nominatim.openstreetmap.org/reverse?${q2}`, osmName);
   if (name) { try { localStorage.setItem(key, name); } catch { /* 存不了也沒關係 */ } }
   return name || nearestPlace(lat, lon);
+}
+
+// Nominatim 的回應 → 「新北市土城區」；台灣以外的地方前面加國名，例如「日本東京都千代田區」
+export function osmName(r) {
+  const a = r?.address;
+  if (!a) return '';
+  const big = a.city || a.town || a.county || a.state || '';
+  const small = a.city_district || a.suburb || a.district || a.village || a.town || '';
+  let name = small && small !== big && !big.endsWith(small) ? `${big}${small}` : big || small;
+  if (a.country_code && a.country_code !== 'tw' && a.country) name = `${a.country}${name}`;
+  return name.trim();
 }
 
 // BigDataCloud 的回應 → 「新北市土城區」這種地名；city、locality 都空的時候，改用行政區清單裡最細的兩層
