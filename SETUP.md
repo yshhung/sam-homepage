@@ -161,3 +161,5 @@ powershell -ExecutionPolicy Bypass -File tools/serve.ps1
 | `tools/invest_plan.py` | 投資計畫書的四池、觸發警報與小計（`invest_sync.py --selftest` 一起測） |
 | `tools/report_sync.py` | 把早報、晚報、週回顧整理的資料轉成投資頁「市場」分頁與首頁「新聞」區的檔（`--selftest` 跑測試） |
 | `tools/invest_sync.py` | 每天更新投資彙總（`--selftest` 只跑計算測試，`--dry-run` 只印結果不寫檔） |
+
+- **和果頁**（`hecho.html`，2026-11-08 加）：首頁工作卡的「詳細」打開。讀和果群組 `常備資料區/土城和果儀表板資料` 裡 YunCare 匯出的 `hechotc_ops_monthly.csv`（每月出席率、服務個案數、新收與未再服務、年齡層、男女、平均年齡）和 `hechotc_handover_stats.json`（每天應到、實到、請假、異常）。只有人數，沒有姓名、案號、金額；沒登入時顯示示範數字。YunCare 是桌面程式，沒有網址可連，細節請在電腦看。沁耘頁與和果頁互相有連結。圖表程式共用 `js/charts.js`。

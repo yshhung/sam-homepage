@@ -178,6 +178,23 @@ export async function getHecho() {
   };
 }
 
+// 和果頁：每月一列的結構統計（只有人數，沒有姓名）加最近每天的交班數字
+export async function getHechoDetail() {
+  const [handover, monthly] = await Promise.all([
+    handoverStats(),
+    hechoFile(CONFIG.hecho.monthly).then((r) => r.text()).then(parseCsv),
+  ]);
+  return { exported: handover.exported, days: [...handover.rows].sort((a, b) => a.date.localeCompare(b.date)), months: monthly };
+}
+
+export function demoHechoDetail() {
+  const t = dateStr();
+  const months = [['2026', '6', 38, 41, 0.9, 33.1, 2, 1], ['2026', '7', 39, 42, 0.91, 34.0, 3, 2], ['2026', '8', 40, 43, 0.89, 33.6, 2, 1], ['2026', '9', 41, 44, 0.92, 35.2, 4, 1], ['2026', '10', 42, 45, 0.9, 35.8, 3, 2], ['2026', '11', 42, 44, 0.91, 34.2, 1, 1]]
+    .map(([年, 月, 名, 服, 率, 均, 新, 未]) => ({ 年, 月, 名單人數: String(名), 服務個案數: String(服), 出席率: String(率), 每日平均出席: String(均), 新收_推算: String(新), 本月未再服務: String(未), 結案: '0', 暫停: '1', 男: '17', 女: '27', '未滿65': '4', '65-74': '10', '75-84': '19', '85以上': '11', 平均年齡: '78.4', 計算到: t, 服務日數: '20' }));
+  const days = Array.from({ length: 14 }, (_, i) => ({ date: addDays(t, i - 13), expected: 38 + (i % 3), present: 30 + (i % 7), clientLeave: 4 + (i % 4), staffOn: 7, staffLeave: i % 3 ? 1 : 2, incidents: i === 12 ? 1 : 0 }));
+  return { exported: `${t} 13:30`, days, months };
+}
+
 // 給「問 AI」貼上用的和果摘要：只放日期和數字，沒有任何姓名
 export function hechoSummary(h) {
   if (!h) return '（和果資料還沒讀到）';

@@ -25,3 +25,5 @@
 .cp-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); }
 .cp-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
 .cp-legend .c1 { background: var(--acc); } .cp-legend .c2 { background: var(--live); } .cp-legend .c3 { background: var(--amb); }
+.cp-kpis.three { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 760px) { .cp-kpis.three { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
