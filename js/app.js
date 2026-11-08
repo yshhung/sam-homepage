@@ -220,7 +220,6 @@ function render() {
   const foot = [];
   if (state.ticktick?.updated) foot.push(document.createTextNode(`TickTick 更新於 ${state.ticktick.updated.slice(5)}`));
   if (state.store?.webUrl) foot.push(el('a', { href: state.store.webUrl, target: '_blank', rel: 'noopener' }, '在 Excel 改卡片與門檻'));
-  foot.push(el('a', { href: CONFIG.legacyHomepage, target: '_blank', rel: 'noopener' }, '舊版 Homepage'));
   $('foot').replaceChildren(...foot.flatMap((a, i) => (i ? [' · ', a] : [a])));
 }
 
