@@ -300,3 +300,11 @@ h2::before { content: ""; width: 3px; height: 13px; background: var(--acc); bord
 .domain { cursor: pointer; }
 .domain.sel { border-color: var(--amb); }
 .pill.on.bad { color: var(--bad); }
+.f-row { display: block; }
+.f-row .f-top { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 8px; width: 100%; cursor: pointer; min-height: 28px; }
+.f-row .f-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.f-row .f-caret { color: var(--muted); font-size: 11px; }
+.f-row .f-meta { margin-top: 6px; }
+.f-row .f-acts { margin-top: 8px; }
+.d-num.up { color: var(--live); }
+.d-num.down { color: var(--bad); }

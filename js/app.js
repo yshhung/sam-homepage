@@ -27,7 +27,7 @@ const state = {
   cards: [], settings: { ...CONFIG.defaults },
   events: [], alerts: [], weather: null, fx: null, mail: [], hecho: null, company: null, ticktick: null, invest: null, life: null, news: [], digests: [],
   errors: {}, syncedAt: null, loading: false,
-  showUpcoming: false, showAllNews: false, showAllFocus: false, showNewsList: false, openMore: new Set(), showAllDay: false, filter: '全部',
+  showUpcoming: false, showAllNews: false, showAllFocus: false, showNewsList: false, openMore: new Set(), showAllDay: false, openRows: new Set(), filter: '全部',
 };
 
 // ---------- 組出今日重點 ----------
@@ -268,13 +268,20 @@ function renderStatus() {
 
 // 只能看：打開原本的地方，或帶到 Claude 處理
 function focusRow(e) {
-  const actions = [];
-  if (e.link) actions.push(el('a', { class: 'act', href: e.link, target: '_blank', rel: 'noopener' }, e.linkLabel || '打開'));
-  actions.push(el('button', { class: 'act primary', type: 'button', title: '複製給 Claude', onclick: () => toClaude(e) }, '問 Claude'));
-  const body = el('div', { class: 'f-body' },
-    el('div', { class: 'f-top' }, el('span', { class: 'chip' }, e.cat), el('span', { class: 'f-title' }, e.title)),
-    e.meta ? el('div', { class: 'f-meta' }, e.meta) : null);
-  return el('li', { class: `f-row ${e.level}` }, body, el('div', { class: 'f-acts' }, actions));
+  // 預設只看一行（類別＋標題），點一下才展開說明與按鈕
+  const open = state.openRows.has(e.key);
+  const toggle = () => { if (open) state.openRows.delete(e.key); else state.openRows.add(e.key); render(); };
+  const top = el('button', { class: 'f-top', type: 'button', 'aria-expanded': String(open), onclick: toggle },
+    el('span', { class: 'chip' }, e.cat), el('span', { class: 'f-title' }, e.title), el('span', { class: 'f-caret', 'aria-hidden': 'true' }, open ? '▾' : '▸'));
+  const kids = [top];
+  if (open) {
+    if (e.meta) kids.push(el('div', { class: 'f-meta' }, e.meta));
+    const actions = [];
+    if (e.link) actions.push(el('a', { class: 'act', href: e.link, target: '_blank', rel: 'noopener' }, e.linkLabel || '打開'));
+    actions.push(el('button', { class: 'act primary', type: 'button', title: '複製給 Claude', onclick: () => toClaude(e) }, '問 Claude'));
+    kids.push(el('div', { class: 'f-acts' }, actions));
+  }
+  return el('li', { class: `f-row ${e.level}` }, ...kids);
 }
 
 // 日期卡片（放在最上面）：今天的日期、星期、農曆、節氣、宜忌；整個月的月曆在「月曆」那一頁
@@ -370,7 +377,7 @@ function renderDomains(focus) {
       onkeydown: (ev) => { if ((ev.key === 'Enter' || ev.key === ' ') && ev.target === ev.currentTarget) { ev.preventDefault(); setFilter(d); } } },
       el('div', { class: 'd-head' }, el('h2', {}, d)),
       auto?.stats
-        ? el('div', { class: 'd-stats' }, ...auto.stats.map((x) => el('div', { class: 'd-stat' }, el('div', { class: 'd-num' }, x.v), el('div', { class: 'd-k' }, x.k))))
+        ? el('div', { class: 'd-stats' }, ...auto.stats.map((x) => el('div', { class: 'd-stat' }, el('div', { class: `d-num ${x.tone || ''}` }, x.v), el('div', { class: 'd-k' }, x.k))))
         : el('div', { class: 'd-num' }, auto?.num || rows[0]?.數字 || '—'),
       auto?.text ? el('p', { class: 'd-text auto' }, auto.text) : null,
       // 手機上卡片窄，四池只顯示「⚠️ 四池」，有問題才出現
@@ -448,7 +455,12 @@ function autoCard(domain) {
   if (domain === '投資') {
     const v = investView(state.invest, dateStr(), state.settings.投資變動門檻);
     // 四池只留一句狀態，點了打開投資頁「計畫」分頁看完整的四池與警報
-    if (v) return { num: v.num, text: v.text, plan: planView(state.invest, dateStr())?.summary };
+    if (v) {
+      const d = state.invest?.dayPct;
+      const stats = [{ k: '總資產（萬）', v: v.num.replace(/\s*萬$/, '') }];
+      if (typeof d === 'number') stats.push({ k: '今日', v: `${d > 0 ? '+' : d < 0 ? '−' : ''}${Math.abs(d).toFixed(2)}%`, tone: d > 0 ? 'up' : d < 0 ? 'down' : '' });
+      return { stats, text: v.text, plan: planView(state.invest, dateStr())?.summary };
+    }
   }
   if (domain === '生活') {
     const v = lifeView(state.life, state.ticktick, dateStr());
