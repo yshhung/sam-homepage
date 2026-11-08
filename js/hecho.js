@@ -34,10 +34,14 @@ function render({ exported, days, months }) {
   lineChart($('chart-rate'), [{ cls: 'l1', points: ms.map((r) => ({ date: mkey(r), value: num(r.出席率) === null ? null : Math.round(num(r.出席率) * 1000) / 10 })) }], { label: (d) => `${Number(d.slice(5))} 月` });
   barChart($('chart-flow'), ms.slice(-6).map((r) => ({ label: mkey(r), bars: [{ cls: 'b1', value: num(r.服務個案數) }, { cls: 'b2', value: num(r.新收_推算) }, { cls: 'b3', value: num(r.本月未再服務) }] })));
   barChart($('chart-age'), cur ? [['未滿65', '未滿 65'], ['65-74', '65–74'], ['75-84', '75–84'], ['85以上', '85 以上']].map(([k, label]) => ({ label, bars: [{ cls: 'b1', value: num(cur[k]) }] })) : [], (l) => l);
+  // 清冊還沒匯進 YunCare 時，年齡與男女是空的（或全是 0），整張圖先藏起來
+  const ageOk = cur && ['未滿65', '65-74', '75-84', '85以上'].some((k) => num(cur[k]) > 0);
+  $('chart-age').closest('section').hidden = !ageOk;
   $('age-note').textContent = cur ? `${cur.年}/${cur.月}，只算有來的個案` : '';
   const dd = days.slice(-14);
   lineChart($('chart-day'), [{ cls: 'l1', points: dd.map((r) => ({ date: r.date, value: r.expected ?? null })) }, { cls: 'l2', points: dd.map((r) => ({ date: r.date, value: r.present ?? null })) }], { fromZero: true });
-  $('foot').textContent = `${exported ? `YunCare 匯出於 ${exported.slice(5)}　` : ''}只有人數，沒有姓名；細節請在電腦的 YunCare 看`;
+  const age = exported ? Math.floor((Date.now() - new Date(exported.replace(' ', 'T')).getTime()) / 86400000) : null;
+  $('foot').textContent = `${age >= 2 ? `⚠️ 已 ${age} 天沒更新（YunCare 要開著才會更新）　` : ''}${exported ? `YunCare 匯出於 ${exported.slice(5)}　` : ''}只有人數，沒有姓名；細節請在電腦的 YunCare 看`;
 }
 
 function status(cls, text) {
