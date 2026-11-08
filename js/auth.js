@@ -33,7 +33,18 @@ export async function initAuth() {
     cache: { cacheLocation: 'localStorage' },
   });
   await pca.initialize();
-  const res = await pca.handleRedirectPromise();
+  let res = null;
+  try {
+    res = await pca.handleRedirectPromise();
+  } catch (e) {
+    // 微軟那邊的登入已經過期（AADSTS160021 等）：清掉舊的登入資料，重新登入一次；用旗標避免一直跳轉
+    const k = 'samhome.reloginTried';
+    let tried = false;
+    try { tried = sessionStorage.getItem(k) === '1'; sessionStorage.setItem(k, '1'); } catch { /* 私密瀏覽 */ }
+    if (!tried) { redirecting = true; await pca.loginRedirect({ scopes: SCOPES, loginHint: loginHint() }); return null; }
+    throw e;
+  }
+  try { sessionStorage.removeItem('samhome.reloginTried'); } catch { /* 私密瀏覽 */ }
   account = res?.account || pca.getAllAccounts()[0] || null;
   // 裝置上的登入資料不見了（例如清過網站資料），但記得帳號：先在背景試一次，不行才讓你按登入
   if (!account && loginHint()) {
@@ -77,7 +88,8 @@ async function getToken() {
     } catch { /* 背景不行，改整頁跳轉 */ }
     if (!redirecting) {
       redirecting = true; // 好幾個資料同時要通行證時，只跳轉一次
-      await pca.acquireTokenRedirect({ scopes: SCOPES, account, loginHint: account?.username || loginHint() });
+      // 不帶 account：它會附上舊的工作階段代號，微軟那邊已經沒有那個工作階段時會回「user session which does not exist」
+      await pca.loginRedirect({ scopes: SCOPES, loginHint: account?.username || loginHint() });
     }
     throw e;
   }
