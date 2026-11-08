@@ -11,7 +11,6 @@ const svg = (tag, attrs = {}) => {
   for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
   return n;
 };
-const kpi = (k, v, sub, tone = '') => el('div', { class: 'cp-kpi' }, el('div', { class: 'k' }, k), el('div', { class: 'v' }, v), el('div', { class: `s ${tone}` }, sub));
 
 // 世界地圖：去過的國家上色；香港、新加坡這類太小或沒有獨立輪廓的，靠地點小點標出
 async function drawMap(travels) {
@@ -40,19 +39,17 @@ function render(travels, life, tasks, today) {
   const trip = trips.find((t) => t.status !== 'planning') || trips[0] || null;
   const n = trip ? diffDays(trip.start, today) : null;
   const overdue = tasks.filter((t) => t.due < today).length;
-  $('kpis').replaceChildren(
-    kpi('國家／地區', String(countries.length), '去過的'),
-    kpi('地點', String(places.length), '城市與島嶼'),
-    kpi('下一趟', trip ? (n <= 0 ? '旅行中' : `${n} 天`) : '—', trip ? trip.name : '還沒有確定的旅行'),
-    kpi('生活待辦', String(tasks.length), overdue ? `${overdue} 件逾期` : '沒有逾期', overdue ? 'down' : ''),
-  );
+  // 地圖下面一行三個數字，取代原本四張大卡
+  $('stats').replaceChildren(
+    ...[[String(countries.length), '個國家／地區'], [String(places.length), '個地點']].map(([v, k]) => el('div', { class: 'lf-stat' }, el('b', {}, v), el('span', {}, k))));
   $('map-note').textContent = places.length ? '藍＝去過的國家，黃點＝地點' : '';
+  $('trip-note').textContent = trip ? (n <= 0 ? '旅行中' : `還有 ${n} 天`) : '';
 
   const byCountry = new Map();
   for (const p of places) byCountry.set(p.country, [...(byCountry.get(p.country) || []), p]);
   $('places').replaceChildren(...(byCountry.size ? [...byCountry].map(([c, ps]) => el('div', { class: 'lf-country' },
-    el('h3', {}, c),
-    el('div', { class: 'chips' }, ...ps.map((p) => el('span', { class: 'chip' }, p.year ? `${p.name} ${p.year}` : p.name))))) : [el('p', { class: 'cp-note' }, '還沒有資料')]));
+    el('span', { class: 'cn' }, c),
+    el('span', { class: 'ps' }, ps.map((x) => (x.year ? `${x.name} ${x.year}` : x.name)).join('、')))) : [el('p', { class: 'cp-note' }, '還沒有資料')]));
 
   $('trip').replaceChildren(...(trip ? [el('div', { class: 'lf-trip' },
     el('div', { class: 'big' }, trip.name),
@@ -62,7 +59,7 @@ function render(travels, life, tasks, today) {
     : [el('p', { class: 'cp-note' }, '目前沒有確定的旅行。確定之後告訴 Claude，這裡會出現。')]));
 
   const shown = tasks.slice(0, 8);
-  $('todo-note').textContent = tasks.length > shown.length ? `只列最近 ${shown.length} 件，共 ${tasks.length} 件` : '';
+  $('todo-note').textContent = overdue ? `${overdue} 件逾期` : tasks.length > shown.length ? `最近 ${shown.length} 件，共 ${tasks.length} 件` : '';
   $('todo').replaceChildren(...(shown.length ? shown.map((t) => el('li', { class: `f-row ${t.due < today ? 'bad' : t.due === today ? 'warn' : 'info'}` },
     el('div', { class: 'f-top' }, el('span', { class: 'chip' }, t.list.replace(/^\p{Extended_Pictographic}️?/u, '')), el('span', { class: 'f-title' }, t.title)),
     el('div', { class: 'f-meta' }, `${relDay(t.due, today)} · ${shortDate(t.due)}${t.time ? ` ${t.time}` : ''}`))) : [el('li', { class: 'empty' }, '✓ 生活待辦都處理好了')]));
