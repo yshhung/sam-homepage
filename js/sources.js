@@ -24,6 +24,20 @@ export async function getCalendar() {
   }));
 }
 
+// 月曆頁用：某段日期（含起、不含迄）的 Outlook 行程，有標題
+export async function getEvents(fromDate, toDate) {
+  const q = new URLSearchParams({
+    startDateTime: `${fromDate}T00:00:00`, endDateTime: `${toDate}T00:00:00`,
+    $select: 'id,subject,start,end,isAllDay,location,webLink,isCancelled',
+    $orderby: 'start/dateTime', $top: '300',
+  });
+  const r = await graph(`/me/calendarView?${q}`, { headers: { Prefer: 'outlook.timezone="Asia/Taipei"' } });
+  return r.value.filter((e) => !e.isCancelled).map((e) => ({
+    id: e.id, subject: e.subject || '（無標題）', start: e.start.dateTime.slice(0, 16), end: e.end.dateTime.slice(0, 16),
+    allDay: e.isAllDay, location: e.location?.displayName || '', link: e.webLink,
+  }));
+}
+
 // 日曆卡片用：這個月有 Outlook 行程的日子（只拿日期，不拿標題）
 export async function getMonthDays(today = dateStr()) {
   const first = `${today.slice(0, 7)}-01`;

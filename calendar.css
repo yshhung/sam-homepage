@@ -1,0 +1,22 @@
+/* 月曆頁：沿用首頁的月曆格子樣式（styles.css 的 .cal-grid、.cal-c） */
+.cp-back { display: inline-block; font-size: 13px; margin-bottom: 4px; }
+.mc-nav { display: flex; align-items: center; gap: 8px; }
+.mc-title { flex: 1; text-align: center; font-size: 17px; font-weight: 600; }
+.mc-open { justify-self: end; font-size: 12px; color: var(--muted); }
+.cal-c { cursor: pointer; }
+.cal-c.sel:not(.today) { outline: 1px solid var(--acc); }
+.cal-c.has.today::after { background: #00141f; }
+.md-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.md-day { font-size: 1.6rem; font-weight: 700; }
+.md-sub { font-size: 13px; color: var(--muted); }
+.md-yj { display: grid; gap: 4px; font-size: 13px; line-height: 1.6; }
+.md-yj span { display: flex; gap: 8px; align-items: baseline; overflow-wrap: anywhere; }
+.md-yj b { flex: none; width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; font-size: 11px; font-weight: 600; }
+.md-yj .yi b { background: #0f2a1e; color: var(--live); }
+.md-yj .ji b { background: #2a1414; color: var(--bad); }
+.md-ev { display: grid; gap: 6px; }
+.md-ev .e { display: grid; grid-template-columns: 54px 1fr; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--panel2); border: 1px solid var(--line); border-left: 3px solid var(--acc); }
+.md-ev .e .tm { font-size: 12px; color: var(--muted); }
+.md-ev .e .t { font-size: 15px; line-height: 1.45; overflow-wrap: anywhere; color: var(--fg); }
+.md-ev .e .s { font-size: 12px; color: var(--muted); }
+.md-empty { color: var(--muted); font-size: 13px; }

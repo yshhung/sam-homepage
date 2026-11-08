@@ -297,3 +297,20 @@ h2::before { content: ""; width: 3px; height: 13px; background: var(--acc); bord
 .fam-h .chip { background: #12301c; color: var(--live); }
 .fam-h b { font-size: 15px; }
 .fam-s { font-size: 13px; color: var(--muted); }
+
+/* 最上面的日期卡片：只放今天；整個月的月曆在 calendar.html */
+.datebar { padding: 12px 14px; gap: 8px; }
+.db-top { display: flex; align-items: center; gap: 12px; }
+.db-day { font-size: 2.6rem; font-weight: 700; letter-spacing: -.03em; line-height: 1; }
+.db-meta { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.db-ym { font-size: 12px; letter-spacing: .1em; color: var(--acc); }
+.db-lunar { font-size: 15px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.db-lunar .chip { background: #0e2a3a; color: var(--acc); }
+.db-open { flex: none; font-size: 13px; color: var(--muted); padding: 6px 10px; border: 1px solid var(--line); border-radius: 10px; text-decoration: none; }
+.db-open:hover { color: var(--fg); text-decoration: none; }
+.db-yj { display: grid; gap: 4px; font-size: 13px; line-height: 1.6; }
+.db-yj span { display: flex; gap: 8px; align-items: baseline; color: var(--fg); overflow-wrap: anywhere; }
+.db-yj b { flex: none; width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; font-size: 11px; font-weight: 600; }
+.db-yj .yi b { background: #0f2a1e; color: var(--live); }
+.db-yj .ji b { background: #2a1414; color: var(--bad); }
+@media (min-width: 760px) { .db-yj { grid-template-columns: 1fr 1fr; gap: 16px; } }

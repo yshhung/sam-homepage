@@ -4,8 +4,8 @@ import { CONFIG } from '../config.js';
 import { getAccount, initAuth, isConfigured, login, logout } from './auth.js';
 import { DemoStore, ExcelStore } from './store.js';
 import {
-  demoCalendar, demoCompany, demoHecho, demoInvest, demoLife, demoMail, demoMonthDays, demoNews, demoTickTick,
-  alertsView, dayView, demoAlerts, getAlerts, getCalendar, getCompany, getFx, getHecho, getInvest, getLife, getLocation, getMail, getMonthDays, getNews, getTickTick, getWeather, hechoSummary,
+  demoCalendar, demoCompany, demoHecho, demoInvest, demoLife, demoMail, demoNews, demoTickTick,
+  alertsView, dayView, demoAlerts, getAlerts, getCalendar, getCompany, getFx, getHecho, getInvest, getLife, getLocation, getMail, getNews, getTickTick, getWeather, hechoSummary,
   digestView, investView, lifeView, newsView, planView,
 } from './sources.js';
 import { addDays, dateStr, diffDays, el, relDay, shortDate, timeStr, weekday } from './util.js';
@@ -25,7 +25,7 @@ const TICKTICK_WEB = 'https://ticktick.com/webapp/';
 const state = {
   store: null,
   cards: [], settings: { ...CONFIG.defaults },
-  events: [], alerts: [], monthDays: [], weather: null, fx: null, mail: [], hecho: null, company: null, ticktick: null, invest: null, life: null, news: [], digests: [],
+  events: [], alerts: [], weather: null, fx: null, mail: [], hecho: null, company: null, ticktick: null, invest: null, life: null, news: [], digests: [],
   errors: {}, syncedAt: null, loading: false,
   showUpcoming: false, showAllNews: false, showAllFocus: false, showNewsList: false, openMore: new Set(), showAllDay: false,
 };
@@ -265,32 +265,20 @@ function focusRow(e) {
   return el('li', { class: `f-row ${e.level}` }, body, el('div', { class: 'f-acts' }, actions));
 }
 
-// 日曆卡片：左邊今天的日期、農曆、節氣、宜忌；右邊本月月曆，有 Outlook 行程的日子打點
+// 日期卡片（放在最上面）：今天的日期、星期、農曆、節氣、宜忌；整個月的月曆在「月曆」那一頁
 function renderCal(today) {
-  const [y, m, d] = today.split('-').map(Number);
-  const a = almanac(today, 6);
-  const left = el('div', { class: 'cal-today' },
-    el('div', { class: 'cal-ym' }, `${y} 年 · 星期${weekday(today)}`),
-    el('div', { class: 'cal-day' }, `${m}/${d}`),
-    a ? el('div', { class: 'cal-lunar' }, `農曆${a.lunar}`, a.term ? el('span', { class: 'chip' }, a.term) : null) : null,
-    a?.yi.length ? el('div', { class: 'cal-yj yi' }, el('b', {}, '宜'), el('span', {}, a.yi.join('、'))) : null,
-    a?.ji.length ? el('div', { class: 'cal-yj ji' }, el('b', {}, '忌'), el('span', {}, a.ji.join('、'))) : null);
-
-  const days = new Set([...state.monthDays, ...state.events.map((ev) => ev.start.slice(0, 10))]);
-  const first = `${today.slice(0, 7)}-01`;
-  const lead = new Date(`${first}T12:00:00+08:00`).getUTCDay();
-  const cells = ['日', '一', '二', '三', '四', '五', '六'].map((w, i) => el('div', { class: `cal-w${i === 0 || i === 6 ? ' we' : ''}` }, w));
-  for (let i = 0; i < lead; i++) cells.push(el('div', { class: 'cal-c blank' }));
-  for (let dt = first; dt.slice(0, 7) === first.slice(0, 7); dt = addDays(dt, 1)) {
-    const dow = new Date(`${dt}T12:00:00+08:00`).getUTCDay();
-    const cls = ['cal-c', dt === today && 'today', dt < today && 'past', (dow === 0 || dow === 6) && 'we', days.has(dt) && 'has'].filter(Boolean).join(' ');
-    cells.push(el('div', { class: cls, title: days.has(dt) ? '有行程' : null },
-      el('span', { class: 'n' }, String(Number(dt.slice(8)))), el('span', { class: 'l' }, lunarDay(dt))));
-  }
-  const grid = el('div', { class: 'cal-month' },
-    el('a', { class: 'cal-open', href: 'https://outlook.office.com/calendar/view/month', target: '_blank', rel: 'noopener' }, '打開 Outlook 行事曆 ›'),
-    el('div', { class: 'cal-grid' }, cells));
-  $('cal').replaceChildren(left, grid);
+  const [, m, d] = today.split('-').map(Number);
+  const a = almanac(today, 4);
+  $('cal').replaceChildren(
+    el('div', { class: 'db-top' },
+      el('div', { class: 'db-day' }, `${m}/${d}`),
+      el('div', { class: 'db-meta' },
+        el('div', { class: 'db-ym' }, `${today.slice(0, 4)} 年 · 星期${weekday(today)}`),
+        a ? el('div', { class: 'db-lunar' }, `農曆${a.lunar}`, a.term ? el('span', { class: 'chip' }, a.term) : null) : null),
+      el('a', { class: 'db-open', href: 'calendar.html' }, '月曆 ›')),
+    a && (a.yi.length || a.ji.length) ? el('div', { class: 'db-yj' },
+      a.yi.length ? el('span', { class: 'yi' }, el('b', {}, '宜'), a.yi.join('、')) : null,
+      a.ji.length ? el('span', { class: 'ji' }, el('b', {}, '忌'), a.ji.join('、')) : null) : null);
 }
 
 // 固定在最上面的天氣列：現在溫度、今天高低溫與降雨，下面一行是警報（有的話）或明天、後天
@@ -582,7 +570,7 @@ async function refresh() {
   lastRefresh = Date.now();
   renderStatus();
   const live = state.store.mode === 'live';
-  const [db, events, weather, fx, mail, hecho, company, ticktick, invest, life, news, monthDays, alerts] = await Promise.all([
+  const [db, events, weather, fx, mail, hecho, company, ticktick, invest, life, news, alerts] = await Promise.all([
     settle('data', state.store.load()),
     live ? settle('calendar', getCalendar()) : Promise.resolve(demoCalendar()),
     settle('weather', getLocation().then(getWeather)),
@@ -594,12 +582,10 @@ async function refresh() {
     live ? settle('invest', getInvest()) : Promise.resolve(demoInvest()),
     live ? settle('life', getLife()) : Promise.resolve(demoLife()),
     live ? settle('news', getNews()) : Promise.resolve(demoNews()),
-    live ? settle('month', getMonthDays()) : Promise.resolve(demoMonthDays()),
     live ? settle('alerts', getAlerts()) : Promise.resolve(demoAlerts()),
   ]);
   if (db) Object.assign(state, db);
   if (events) state.events = events;
-  if (monthDays) state.monthDays = monthDays;
   if (alerts) state.alerts = alerts;
   if (weather) state.weather = weather;
   if (fx) state.fx = fx;
