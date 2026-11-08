@@ -192,7 +192,9 @@ function buildFocus() {
   const today = dateStr();
   const tt = tickTickEntries(today);
   const all = [...tt.focus, ...autoEntries(today)].sort((a, b) => a.sort - b.sort);
-  const focus = all.filter((e) => pending(e, today));
+  const rank = { bad: 0, warn: 1 };
+  // 紅的、黃的排前面，其餘（資訊性的）排後面，預設只露出前 3 件
+  const focus = all.filter((e) => pending(e, today)).sort((a, b) => (rank[a.level] ?? 2) - (rank[b.level] ?? 2) || a.sort - b.sort);
   const upcoming = tt.upcoming.sort((a, b) => a.sort - b.sort);
   return { focus, upcoming };
 }
@@ -396,7 +398,7 @@ function renderDomains(focus) {
 
 // 新聞：早報、晚報整理的，點標題開原文（新分頁）
 const NEWS_FIRST = 6;
-const FOCUS_FIRST = 5;
+const FOCUS_FIRST = 3;
 function renderNews(today) {
   const items = newsView(state.news);
   const dg = digestView(state.digests);
