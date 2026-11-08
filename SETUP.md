@@ -142,7 +142,7 @@ powershell -ExecutionPolicy Bypass -File tools/serve.ps1
 - company_stats.json、company_history.json：沁耘網站與社群的本月數字與歷史
 - alerts_weather.json、alerts_ops.json：天氣與營運警報（只有標題、一句提醒、來源連結）
 - invest.json：投資彙總（總資產、國泰、嘉信、變動 %），沒有持股明細
-- life.json：旅行（名稱、日期、地點、確定或規劃中、一句提醒）
+- life.json：旅行（名稱、日期、地點、確定或規劃中、一句提醒；可另帶 details 行程細節，生活頁「下一趟旅行」會列出，還沒定案的項目標成「待確認」）
 - SamHomepage.xlsx：卡片說明與門檻
 
 **「待辦行程分流」技能**要上傳新版才會在改完 TickTick 後同步首頁：claude.ai → 設定 → Capabilities（功能）→ Skills → 找到 task-schedule-router → 上傳新版 zip。

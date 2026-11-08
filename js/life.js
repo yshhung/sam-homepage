@@ -30,6 +30,18 @@ async function drawMap(travels) {
   $('map').replaceChildren(s);
 }
 
+// 旅行細節：life.json 每趟旅行可帶 details＝[{ title, items: [文字 或 { text, todo: true }] }]
+// todo:true 的項目標成「待確認」，用來放還沒定案、不要當成事實的資訊
+function tripDetails(details) {
+  if (!Array.isArray(details) || !details.length) return null;
+  return el('div', { class: 'lf-detail' }, ...details.filter((d) => d && d.items?.length).map((d) => el('div', { class: 'lf-dsec' },
+    d.title ? el('h3', {}, d.title) : null,
+    el('ul', {}, ...d.items.map((it) => {
+      const x = typeof it === 'string' ? { text: it } : it || {};
+      return el('li', { class: x.todo ? 'todo' : '' }, x.todo ? el('span', { class: 'chip' }, '待確認') : null, el('span', {}, x.text || ''));
+    })))));
+}
+
 function render(travels, life, tasks, today) {
   const places = travels?.places || [];
   const countries = [...new Set(places.map((p) => p.country))];
@@ -55,7 +67,8 @@ function render(travels, life, tasks, today) {
     el('div', { class: 'big' }, trip.name),
     el('div', { class: 'cp-note' }, `${shortDate(trip.start)}${trip.end && trip.end !== trip.start ? ` – ${shortDate(trip.end)}` : ''}${trip.place ? ` · ${trip.place}` : ''}${trip.status === 'planning' ? ' · 規劃中' : ''}`),
     trip.note ? el('div', { class: 'cp-note' }, trip.note) : null,
-    trip.url ? el('a', { href: trip.url, target: '_blank', rel: 'noopener' }, '打開行程 ↗') : null)]
+    trip.url ? el('a', { href: trip.url, target: '_blank', rel: 'noopener' }, '打開行程 ↗') : null,
+    tripDetails(trip.details))]
     : [el('p', { class: 'cp-note' }, '目前沒有確定的旅行。確定之後告訴 Claude，這裡會出現。')]));
 
   const shown = tasks.slice(0, 8);

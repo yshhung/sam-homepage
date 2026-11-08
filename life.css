@@ -16,3 +16,9 @@
 .lf-country { display: grid; grid-template-columns: 5.5em minmax(0, 1fr); gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
 .lf-country:first-child { border-top: 0; }
 .lf-country .cn { color: var(--muted); }
+.lf-detail { display: grid; gap: 12px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.lf-dsec h3 { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: .06em; }
+.lf-dsec ul { margin: 0; padding-left: 1.1em; display: grid; gap: 3px; font-size: 14px; line-height: 1.55; }
+.lf-dsec li { overflow-wrap: anywhere; }
+.lf-dsec li.todo { list-style: none; margin-left: -1.1em; }
+.lf-dsec li.todo .chip { margin-right: 6px; background: #2b2410; color: var(--amb); }
