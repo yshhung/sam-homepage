@@ -299,7 +299,7 @@ function renderPinned(today) {
   const s = state.settings;
   const rainy = (d) => d.rain >= s.雨機率門檻;
   const wt = w?.days.find((d) => d.date === today);
-  const al = alertsView(state.alerts, today).entries;
+  const al = alertsView(state.alerts, today).entries.filter((a) => !a.family);
   const top = el('div', { class: 'wp-main' },
     el('span', { class: 'wp-t' }, w ? `${w.now}°` : '—'),
     el('span', { class: 'wp-d' }, w ? w.text : state.errors.weather ? '天氣抓不到' : '載入中',
@@ -318,6 +318,13 @@ const DAY_FIRST = 8;
 function renderDay(today) {
   const al = alertsView(state.alerts, today).entries;
   const v = dayView({ events: state.events, tasks: state.ticktick?.tasks || [], alerts: al }, today, timeStr());
+  $('day-fam').replaceChildren(...al.filter((a) => a.family).map((a) => el('div', { class: 'fam' },
+    el('div', { class: 'fam-h' }, el('span', { class: 'chip' }, '提醒家屬'), el('b', {}, a.title)),
+    a.text ? el('div', { class: 'fam-s' }, a.text) : null,
+    el('div', { class: 'fam-msg' }, a.family),
+    el('div', { class: 'fam-acts' },
+      el('button', { class: 'act primary', type: 'button', onclick: () => (navigator.clipboard ? navigator.clipboard.writeText(a.family).then(() => toast('已複製，貼給護理師群發'), () => toast('無法複製，請手動選取訊息')) : toast('這個瀏覽器不能複製，請手動選取訊息')) }, '複製訊息'),
+      el('a', { class: 'act', href: `https://line.me/R/share?text=${encodeURIComponent(a.family)}`, target: '_blank', rel: 'noopener' }, '用 LINE 傳')))));
   $('day-status').className = `day-status ${v.tone}`;
   $('day-status').replaceChildren(el('b', {}, v.head), ...(v.detail ? [el('span', {}, v.detail)] : []));
   const shown = state.showAllDay ? v.items : v.items.slice(0, DAY_FIRST);

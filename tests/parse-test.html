@@ -166,6 +166,12 @@ check('時間軸：什麼都沒有時是綠色「沒有要緊的事」', dv0.ton
 check('時間軸：有紅色警報就是紅色狀態', dayView({ alerts: [{ title: '海上颱風警報生效', lvl: 'risk' }] }, '2026-11-08', '12:30').tone === 'bad');
 check('時間軸：全部都過了，現在線在最後一個定時項目後面', dayView({ events: [{ subject: 'x', start: '2026-11-08T08:00', end: '2026-11-08T09:00' }] }, '2026-11-08', '12:30').nowAt === 1);
 
+// 家屬提醒：訊息草稿會帶出來、太長會截斷；時間軸不重複放它，但狀態仍算件數
+const fam = alertsView([{ path: 'x', updated: '2026-11-08 21:35', alerts: [{ tag: '家屬提醒', lvl: 'warn', title: '明天偏冷', text: '建議今晚請護理師提醒家屬', until: '2026-11-09', family: '各位家屬好，明天天氣偏冷。' + 'x'.repeat(500) }, { tag: '低溫警戒', lvl: 'warn', title: '低溫特報生效' }] }], '2026-11-08', new Date('2026-11-08T22:00:00+08:00'));
+check('家屬提醒：family 帶出來並截成 400 字', fam.entries[0].family.startsWith('各位家屬好') && fam.entries[0].family.length === 400 && fam.entries[1].family === '');
+const dvf = dayView({ alerts: fam.entries }, '2026-11-08', '12:00');
+check('家屬提醒：不進時間軸、但算在要留意的件數', !dvf.items.some((i) => i.title === '明天偏冷') && dvf.items.some((i) => i.title === '低溫特報生效') && dvf.counts.yellow === 2 && dvf.head === '今天有 2 件要留意');
+
 // 農民曆（套件離線計算；春節日期是公開的固定資料）
 check('農曆：2026/2/17 是正月初一', almanac('2026-02-17')?.lunar === '正月初一', JSON.stringify(almanac('2026-02-17')));
 check('農曆：2025/1/29 是正月初一', almanac('2025-01-29')?.lunar === '正月初一');
