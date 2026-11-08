@@ -20,6 +20,7 @@ const DOMAIN_OF = { 和果: '工作', 沁耘: '工作', 網站: '工作', 社群
 const LIST_DOMAIN = { '💼公司營運': '工作', '🦄未來拓展': '工作', '🏫社區長照營運': '工作', '🏠我的家庭': '生活', '🏃我的生活': '生活', '📦生活瑣事': '生活' };
 // Excel「卡片」表裡這幾列的說明都顯示在工作卡
 const CARD_ROWS = { 工作: ['工作', '沁耘', '和果'] };
+const CWA_WARN = 'https://www.cwa.gov.tw/'; // 檔案沒附網址時的備用：氣象署首頁（首頁最上面就是目前的警特報）
 const TICKTICK_WEB = 'https://ticktick.com/webapp/';
 
 const state = {
@@ -329,7 +330,9 @@ function renderDay(today) {
   const v = dayView({ events: state.events, tasks: state.ticktick?.tasks || [], alerts: al }, today, timeStr());
   $('day-fam').replaceChildren(...al.filter((a) => a.tag === '家屬提醒').map((a) => el('div', { class: 'fam' },
     el('div', { class: 'fam-h' }, el('span', { class: 'chip' }, '提醒家屬'), el('b', {}, a.title)),
-    a.text ? el('div', { class: 'fam-s' }, a.text) : null)));
+    a.text ? el('div', { class: 'fam-s' }, a.text) : null,
+    // 讓你自己查證：連到氣象署的公告；檔案裡沒有附網址時，連到氣象署首頁
+    el('div', { class: 'fam-s' }, '查證：', el('a', { class: 'fam-src', href: a.url || CWA_WARN, target: '_blank', rel: 'noopener noreferrer' }, `${a.src || '中央氣象署'}${a.url ? '公告' : '首頁（看警特報）'} ↗`)))));
   $('day-status').className = `day-status ${v.tone}`;
   $('day-status').replaceChildren(el('b', {}, v.head), ...(v.detail ? [el('span', {}, v.detail)] : []));
   const shown = state.showAllDay ? v.items : v.items.slice(0, DAY_FIRST);

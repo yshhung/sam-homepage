@@ -309,3 +309,4 @@ h2::before { content: ""; width: 3px; height: 13px; background: var(--acc); bord
 .d-num.up { color: var(--live); }
 .d-num.down { color: var(--bad); }
 .focus-list > li, .f-row, .f-row .f-top { min-width: 0; max-width: 100%; }
+.fam a.fam-src { color: var(--acc); text-decoration: underline; text-underline-offset: 2px; }
