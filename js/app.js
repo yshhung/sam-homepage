@@ -27,7 +27,7 @@ const state = {
   cards: [], settings: { ...CONFIG.defaults },
   events: [], alerts: [], weather: null, fx: null, mail: [], hecho: null, company: null, ticktick: null, invest: null, life: null, news: [], digests: [],
   errors: {}, syncedAt: null, loading: false,
-  showUpcoming: false, showAllNews: false, showAllFocus: false, showNewsList: false, openMore: new Set(), showAllDay: false,
+  showUpcoming: false, showAllNews: false, showAllFocus: false, showNewsList: false, openMore: new Set(), showAllDay: false, filter: '全部',
 };
 
 // ---------- 組出今日重點 ----------
@@ -71,7 +71,7 @@ function autoEntries(today) {
     if (day === today && !ev.allDay && ev.end < now) continue;
     const time = ev.allDay ? '整天' : `${ev.start.slice(11)}–${ev.end.slice(11)}`;
     out.push({
-      key: `cal:${ev.id}`, cat: '行程', title: ev.subject,
+      key: `cal:${ev.id}`, cat: '行程', title: ev.subject, when: day,
       meta: [day === today ? '今天' : '明天', time, ev.location].filter(Boolean).join(' · '),
       level: day === today ? 'warn' : 'info', link: ev.link, linkLabel: '打開 Outlook',
       sort: day === today ? 0.1 + Number(ev.start.slice(11, 13)) / 100 : 1.5,
@@ -178,10 +178,21 @@ function hechoEntries(today) {
   return out;
 }
 
+// 「待處理」只放需要你做決定或動手的事：
+// 今天以前到期的待辦、今天的行程、天氣（已在上方釘著）、營運警報（已在狀態列）不重複列
+function pending(e, today) {
+  if (e.key.startsWith('tt:') && e.key !== 'tt:stale') return !(e.when && e.when <= today);
+  if (e.key.startsWith('cal:')) return !(e.when && e.when.slice(0, 10) <= today);
+  if (e.key.startsWith('wx:')) return false;
+  if (e.key.startsWith('alert:') && !e.key.startsWith('alert:stale:')) return false;
+  return true;
+}
+
 function buildFocus() {
   const today = dateStr();
   const tt = tickTickEntries(today);
-  const focus = [...tt.focus, ...autoEntries(today)].sort((a, b) => a.sort - b.sort);
+  const all = [...tt.focus, ...autoEntries(today)].sort((a, b) => a.sort - b.sort);
+  const focus = all.filter((e) => pending(e, today));
   const upcoming = tt.upcoming.sort((a, b) => a.sort - b.sort);
   return { focus, upcoming };
 }
@@ -200,13 +211,15 @@ function render() {
   renderDay(today);
   renderCal(today);
 
+  renderFilter(focus);
+  const shown0 = state.filter === '全部' ? focus : focus.filter((e) => domainOf(e) === state.filter);
   const list = $('focus-list');
-  const shownFocus = state.showAllFocus ? focus : focus.slice(0, FOCUS_FIRST);
-  list.replaceChildren(...(focus.length ? shownFocus.map(focusRow) : [el('li', { class: 'empty' }, '✓ 今天沒有重點，放心做別的事')]));
-  $('focus-count').textContent = focus.length ? String(focus.length) : '';
+  const shownFocus = state.showAllFocus ? shown0 : shown0.slice(0, FOCUS_FIRST);
+  list.replaceChildren(...(shown0.length ? shownFocus.map(focusRow) : [el('li', { class: 'empty' }, '✓ 沒有待處理的事，放心做別的事')]));
+  $('focus-count').textContent = shown0.length ? String(shown0.length) : '';
   const focusMore = $('btn-focus-more');
-  focusMore.hidden = focus.length <= FOCUS_FIRST;
-  focusMore.textContent = state.showAllFocus ? '▾ 收起' : `▸ 再看 ${focus.length - FOCUS_FIRST} 件`;
+  focusMore.hidden = shown0.length <= FOCUS_FIRST;
+  focusMore.textContent = state.showAllFocus ? '▾ 收起' : `▸ 再看 ${shown0.length - FOCUS_FIRST} 件`;
 
   const upBtn = $('btn-upcoming');
   upBtn.hidden = upcoming.length === 0;
@@ -215,7 +228,6 @@ function render() {
   upList.hidden = !state.showUpcoming || upcoming.length === 0;
   upList.replaceChildren(...upcoming.map(focusRow));
 
-  renderStrip(today);
   renderDomains(focus);
   renderNews(today);
 
@@ -331,51 +343,17 @@ function renderDay(today) {
   more.textContent = state.showAllDay ? '▾ 收起' : `▸ 再看 ${v.items.length - DAY_FIRST} 件`;
 }
 
-function renderStrip(today) {
-  const tiles = [];
-  tiles.push(assetTile(today));
-
-  const todays = state.events.filter((ev) => ev.start.slice(0, 10) === today);
-  const next = todays.find((ev) => ev.allDay || ev.end >= `${today}T${timeStr()}`);
-  tiles.push(tile('今日行程', state.errors.calendar ? '—' : `${todays.length} 個`,
-    next ? `下一個 ${next.allDay ? '整天' : next.start.slice(11)} ${next.subject}` : todays.length ? '今天的行程都結束了' : '今天沒有行程'));
-
-  const tasks = state.ticktick?.tasks || [];
-  const overdue = tasks.filter((t) => t.due && t.due < today).length;
-  const dueToday = tasks.filter((t) => t.due === today).length;
-  tiles.push(tile('TickTick', state.ticktick ? `今天 ${dueToday} 件` : '—',
-    state.ticktick ? (overdue ? `${overdue} 件逾期` : '沒有逾期') : state.errors.ticktick ? '抓不到' : '還沒同步', overdue ? 'down' : ''));
-
-  $('strip').replaceChildren(...tiles);
+function setFilter(d) {
+  state.filter = state.filter === d ? '全部' : d;
+  state.showAllFocus = false;
+  render();
 }
 
-// 總資產：台股＋美股合計（invest.json）；今日變動用美股習慣：漲綠、跌紅
-function assetTile(today) {
-  const inv = state.invest;
-  if (!inv?.totalTwd) return tile('總資產', '—', state.errors.invest ? '抓不到' : state.loading ? '載入中' : '還沒同步');
-  const sign = (v) => (v > 0 ? '+' : v < 0 ? '−' : '');
-  const tone = (v) => (v > 0 ? 'up' : v < 0 ? 'down' : '');
-  const pct = (v) => (typeof v === 'number' ? `${sign(v)}${Math.abs(v).toFixed(2)}%` : '—');
-  const big = `${(inv.totalTwd / 10000).toLocaleString('zh-TW', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} 萬`;
-  const age = inv.updated ? diffDays(today, inv.updated.slice(0, 10)) : 99;
-  const lines = [];
-  if (typeof inv.dayPct === 'number') {
-    const amt = Math.round(inv.totalTwd * inv.dayPct / (100 + inv.dayPct));
-    const a = Math.abs(amt);
-    const amtText = a >= 10000 ? `${(a / 10000).toFixed(1)} 萬` : a.toLocaleString('en-US');
-    lines.push(el('span', { class: `ln ${tone(inv.dayPct)}` }, `今日 ${sign(amt)}${amtText}（${pct(inv.dayPct)}）`));
-  }
-  if (age >= 3) lines.push(el('span', { class: 'ln' }, `${age} 天沒更新`));
-  else if (typeof inv.cathayDayPct === 'number' || typeof inv.schwabDayPct === 'number') {
-    lines.push(el('span', { class: 'ln split' },
-      el('span', {}, '台股 ', el('b', { class: tone(inv.cathayDayPct) }, pct(inv.cathayDayPct))), ' ',
-      el('span', {}, '美股 ', el('b', { class: tone(inv.schwabDayPct) }, pct(inv.schwabDayPct)))));
-  }
-  return el('div', { class: 'tile asset' }, el('div', { class: 'k' }, '總資產（NT$）'), el('div', { class: 'v' }, big), el('div', { class: 's' }, ...lines));
-}
-
-function tile(k, v, s, tone = '') {
-  return el('div', { class: 'tile' }, el('div', { class: 'k' }, k), el('div', { class: `v ${tone}` }, v), el('div', { class: 's' }, s));
+function renderFilter(focus) {
+  const count = (d) => (d === '全部' ? focus.length : focus.filter((e) => domainOf(e) === d).length);
+  $('focus-filter').replaceChildren(...['全部', ...DOMAINS].map((d) => el('button', {
+    class: `f-chip${state.filter === d ? ' on' : ''}`, type: 'button', 'aria-pressed': String(state.filter === d), onclick: () => setFilter(d),
+  }, `${d} ${count(d)}`)));
 }
 
 function renderDomains(focus) {
@@ -385,7 +363,11 @@ function renderDomains(focus) {
     const n = focus.filter((e) => domainOf(e) === d).length;
     const auto = autoCard(d);
     const link = auto?.link || CONFIG.detailLinks[d];
-    return el('article', { class: 'domain' },
+    const mine = focus.filter((e) => domainOf(e) === d);
+    const lvl = mine.some((e) => e.level === 'bad') ? 'bad' : mine.some((e) => e.level === 'warn') ? 'warn' : '';
+    return el('article', { class: `domain${state.filter === d ? ' sel' : ''}`, tabindex: '0', role: 'button', 'aria-pressed': String(state.filter === d),
+      onclick: (ev) => { if (ev.target.closest('a,button')) return; setFilter(d); $('focus-h').scrollIntoView({ behavior: 'smooth', block: 'start' }); },
+      onkeydown: (ev) => { if ((ev.key === 'Enter' || ev.key === ' ') && ev.target === ev.currentTarget) { ev.preventDefault(); setFilter(d); } } },
       el('div', { class: 'd-head' }, el('h2', {}, d)),
       auto?.stats
         ? el('div', { class: 'd-stats' }, ...auto.stats.map((x) => el('div', { class: 'd-stat' }, el('div', { class: 'd-num' }, x.v), el('div', { class: 'd-k' }, x.k))))
@@ -397,7 +379,7 @@ function renderDomains(focus) {
       ...notes.map((t) => el('p', { class: 'd-text' }, t)),
       d === '工作' && state.hecho ? el('button', { class: 'act d-ask', type: 'button', title: '複製最近的數字（沒有姓名），打開 Claude', onclick: askHecho }, '問 AI') : null,
       el('div', { class: 'd-foot' },
-        el('span', { class: n ? 'pill on' : 'pill' }, n ? `${n} 件重點` : '沒有重點'),
+        el('span', { class: n ? `pill on ${lvl}` : 'pill' }, n ? `${n} 件待處理` : '沒有待處理'),
         // 首頁自己的頁面（例如投資頁）在同一個畫面打開；外部連結開新分頁
         link ? (/^https?:/.test(link) ? el('a', { href: link, target: '_blank', rel: 'noopener' }, '詳細 ↗') : el('a', { href: link }, '詳細 →'))
           : el('span', { 'aria-hidden': 'true' }, '\u00a0'))); // 沒有連結也留位置，三張的最下面一行才對齊
