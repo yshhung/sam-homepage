@@ -466,7 +466,7 @@ function autoCard(domain) {
   }
   if (domain === '生活') {
     const v = lifeView(state.life, state.ticktick, dateStr());
-    if (v) return { num: v.num, text: v.text, link: v.link };
+    if (v) return { num: v.num, text: v.text };
   }
   return null;
 }

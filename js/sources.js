@@ -460,6 +460,19 @@ export function demoLife() {
   return { updated: `${dateStr()} 08:00`, trips: [{ name: '示範旅行', start: addDays(dateStr(), 18), end: addDays(dateStr(), 20), place: '某地', status: 'confirmed', url: '' }] };
 }
 
+export function lifeTasks(ticktick) {
+  return (ticktick?.tasks || []).filter((t) => LIFE_LISTS.includes(t.list) && t.due)
+    .sort((a, b) => a.due.localeCompare(b.due) || (a.time || '99').localeCompare(b.time || '99'));
+}
+
+export function demoTravels() {
+  return { updated: dateStr(), places: [
+    { name: '東京', country: '日本', iso: '392', lat: 35.68, lon: 139.69 },
+    { name: '沖繩', country: '日本', iso: '392', lat: 26.21, lon: 127.68 },
+    { name: '香港', country: '香港', iso: '', lat: 22.32, lon: 114.17 },
+  ] };
+}
+
 export function lifeView(life, ticktick, today) {
   const trips = (life?.trips || []).filter((t) => t.start && (t.end || t.start) >= today).sort((a, b) => a.start.localeCompare(b.start));
   const trip = trips.find((t) => t.status !== 'planning') || trips[0] || null;

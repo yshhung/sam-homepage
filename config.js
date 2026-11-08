@@ -20,6 +20,8 @@ export const CONFIG = {
   alertsPaths: ['Sam Homepage/alerts_weather.json', 'Sam Homepage/alerts_ops.json'],
   // 旅行：行程確定或改變時由 Claude 更新
   lifePath: 'Sam Homepage/life.json',
+  // 足跡：去過的地方（生活頁的世界地圖），由 Claude 依你說的更新
+  travelsPath: 'Sam Homepage/travels.json',
 
   weather: { name: '土城', lat: 24.972, lon: 121.443 },
 
@@ -39,6 +41,7 @@ export const CONFIG = {
   detailLinks: {
     投資: 'invest.html',
     工作: 'hecho.html',
+    生活: 'life.html',
   },
 
   // 預設門檻（可在 Excel「設定」表裡改）

@@ -163,3 +163,5 @@ powershell -ExecutionPolicy Bypass -File tools/serve.ps1
 | `tools/invest_sync.py` | 每天更新投資彙總（`--selftest` 只跑計算測試，`--dry-run` 只印結果不寫檔） |
 
 - **和果頁**（`hecho.html`，2026-11-08 加）：首頁工作卡的「詳細」打開。讀和果群組 `常備資料區/土城和果儀表板資料` 裡 YunCare 匯出的 `hechotc_ops_monthly.csv`（每月出席率、服務個案數、新收與未再服務、年齡層、男女、平均年齡）和 `hechotc_handover_stats.json`（每天應到、實到、請假、異常）。只有人數，沒有姓名、案號、金額；沒登入時顯示示範數字。YunCare 是桌面程式，沒有網址可連，細節請在電腦看。沁耘頁與和果頁互相有連結。圖表程式共用 `js/charts.js`。
+
+- **生活頁**（`life.html`，2026-11-08 加）：首頁生活卡的「詳細」打開。上面四格（去過幾個國家／地區、幾個地點、下一趟倒數、生活待辦），下面是世界地圖（去過的國家上色、地點標黃點）、依國家分組的地點、下一趟旅行、生活待辦（TickTick 的「我的家庭、我的生活、生活瑣事」）。足跡存在 OneDrive `Sam Homepage/travels.json`：`{updated, home:{lat,lon}, places:[{name, country, iso, lat, lon, year?}]}`，`iso` 是國家的數字代碼（地圖用它上色，香港、新加坡輪廓太小或沒有，留空，只標點）。新增去過的地方請告訴 Claude 更新這個檔。世界地圖輪廓是 `vendor/world-110m.json`（npm 套件 world-atlas@2.0.2 的 countries-110m，轉成 GeoJSON、去掉南極）。家庭帳本等 LINE 機器人的資料存放位置定了再加。

@@ -1,0 +1,14 @@
+/* 生活頁：沿用沁耘頁的版面 */
+.lf-map { width: 100%; }
+.lf-map svg { display: block; width: 100%; height: auto; }
+.lf-map .sea { fill: var(--panel); }
+.lf-map .land { fill: #2a2f37; stroke: var(--bg); stroke-width: .4; }
+.lf-map .land.seen { fill: var(--acc); fill-opacity: .55; }
+.lf-map .pin { fill: var(--amb); stroke: var(--bg); stroke-width: 1; }
+.lf-map .home { fill: var(--live); stroke: var(--bg); stroke-width: 1; }
+.lf-country { display: grid; gap: 4px; padding: 8px 0; border-top: 1px solid var(--line); }
+.lf-country:first-child { border-top: 0; }
+.lf-country h3 { margin: 0; font-size: 14px; font-weight: 500; }
+.lf-country .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.lf-trip { display: grid; gap: 4px; }
+.lf-trip .big { font-size: 1.5rem; font-weight: 650; }
