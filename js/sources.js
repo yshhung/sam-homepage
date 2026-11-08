@@ -348,7 +348,7 @@ export function demoAlerts() {
   const t = dateStr();
   return [{ updated: `${t} 07:35`, by: '示範', path: 'demo', alerts: [
     { tag: '低溫警戒', lvl: 'warn', title: '示範：低溫特報生效', text: '明晨新北最低 9°C，長輩保暖、接送加衣物', until: addDays(t, 1), src: '中央氣象署', url: 'https://www.cwa.gov.tw/' },
-    { tag: '家屬提醒', lvl: 'warn', title: '明天偏冷', text: '建議今晚請護理師提醒家屬：洋蔥式穿搭', until: addDays(t, 1), src: '中央氣象署', family: '各位家屬好，明天天氣偏冷，預計 12–16°C，早晚溫差大。建議長輩採洋蔥式穿法：內層排汗、中層保暖、外層防風，並備一件外套放在包包裡，也請帶帽子、圍巾或手套。接送時請協助穿戴好再出門，謝謝大家。' },
+    { tag: '家屬提醒', lvl: 'warn', title: '明天偏冷溫差大', text: '12–16°C，早晚溫差大，請護理師提醒家屬', until: addDays(t, 1), src: '中央氣象署' },
   ] }];
 }
 
@@ -368,7 +368,7 @@ export function alertsView(files, today, now = new Date()) {
       const key = `${tag}:${a.title}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      entries.push({ key, tag, lvl: a.lvl, title: String(a.title).slice(0, 40), text: String(a.text || '').slice(0, 80), src: String(a.src || ''), url: /^https?:\/\//.test(a.url || '') ? a.url : '', family: String(a.family || '').trim().slice(0, 400) });
+      entries.push({ key, tag, lvl: a.lvl, title: String(a.title).slice(0, 40), text: String(a.text || '').slice(0, 80), src: String(a.src || ''), url: /^https?:\/\//.test(a.url || '') ? a.url : '' });
     }
   }
   return { entries, stale };
@@ -393,8 +393,8 @@ export function dayView({ events = [], tasks = [], alerts = [] }, today, nowHM) 
     else if (t.due === today && t.time) items.push({ group: 0, sortKey: t.time, time: t.time, title: t.title, meta: list, tone: t.priority >= 5 ? 'warn' : 'info', past: t.time < nowHM, kind: 'task' });
     else if (t.due === today) items.push({ group: 2, time: '全天', title: t.title, meta: list, tone: 'info', kind: 'task' });
   }
-  // 家屬提醒（有 family）另外在狀態下面顯示、可以複製訊息，不放進時間軸；但仍算在「要留意」的件數裡
-  for (const a of alerts) if (!a.family) items.push({ group: 1, time: '警報', title: a.title, meta: a.text || '', tone: a.lvl === 'risk' ? 'bad' : 'warn', kind: 'alert', link: a.url || '' });
+  // 家屬提醒（tag「家屬提醒」）另外在狀態下面顯示，不放進時間軸；但仍算在「要留意」的件數裡
+  for (const a of alerts) if (a.tag !== '家屬提醒') items.push({ group: 1, time: '警報', title: a.title, meta: a.text || '', tone: a.lvl === 'risk' ? 'bad' : 'warn', kind: 'alert', link: a.url || '' });
   const order = (x) => x.group * 10 + (x.tone === 'bad' ? 0 : 1);
   items.sort((a, b) => a.group - b.group || (a.group === 0 ? a.sortKey.localeCompare(b.sortKey) : a.group === 3 ? a.sortKey.localeCompare(b.sortKey) : order(a) - order(b)));
   const timed = items.filter((x) => x.group === 0);

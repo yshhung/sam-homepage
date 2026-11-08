@@ -289,13 +289,11 @@ h2::before { content: ""; width: 3px; height: 13px; background: var(--acc); bord
 .day-tl .now { position: relative; margin: 2px 0 8px -2px; height: 0; border-top: 2px solid var(--bad); }
 .day-tl .now::before { content: attr(data-t); position: absolute; left: -56px; top: -9px; font-size: 11px; color: var(--bad); background: var(--bg); padding: 0 2px; white-space: nowrap; }
 
-/* 提醒家屬：天氣型的家屬訊息草稿，一鍵複製或用 LINE 傳給護理師 */
+/* 提醒家屬：天氣型（偏冷、溫差大、高溫）的提醒，內容由護理師自己決定 */
 .day-fam { display: grid; gap: 10px; }
 .day-fam:empty { display: none; }
 .fam { border: 1px solid #2c3a2a; border-left: 3px solid var(--live); border-radius: 12px; padding: 12px 14px; background: #0a120c; display: grid; gap: 6px; }
 .fam-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .fam-h .chip { background: #12301c; color: var(--live); }
 .fam-h b { font-size: 15px; }
-.fam-s { font-size: 12.5px; color: var(--muted); }
-.fam-msg { font-size: 14px; line-height: 1.7; color: var(--fg); background: #0e1511; border: 1px dashed #2a3a2e; border-radius: 10px; padding: 10px 12px; white-space: pre-line; overflow-wrap: anywhere; }
-.fam-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.fam-s { font-size: 13px; color: var(--muted); }
