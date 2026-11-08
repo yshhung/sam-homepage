@@ -63,12 +63,19 @@ export function getAccount() {
 // 用整頁跳轉而不是彈出視窗：iPhone 主畫面 App 不支援彈出視窗。
 // 帶入記住的帳號、不強制選帳號：微軟那邊還記得你時，會自動跳回來、不用再輸入
 export function login() {
-  return pca.loginRedirect({ scopes: SCOPES, loginHint: loginHint() });
+  return pca.loginRedirect({ scopes: SCOPES, loginHint: loginHint(), prompt: loginHint() ? undefined : 'select_account' });
 }
 
-export function logout() {
+// 只登出這個網站：清掉這台裝置上的登入資料再重新載入。
+// 不經過微軟的登出頁，因為登入已過期時那一步會出錯、卡在原地
+export async function logout() {
   try { localStorage.removeItem(HINT_KEY); } catch { /* 私密瀏覽 */ }
-  return pca.logoutRedirect({ account });
+  try { await pca.clearCache(); } catch { /* 沒有可清的 */ }
+  try {
+    for (const k of Object.keys(localStorage)) if (/^msal\.|login\.windows|\.login\.microsoftonline/i.test(k) || k.includes(CONFIG.clientId)) localStorage.removeItem(k);
+    sessionStorage.clear();
+  } catch { /* 私密瀏覽 */ }
+  location.reload();
 }
 
 // 通行證（約 1 小時）過期時 MSAL 會自己換新；換新用的憑證微軟規定網頁版只能用 24 小時，
