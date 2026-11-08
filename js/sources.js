@@ -457,7 +457,8 @@ export function getLife() {
 }
 
 export function demoLife() {
-  return { updated: `${dateStr()} 08:00`, trips: [{ name: '示範旅行', start: addDays(dateStr(), 18), end: addDays(dateStr(), 20), place: '某地', status: 'confirmed', url: '' }] };
+  return { updated: `${dateStr()} 08:00`, trips: [{ name: '示範旅行', start: addDays(dateStr(), 18), end: addDays(dateStr(), 20), place: '某地', status: 'confirmed', url: '',
+    details: [{ title: '行前準備', items: ['示範項目', { text: '還沒確定的事會標成待確認', todo: true }] }] }] };
 }
 
 export function lifeTasks(ticktick) {
