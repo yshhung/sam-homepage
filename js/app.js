@@ -5,7 +5,7 @@ import { getAccount, initAuth, isConfigured, login, logout } from './auth.js';
 import { DemoStore, ExcelStore } from './store.js';
 import {
   demoCalendar, demoCompany, demoHecho, demoInvest, demoLife, demoMail, demoMonthDays, demoNews, demoTickTick,
-  alertsView, demoAlerts, getAlerts, getCalendar, getCompany, getFx, getHecho, getInvest, getLife, getLocation, getMail, getMonthDays, getNews, getTickTick, getWeather, hechoSummary,
+  alertsView, dayView, demoAlerts, getAlerts, getCalendar, getCompany, getFx, getHecho, getInvest, getLife, getLocation, getMail, getMonthDays, getNews, getTickTick, getWeather, hechoSummary,
   digestView, investView, lifeView, newsView, planView,
 } from './sources.js';
 import { addDays, dateStr, diffDays, el, relDay, shortDate, timeStr, weekday } from './util.js';
@@ -27,7 +27,7 @@ const state = {
   cards: [], settings: { ...CONFIG.defaults },
   events: [], alerts: [], monthDays: [], weather: null, fx: null, mail: [], hecho: null, company: null, ticktick: null, invest: null, life: null, news: [], digests: [],
   errors: {}, syncedAt: null, loading: false,
-  showUpcoming: false, showAllNews: false, showAllFocus: false, showNewsList: false, openMore: new Set(),
+  showUpcoming: false, showAllNews: false, showAllFocus: false, showNewsList: false, openMore: new Set(), showAllDay: false,
 };
 
 // ---------- 組出今日重點 ----------
@@ -196,6 +196,8 @@ function render() {
   const { focus, upcoming } = buildFocus();
 
   renderStatus();
+  renderPinned(today);
+  renderDay(today);
   renderCal(today);
 
   const list = $('focus-list');
@@ -272,8 +274,7 @@ function renderCal(today) {
     el('div', { class: 'cal-day' }, `${m}/${d}`),
     a ? el('div', { class: 'cal-lunar' }, `農曆${a.lunar}`, a.term ? el('span', { class: 'chip' }, a.term) : null) : null,
     a?.yi.length ? el('div', { class: 'cal-yj yi' }, el('b', {}, '宜'), el('span', {}, a.yi.join('、'))) : null,
-    a?.ji.length ? el('div', { class: 'cal-yj ji' }, el('b', {}, '忌'), el('span', {}, a.ji.join('、'))) : null,
-    calWeather(today));
+    a?.ji.length ? el('div', { class: 'cal-yj ji' }, el('b', {}, '忌'), el('span', {}, a.ji.join('、'))) : null);
 
   const days = new Set([...state.monthDays, ...state.events.map((ev) => ev.start.slice(0, 10))]);
   const first = `${today.slice(0, 7)}-01`;
@@ -292,22 +293,51 @@ function renderCal(today) {
   $('cal').replaceChildren(left, grid);
 }
 
-// 日曆卡片裡的天氣：現在溫度＋今天高低溫與降雨，再加明天、後天
-function calWeather(today) {
+// 固定在最上面的天氣列：現在溫度、今天高低溫與降雨，下面一行是警報（有的話）或明天、後天
+function renderPinned(today) {
   const w = state.weather;
-  const head = el('div', { class: 'cal-wx-k', title: w?.here ? '依這台裝置的目前位置' : '沒有取得目前位置，用預設地點' },
-    `天氣 · ${w?.place || CONFIG.weather.name}${w?.here ? ' 📍' : ''}`);
-  if (!w) return el('div', { class: 'cal-wx' }, head, el('div', { class: 'cal-wx-s' }, state.errors.weather ? '抓不到' : '載入中'));
   const s = state.settings;
   const rainy = (d) => d.rain >= s.雨機率門檻;
-  const wt = w.days.find((d) => d.date === today);
-  const rest = w.days.filter((d) => d.date > today).slice(0, 2);
-  return el('div', { class: 'cal-wx' }, head,
-    el('div', { class: 'cal-wx-now' },
-      el('span', { class: 'cal-wx-t' }, `${w.now}°`),
-      el('span', {}, w.text, wt ? el('span', { class: 'cal-wx-s' }, ` · ${wt.min}–${wt.max}° · `, el('span', { class: rainy(wt) ? 'rain' : '' }, `雨 ${wt.rain}%`)) : null)),
-    rest.length ? el('div', { class: 'cal-wx-next' }, rest.map((d) =>
-      el('span', {}, `${diffDays(d.date, today) === 1 ? '明天' : '後天'} ${d.text} ${d.min}–${d.max}° `, el('span', { class: rainy(d) ? 'rain' : '' }, `雨 ${d.rain}%`)))) : null);
+  const wt = w?.days.find((d) => d.date === today);
+  const al = alertsView(state.alerts, today).entries;
+  const top = el('div', { class: 'wp-main' },
+    el('span', { class: 'wp-t' }, w ? `${w.now}°` : '—'),
+    el('span', { class: 'wp-d' }, w ? w.text : state.errors.weather ? '天氣抓不到' : '載入中',
+      wt ? el('span', { class: 'wp-s' }, ` · ${wt.min}–${wt.max}° · `, el('span', { class: rainy(wt) ? 'rain' : '' }, `雨 ${wt.rain}%`)) : null));
+  const rest = w ? w.days.filter((d) => d.date > today).slice(0, 2) : [];
+  const place = el('span', { class: 'wp-p', title: w?.here ? '依這台裝置的目前位置' : '沒有取得目前位置，用預設地點' }, `${w?.place || CONFIG.weather.name}${w?.here ? ' 📍' : ''}`);
+  const second = al.length
+    ? el('div', { class: 'wp-al' }, place, ...al.map((a) => el(a.url ? 'a' : 'span', { class: `wp-chip ${a.lvl}`, ...(a.url ? { href: a.url, target: '_blank', rel: 'noopener' } : {}) }, `${a.tag} · ${a.title}`)))
+    : el('div', { class: 'wp-next' }, place, ...rest.map((d) => el('span', {}, `${diffDays(d.date, today) === 1 ? '明天' : '後天'} ${d.text} ${d.min}–${d.max}° `, el('span', { class: rainy(d) ? 'rain' : '' }, `雨 ${d.rain}%`))));
+  $('wxpin').className = `wx-pin ${al.some((a) => a.lvl === 'risk') ? 'bad' : al.length ? 'warn' : ''}`;
+  $('wxpin').replaceChildren(top, second);
+}
+
+// 今天：一句話狀態＋時間軸（行程、有時間的待辦、警報、逾期）
+const DAY_FIRST = 8;
+function renderDay(today) {
+  const al = alertsView(state.alerts, today).entries;
+  const v = dayView({ events: state.events, tasks: state.ticktick?.tasks || [], alerts: al }, today, timeStr());
+  $('day-status').className = `day-status ${v.tone}`;
+  $('day-status').replaceChildren(el('b', {}, v.head), ...(v.detail ? [el('span', {}, v.detail)] : []));
+  const shown = state.showAllDay ? v.items : v.items.slice(0, DAY_FIRST);
+  const nodes = [];
+  let timedSeen = 0;
+  let placed = false;
+  for (const it of shown) {
+    // 現在線：插在第一個還沒到的定時項目前面；定時項目全都過了就插在它們後面
+    if (!placed && v.nowAt >= 0 && timedSeen === v.nowAt) { nodes.push(el('div', { class: 'now', 'data-t': `現在 ${timeStr()}` })); placed = true; }
+    if (it.group === 0) timedSeen++;
+    nodes.push(el('div', { class: `it ${it.tone}${it.past ? ' past' : ''}` },
+      el('div', { class: 'tm' }, it.time),
+      el(it.link ? 'a' : 'div', { class: 'tt', ...(it.link ? { href: it.link, target: '_blank', rel: 'noopener' } : {}) }, it.title),
+      it.meta ? el('div', { class: 's' }, it.meta) : null));
+  }
+  if (!placed && v.nowAt >= 0 && timedSeen === v.nowAt) nodes.push(el('div', { class: 'now', 'data-t': `現在 ${timeStr()}` }));
+  $('day-tl').replaceChildren(...(nodes.length ? nodes : [el('div', { class: 's' }, '今天沒有行程，也沒有待辦')]));
+  const more = $('btn-day-more');
+  more.hidden = v.items.length <= DAY_FIRST;
+  more.textContent = state.showAllDay ? '▾ 收起' : `▸ 再看 ${v.items.length - DAY_FIRST} 件`;
 }
 
 function renderStrip(today) {
@@ -519,6 +549,7 @@ function openClaude() {
 $('btn-refresh').addEventListener('click', () => refresh());
 $('btn-upcoming').addEventListener('click', () => { state.showUpcoming = !state.showUpcoming; render(); });
 $('btn-focus-more').addEventListener('click', () => { state.showAllFocus = !state.showAllFocus; render(); });
+$('btn-day-more').addEventListener('click', () => { state.showAllDay = !state.showAllDay; render(); });
 $('btn-news-list').addEventListener('click', () => { state.showNewsList = !state.showNewsList; render(); });
 $('btn-news-more').addEventListener('click', () => { state.showAllNews = !state.showAllNews; render(); });
 $('btn-account').addEventListener('click', () => (getAccount() ? logout() : login()));

@@ -250,3 +250,41 @@ h2::before { content: ""; width: 3px; height: 13px; background: var(--acc); bord
   opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; max-width: calc(100vw - 32px);
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* 固定在最上面的天氣列（捲動時黏在頂端）與今日時間軸 */
+.wx-pin { position: sticky; top: max(6px, env(safe-area-inset-top)); z-index: 20; margin: 0 -2px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 14px; background: rgba(11, 12, 14, .94); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); display: grid; gap: 4px; }
+.wx-pin.warn { border-color: #4a3a12; background: rgba(23, 19, 10, .95); }
+.wx-pin.bad { border-color: #5a2222; background: rgba(28, 12, 12, .95); }
+.wp-main { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.wp-t { font-size: 1.7rem; font-weight: 650; letter-spacing: -.02em; line-height: 1; }
+.wp-d { font-size: 14px; }
+.wp-s { color: var(--muted); }
+.wp-p { font-size: 12px; color: var(--muted); }
+.wp-next { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 14px; font-size: 12px; color: var(--muted); }
+.wp-al { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.wp-chip { font-size: 12px; padding: 2px 9px; border-radius: 999px; border: 1px solid #5a4514; background: #241c08; color: #f5d37a; text-decoration: none; }
+.wp-chip.risk { border-color: #6a2a2a; background: #2b1010; color: #ffb0b0; }
+.wx-pin .rain { color: var(--acc); }
+.day { display: grid; gap: 10px; }
+.day-status { border-radius: 14px; padding: 12px 14px; border: 1px solid #173a28; background: linear-gradient(180deg, #07170f, #06110b); display: grid; gap: 3px; }
+.day-status b { font-size: 16px; color: #7fe3ab; }
+.day-status span { font-size: 12.5px; color: #8fb9a2; overflow-wrap: anywhere; }
+.day-status.warn { border-color: #4a3a12; background: linear-gradient(180deg, #1a1507, #120f06); }
+.day-status.warn b { color: #f5d37a; }
+.day-status.warn span { color: #cdbb86; }
+.day-status.bad { border-color: #5a2222; background: linear-gradient(180deg, #230d0d, #170909); }
+.day-status.bad b { color: #ffb0b0; }
+.day-status.bad span { color: #d6a0a0; }
+.day-tl { position: relative; display: grid; padding-left: 56px; }
+.day-tl .it { position: relative; padding: 6px 0 14px 14px; border-left: 2px solid var(--line); min-width: 0; }
+.day-tl .it::before { content: ""; position: absolute; left: -6px; top: 10px; width: 10px; height: 10px; border-radius: 50%; background: var(--acc); border: 2px solid var(--bg); }
+.day-tl .it .tm { position: absolute; left: -58px; top: 6px; width: 46px; text-align: right; font-size: 12px; color: var(--muted); }
+.day-tl .it .tt { font-size: 15px; line-height: 1.45; color: var(--fg); overflow-wrap: anywhere; }
+.day-tl .it .s { font-size: 12px; color: var(--muted); }
+.day-tl .it.past { opacity: .45; }
+.day-tl .it.past::before { background: #3a4552; }
+.day-tl .it.warn::before { background: var(--amb); }
+.day-tl .it.bad::before { background: var(--bad); }
+.day-tl .it.bad .tm { color: var(--bad); }
+.day-tl .now { position: relative; margin: 2px 0 8px -2px; height: 0; border-top: 2px solid var(--bad); }
+.day-tl .now::before { content: attr(data-t); position: absolute; left: -56px; top: -9px; font-size: 11px; color: var(--bad); background: var(--bg); padding: 0 2px; white-space: nowrap; }

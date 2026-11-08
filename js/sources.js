@@ -373,6 +373,47 @@ export function alertsView(files, today, now = new Date()) {
   return { entries, stale };
 }
 
+// ---------- 今日時間軸 ----------
+// 把今天的 Outlook 行程、TickTick 待辦（有時間的排進時間軸，沒時間的是「全天」，過期的是「逾期」）和警報排成一條線。
+// 純函式，不連網（tests/parse-test.html 測這裡）。nowHM 是現在的時間 "HH:MM"。
+const stripEmoji = (t) => String(t || '').replace(/^\p{Extended_Pictographic}️?/u, '');
+export function dayView({ events = [], tasks = [], alerts = [] }, today, nowHM) {
+  const items = [];
+  for (const ev of events) {
+    if (!ev || String(ev.start || '').slice(0, 10) !== today) continue;
+    if (ev.allDay) { items.push({ group: 1, time: '全天', title: ev.subject, meta: ev.location || '', tone: 'info', link: ev.link || '', kind: 'event' }); continue; }
+    const t = ev.start.slice(11, 16);
+    items.push({ group: 0, sortKey: t, time: t, title: ev.subject, meta: [ev.end ? `到 ${ev.end.slice(11, 16)}` : '', ev.location].filter(Boolean).join(' · '), tone: 'info', past: (ev.end || ev.start).slice(11, 16) < nowHM, link: ev.link || '', kind: 'event' });
+  }
+  for (const t of tasks) {
+    if (!t || !t.due || !t.title) continue;
+    const list = stripEmoji(t.list);
+    if (t.due < today) items.push({ group: 3, sortKey: t.due, time: '逾期', title: t.title, meta: `已逾 ${Math.round((Date.parse(`${today}T12:00:00+08:00`) - Date.parse(`${t.due}T12:00:00+08:00`)) / 86400000)} 天 · ${list}`, tone: 'bad', kind: 'task' });
+    else if (t.due === today && t.time) items.push({ group: 0, sortKey: t.time, time: t.time, title: t.title, meta: list, tone: t.priority >= 5 ? 'warn' : 'info', past: t.time < nowHM, kind: 'task' });
+    else if (t.due === today) items.push({ group: 2, time: '全天', title: t.title, meta: list, tone: 'info', kind: 'task' });
+  }
+  for (const a of alerts) items.push({ group: 1, time: '警報', title: a.title, meta: a.text || '', tone: a.lvl === 'risk' ? 'bad' : 'warn', kind: 'alert', link: a.url || '' });
+  const order = (x) => x.group * 10 + (x.tone === 'bad' ? 0 : 1);
+  items.sort((a, b) => a.group - b.group || (a.group === 0 ? a.sortKey.localeCompare(b.sortKey) : a.group === 3 ? a.sortKey.localeCompare(b.sortKey) : order(a) - order(b)));
+  const timed = items.filter((x) => x.group === 0);
+  const firstUpcoming = timed.findIndex((x) => !x.past);
+  const nowAt = timed.length ? (firstUpcoming === -1 ? timed.length : firstUpcoming) : -1; // 現在線插在第幾個定時項目前面
+  const redAlerts = alerts.filter((a) => a.lvl === 'risk').length;
+  const yellowAlerts = alerts.filter((a) => a.lvl === 'warn').length;
+  const overdue = items.filter((x) => x.group === 3).length;
+  const upcoming = timed.filter((x) => !x.past);
+  let tone = 'ok';
+  let head;
+  if (redAlerts) { tone = 'bad'; head = `有 ${redAlerts} 件緊急警報`; }
+  else if (yellowAlerts || overdue) { tone = 'warn'; head = `今天有 ${yellowAlerts + overdue} 件要留意`; }
+  else head = upcoming.length ? `今天還有 ${upcoming.length} 件事` : '今天沒有要緊的事';
+  const bits = [];
+  if (upcoming.length) bits.push(`下一件 ${upcoming[0].time} ${upcoming[0].title}`);
+  for (const a of alerts.filter((x) => x.lvl === 'risk' || x.lvl === 'warn').slice(0, 2)) bits.push(a.title);
+  if (overdue) bits.push(`逾期 ${overdue} 件`);
+  return { items, nowAt, tone, head, detail: bits.join(' · '), counts: { red: redAlerts, yellow: yellowAlerts, overdue, upcoming: upcoming.length } };
+}
+
 // ---------- 生活：旅行倒數＋TickTick 生活清單 ----------
 
 export const LIFE_LISTS = ['🏠我的家庭', '🏃我的生活', '📦生活瑣事'];

@@ -12,7 +12,7 @@
 <script type="module">
 import { almanac, almanacText, lunarDay, toTrad } from '../js/almanac.js';
 import { dailySeries, latestWithChange, sumLast, webSeries } from '../js/company-data.js';
-import { alertsView, digestView, eventDays, hechoSummary, investView, lifeView, newsView, parseCsv } from '../js/sources.js';
+import { alertsView, dayView, digestView, eventDays, hechoSummary, investView, lifeView, newsView, parseCsv } from '../js/sources.js';
 
 const out = document.getElementById('out');
 let failed = 0;
@@ -149,6 +149,22 @@ const lc = latestWithChange(dailySeries(ch, 'instagram', 'followers'), 30);
 check('最新值與 30 天前相比', lc.value === 68 && lc.change === 8 && lc.since === '2026-10-01', JSON.stringify(lc));
 check('只有一筆時沒有變化', latestWithChange(dailySeries(ch, 'facebook', 'followers')).change === null);
 check('區間合計、沒資料回 null', sumLast(dailySeries(ch, 'instagram', 'views'), 7) === 4 && sumLast([], 7) === null && webSeries(null).length === 0 && dailySeries(undefined, 'facebook', 'views').length === 0);
+
+// 今日時間軸：定時項目排在前面、過去的標 past、現在線的位置、全天與逾期排後面、狀態一句話
+const dvw = dayView({
+  events: [{ subject: '站會', start: '2026-11-08T10:00', end: '2026-11-08T11:00', allDay: false, location: '和果' }, { subject: '訪視', start: '2026-11-08T15:00', end: '2026-11-08T16:30', allDay: false }, { subject: '明天的', start: '2026-11-09T09:00', end: '2026-11-09T10:00', allDay: false }],
+  tasks: [{ title: '核銷', list: '🏫社區長照營運', due: '2026-11-08', time: '09:00', priority: 5 }, { title: '全天待辦', list: '📦生活瑣事', due: '2026-11-08' }, { title: '舊事', list: '💼公司營運', due: '2026-11-06' }, { title: '之後', due: '2026-11-12', time: '10:00' }],
+  alerts: [{ title: '強風特報', lvl: 'warn', text: '到 23:00' }],
+}, '2026-11-08', '12:30');
+check('時間軸：定時的排前面、再來警報與全天、最後逾期', dvw.items.map((i) => i.title).join('|') === '核銷|站會|訪視|強風特報|全天待辦|舊事', dvw.items.map((i) => i.title).join('|'));
+check('時間軸：過去的標 past、現在線在第一個還沒到的前面', dvw.items[0].past === true && dvw.items[1].past === true && dvw.items[2].past === false && dvw.nowAt === 2);
+check('時間軸：狀態是「要留意」、件數與下一件', dvw.tone === 'warn' && dvw.head === '今天有 2 件要留意' && dvw.counts.upcoming === 1 && dvw.detail.includes('下一件 15:00 訪視'), JSON.stringify(dvw.head + '|' + dvw.detail));
+check('時間軸：明天的、之後的不放進今天', !dvw.items.some((i) => i.title === '明天的' || i.title === '之後'));
+check('時間軸：逾期天數與清單名稱（拿掉 emoji）', dvw.items.at(-1).meta === '已逾 2 天 · 公司營運' && dvw.items[0].meta === '社區長照營運' && dvw.items[0].tone === 'warn');
+const dv0 = dayView({ events: [], tasks: [], alerts: [] }, '2026-11-08', '12:30');
+check('時間軸：什麼都沒有時是綠色「沒有要緊的事」', dv0.tone === 'ok' && dv0.head === '今天沒有要緊的事' && dv0.items.length === 0 && dv0.nowAt === -1);
+check('時間軸：有紅色警報就是紅色狀態', dayView({ alerts: [{ title: '海上颱風警報生效', lvl: 'risk' }] }, '2026-11-08', '12:30').tone === 'bad');
+check('時間軸：全部都過了，現在線在最後一個定時項目後面', dayView({ events: [{ subject: 'x', start: '2026-11-08T08:00', end: '2026-11-08T09:00' }] }, '2026-11-08', '12:30').nowAt === 1);
 
 // 農民曆（套件離線計算；春節日期是公開的固定資料）
 check('農曆：2026/2/17 是正月初一', almanac('2026-02-17')?.lunar === '正月初一', JSON.stringify(almanac('2026-02-17')));
