@@ -1,5 +1,5 @@
 // 只快取首頁本身的檔案，讓它開得快；資料一律即時抓，不快取。
-const VERSION = 'v54';
+const VERSION = 'v55';
 const SHELL = [
   './', 'index.html', 'styles.css', 'config.js', 'manifest.webmanifest', 'template/SamHomepage.xlsx',
   'vendor/msal-browser-3.28.1.min.js', 'vendor/lunar-javascript-1.7.7.js',
