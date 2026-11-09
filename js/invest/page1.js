@@ -490,12 +490,36 @@ dash.calc('rule_usage', {
 });
 const wan = v => d3.format(',.3f')(v / 1e6) + 'M';
 const wan0 = v => d3.format(',.2~f')(v / 1e6) + 'M';
+const retireTiers = () => { const RG = rows('goals'), G = rows('goal_pace'); const tot = G && G.find(x => x.scope === 'total'); return RG && RG[0] && tot && window.retirePace ? window.retirePace(RG[0], tot.current) : null; };
+const moTxt = m => { const a = Math.abs(m); return a >= 12 ? d3.format('.1f')(a / 12) + ' 年' : d3.format('.1f')(a) + ' 個月'; };
+// 老 10 年千萬進度線收進「詳細」
+function foldOld(parent, nodes, label) {
+  const dt = document.createElement('details'); dt.className = 'sd-old';
+  const sm = document.createElement('summary'); sm.textContent = label; dt.appendChild(sm); dt.append(...nodes); parent.appendChild(dt);
+}
+function tierCard(t, full) {
+  const d = document.createElement('div'); d.className = 'sd-tier';
+  const on = Math.abs(t.diff) < t.pace * 0.005;
+  const h = document.createElement('div'); h.className = 'k'; h.textContent = t.label + (t.desc ? '・' + t.desc : '');
+  const st = document.createElement('div'); st.className = 'st ' + (on ? '' : t.diff >= 0 ? 'up' : 'down');
+  st.textContent = on ? '符合進度' : (t.diff >= 0 ? '超前 ' : '落後 ') + moTxt(t.aheadMonths);
+  const sm = document.createElement('small'); sm.textContent = (t.diff >= 0 ? '+' : '−') + wan(Math.abs(t.diff)) + '（' + d3.format('+.1%')(t.diffPct) + '）'; st.appendChild(sm);
+  const p = document.createElement('p'); const b1 = document.createElement('b'); b1.textContent = wan(t.current); const b2 = document.createElement('b'); b2.textContent = wan(t.pace);
+  p.append('現在 ', b1, '　今天應有 ', b2);
+  d.append(h, st, p);
+  if (full) {
+    const p2 = document.createElement('p'); p2.textContent = '每月 ' + nt(t.monthly) + '（4% 法則，今天的錢 ' + wan0(t.needToday) + '）・45 歲需 ' + wan0(t.need45) + '・年化需 ' + d3.format('.1%')(t.rate); d.appendChild(p2);
+    t.cps.forEach(c => { const q = document.createElement('p'); q.textContent = c.age + ' 歲（' + c.month.replace('-', '/') + '）' + (c.role ? c.role + '：' : '需 ') + wan0(c.need) + '，照這條進度線到時約 ' + wan0(c.pace); d.appendChild(q); });
+  }
+  return d;
+}
 function drawGoals() {
   const G = rows('goal_pace'), RG = rows('goals');
   const box = document.getElementById('goal-total'), mk = document.getElementById('goal-markets'), note = document.getElementById('goal-note');
   box.textContent = ''; mk.textContent = '';
   if (!G || !G.length || !RG || !RG.length) return;
   const g = RG[0], tot = G.find(x => x.scope === 'total');
+  const tiers = retireTiers();
   let ms = g.total_milestones, mm = g.market_milestones;
   if (typeof ms === 'string') { try { ms = JSON.parse(ms); } catch (e) { ms = []; } }
   if (typeof mm === 'string') { try { mm = JSON.parse(mm); } catch (e) { mm = []; } }
@@ -537,6 +561,15 @@ function drawGoals() {
     cp.forEach(c => { const sp = document.createElement('span'); sp.className = c.passed ? 'done' : (c === nx ? 'next' : ''); sp.textContent = '第' + c.year + '年 ' + c.date.replace('-', '/') + '　' + wan0(Math.round(c.pace / 1e4) * 1e4); pills.appendChild(sp); });
     d.append(h, vv, mini, pace, pace2, pills); mk.appendChild(d);
   });
+  if (tiers) {  // 計畫書 v1：主目標是 40～45 歲半退休三級現金流，三條線各自的「今天應有」；舊的 10 年千萬進度線收進詳細
+    const old = [...box.childNodes, ...mk.childNodes];
+    box.textContent = ''; mk.textContent = '';
+    note.textContent = '主目標（投資計畫書 v1）：40～45 歲半退休，三級現金流（4% 法則、今天的購買力、通膨 2%）。每一級用起始資產與每年投入反推到 45 歲所需金額的年化報酬率，算出今天應有的位置；每年投入約 ' + wan0(Number(g.retire.annual_contrib_twd || g.annual_contrib_twd)) + '，不含年終分紅';
+    const wrap = document.createElement('div'); wrap.className = 'sd-tiers';
+    tiers.forEach(t => wrap.appendChild(tierCard(t, true)));
+    box.appendChild(wrap);
+    foldOld(box, old, '舊的 10 年千萬進度線（詳細）');
+  }
 }
 
 function drawGoalStatus() {
@@ -544,7 +577,8 @@ function drawGoalStatus() {
   list.textContent = '';
   const G = rows('goal_pace'), RG = rows('goals'); if (!G || !G.length) { note.textContent = '—'; return; }
   const g = RG && RG[0];
-  note.textContent = '對照 10 年 ' + (g ? wan0(Number(g.target_twd)) : '千萬') + ' 計畫的進度線（年化約 ' + d3.format('.1%')(G[0].rate) + '）；超前／落後月數＝照進度要再過多久才會到現在的金額';
+  const tiers = retireTiers();
+  note.textContent = tiers ? '對照 40～45 歲半退休三級現金流的進度線（今天應有）；舊的 10 年千萬進度與補進度建議收在下面' : '對照 10 年 ' + (g ? wan0(Number(g.target_twd)) : '千萬') + ' 計畫的進度線（年化約 ' + d3.format('.1%')(G[0].rate) + '）；超前／落後月數＝照進度要再過多久才會到現在的金額';
   const mo = m => { const a = Math.abs(m); return a >= 12 ? d3.format('.1f')(a / 12) + ' 年' : d3.format('.1f')(a) + ' 個月'; };
   G.forEach(x => {
     const d = document.createElement('div');
@@ -573,6 +607,14 @@ function drawGoalStatus() {
     }
     list.appendChild(d);
   });
+  if (tiers) {  // 三級現金流放在最上面，舊的 10 年千萬進度（與補進度建議）收進詳細
+    const oldRows = [...list.childNodes];
+    list.textContent = '';
+    const wrap = document.createElement('div'); wrap.className = 'sd-tiers';
+    tiers.forEach(t => wrap.appendChild(tierCard(t, false)));
+    list.appendChild(wrap);
+    foldOld(list, oldRows, '舊的 10 年千萬進度與補進度建議（詳細）');
+  }
 }
 document.getElementById('goal-status-link').addEventListener('click', () => { const t = document.getElementById('tab-plans'); if (t) t.click(); const el = document.getElementById('goals'); if (el) setTimeout(() => el.scrollIntoView({behavior: 'smooth', block: 'start'}), 50); });
 
