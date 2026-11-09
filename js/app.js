@@ -4,7 +4,7 @@ import { CONFIG } from '../config.js';
 import { getAccount, initAuth, isConfigured, login, logout } from './auth.js';
 import { DemoStore, ExcelStore } from './store.js';
 import {
-  demoCalendar, demoCompany, demoHecho, demoInvest, demoLife, demoMail, demoNews, demoTickTick,
+  demoCalendar, demoCompany, demoHecho, demoInbox, demoInvest, demoLife, demoMail, demoNews, demoTickTick,
   alertsView, dayView, demoAlerts, getAlerts, getCalendar, getCompany, getFx, getHecho, getHolidayToday, getInbox, getInvest, getLife, getLocation, getMail, getNews, getTickTick, getWeather, hechoSummary,
   digestView, investView, lifeView, newsView, planView,
 } from './sources.js';
@@ -153,32 +153,104 @@ function companyEntries(today) {
 }
 
 // 和果：最新一天的交班統計（只用數字），太舊的資料不提醒
-// 信箱分流排程（每天 12:10）寫的 inbox.json：需行動／需你決定／需回覆的信 + 1HR 待簽核件數
+// 信箱分流排程寫的 inbox.json：完整清單與件數在「信箱」卡（renderInbox）；待處理只放 7 天內到期、已過期的信與 1HR 待簽核
 const INBOX_CAT = { action: '行動', decide: '決定', reply: '回覆' };
+const BOXES = [['outlook', '工作信箱'], ['gmail', '私人信箱']];
+function inboxValid(ib) {
+  return !!ib && typeof ib === 'object' && ib.schema_version === 1 && (ib.outlook || ib.gmail);
+}
+function safeHttps(u) {
+  try { const x = new URL(u); return x.protocol === 'https:' ? x.href : undefined; } catch { return undefined; }
+}
+function daysLeft(deadline, today) {
+  return deadline ? Math.round((new Date(`${deadline}T00:00:00`) - new Date(`${today}T00:00:00`)) / 86400000) : null;
+}
 function inboxEntries(ib, today) {
-  if (!ib || typeof ib !== 'object') return [];
+  if (!inboxValid(ib)) return [];
   const out = [];
-  const ageH = ib.updated ? (Date.now() - new Date(ib.updated).getTime()) / 3600000 : null;
-  if (ib.status === 'error') out.push({ key: 'inbox:error', cat: '信箱', title: '信箱分流排程出錯', meta: ib.note || '看下一次排程是否恢復', level: 'info', sort: 0.8 });
-  else if (ageH != null && ageH > 36) out.push({ key: 'inbox:stale', cat: '信箱', title: `信箱分流 ${Math.round(ageH)} 小時沒更新`, meta: '排程每天 00:10 與 12:10 執行', level: 'info', sort: 0.8 });
-  for (const [box, name] of [['outlook', '工作信箱'], ['gmail', '私人信箱']]) {
+  for (const [box, name] of BOXES) {
     const b = ib[box];
     if (!b) continue;
     if (box === 'outlook' && b.pending_approvals_1hr > 0) {
       out.push({ key: 'inbox:1hr', cat: '信箱', title: `1HR 待簽核 ${b.pending_approvals_1hr} 件`, meta: `${name} · 以 1HR 系統為準`, level: 'info', sort: 0.65 });
     }
     for (const [i, it] of (b.items || []).entries()) {
+      const left = daysLeft(it.deadline, today);
+      if (left === null || left > 7) continue;
       if (box === 'outlook' && /待簽核/.test(it.title || '') && b.pending_approvals_1hr > 0) continue;
-      const left = it.deadline ? Math.round((new Date(`${it.deadline}T00:00:00`) - new Date(`${today}T00:00:00`)) / 86400000) : null;
       out.push({
         key: `inbox:${box}:${it.link || i}:${it.title}`, cat: '信箱',
         title: `${INBOX_CAT[it.category] || ''}${INBOX_CAT[it.category] ? '：' : ''}${it.title}`,
-        meta: [name, it.org, it.deadline ? `期限 ${shortDate(it.deadline)}` : '', it.unsure ? '待確認' : ''].filter(Boolean).join(' · '),
-        level: left != null && left <= 3 ? 'warn' : 'info', link: it.link || undefined, linkLabel: '打開信件', sort: left != null ? 0.5 + Math.max(left, 0) / 100 : 0.7,
+        meta: [name, it.org, `期限 ${shortDate(it.deadline)}`, it.unsure ? '待確認' : ''].filter(Boolean).join(' · '),
+        level: left <= 3 ? 'bad' : 'warn', link: safeHttps(it.link), linkLabel: '打開信件', sort: 0.4 + Math.max(left, 0) / 100,
       });
     }
   }
   return out;
+}
+
+const IB_COUNTS = [['action', '需行動'], ['decide', '需決定'], ['reply', '需回覆'], ['notice', '通知'], ['promo', '推銷'], ['finance_security', '帳務安全']];
+function renderInbox(today) {
+  const sec = $('inbox-sec'), card = $('inbox');
+  const ready = !!state.syncedAt;
+  sec.hidden = card.hidden = !ready;
+  if (!ready) return;
+  const ib = state.inbox;
+  const warn = $('inbox-warn');
+  const setWarn = (t) => { warn.hidden = !t; warn.textContent = t || ''; };
+  if (!inboxValid(ib)) {
+    $('inbox-meta').textContent = '';
+    $('inbox-tiles').replaceChildren();
+    $('inbox-boxes').replaceChildren();
+    $('inbox-list').replaceChildren();
+    $('inbox-foot').textContent = '';
+    setWarn(state.errors.inbox ? `信箱分流檔抓不到：${state.errors.inbox}` : '尚無信箱分流資料');
+    return;
+  }
+  const o = ib.outlook || { counts: {}, items: [] };
+  const g = ib.gmail || { counts: {}, items: [] };
+  const n = (v) => Number(v) || 0;
+  const sum = (k) => n(o.counts?.[k]) + n(g.counts?.[k]);
+  const upd = ib.updated ? new Date(ib.updated) : null;
+  const ageH = upd && !Number.isNaN(upd.getTime()) ? (Date.now() - upd.getTime()) / 3600000 : null;
+  $('inbox-meta').textContent = upd && ageH !== null ? `${shortDate(dateStr(upd))} ${timeStr(upd)}` : '';
+  setWarn(ib.status === 'partial' || ib.status === 'error' || ageH === null || ageH > 36
+    ? ['信箱分流資料可能過期', ib.note].filter(Boolean).join('：') : '');
+
+  const tiles = [
+    ['需行動', sum('action'), true], ['需你決定', sum('decide'), true], ['需回覆', sum('reply'), true],
+    ['沒把握', n(ib.actions?.unsure_as_action), true], ['1HR 待簽核', n(o.pending_approvals_1hr), true], ['帳務安全', sum('finance_security'), false],
+  ];
+  $('inbox-tiles').replaceChildren(...tiles.map(([lab, v, alert]) => el('div', { class: `ib-tile${alert && v > 0 ? ' on' : !alert ? ' dim' : ''}` },
+    el('div', { class: 'ib-num' }, String(v)), el('div', { class: 'ib-lab' }, lab))));
+
+  $('inbox-boxes').replaceChildren(...[['工作 Outlook', o], ['私人 Gmail', g]].map(([title, b]) => el('div', { class: 'ib-box' },
+    el('h3', {}, title, el('span', {}, `掃描 ${n(b.scanned)} 封`)),
+    el('div', { class: 'ib-mini' }, ...IB_COUNTS.map(([k, lab]) => el('div', {}, el('b', {}, String(n(b.counts?.[k]))), el('span', {}, lab)))))));
+
+  const rank = { action: 0, decide: 1, reply: 2 };
+  const all = [...(o.items || []).map((it) => ({ ...it, box: '工作' })), ...(g.items || []).map((it) => ({ ...it, box: '私人' }))]
+    .filter((it) => rank[it.category] !== undefined)
+    .sort((a, b) => {
+      const da = a.deadline || '9999-99-99', db = b.deadline || '9999-99-99';
+      return da === db ? rank[a.category] - rank[b.category] : da < db ? -1 : 1;
+    });
+  const shown = all.slice(0, 10);
+  const rows = shown.map((it) => {
+    const left = daysLeft(it.deadline, today);
+    const lvl = left !== null && left < 0 ? 'bad' : left !== null && left <= 7 ? 'warn' : '';
+    const href = safeHttps(it.link);
+    const title = href ? el('a', { href, target: '_blank', rel: 'noopener noreferrer' }, it.title) : it.title;
+    return el('li', { class: `f-row ${lvl}` },
+      el('div', { class: 'f-title' }, title),
+      el('div', { class: 'f-meta' },
+        el('span', { class: 'chip' }, INBOX_CAT[it.category] || ''), ' ',
+        el('span', { class: 'chip' }, it.box), ' ',
+        it.unsure ? el('span', { class: 'chip unsure' }, '沒把握') : null,
+        ` ${[it.org, it.deadline ? `期限 ${shortDate(it.deadline)}${left !== null && left < 0 ? '（已過期）' : ''}` : ''].filter(Boolean).join(' · ')}`));
+  });
+  $('inbox-list').replaceChildren(...(rows.length ? rows : [el('li', { class: 'empty' }, '✓ 兩個信箱都沒有需要處理的信')]));
+  $('inbox-foot').textContent = [all.length > shown.length ? `還有 ${all.length - shown.length} 筆` : '', ib.stage !== undefined ? `分流階段 ${ib.stage}` : ''].filter(Boolean).join(' · ');
 }
 
 function hechoEntries(today) {
@@ -267,6 +339,7 @@ function render() {
   upList.replaceChildren(...upcoming.map(focusRow));
 
   renderDomains(focus);
+  renderInbox(today);
   renderNews(today);
 
   const foot = [];
@@ -611,7 +684,7 @@ async function refresh() {
     settle('weather', dbP.then((d) => getLocation(!!d?.settings?.用目前位置)).then(getWeather)),
     settle('fx', getFx()),
     live ? settle('mail', getMail()) : Promise.resolve(demoMail()),
-    live ? settle('inbox', getInbox()) : Promise.resolve(null),
+    live ? settle('inbox', getInbox()) : Promise.resolve(demoInbox()),
     live ? settle('hecho', getHecho()) : Promise.resolve(demoHecho()),
     live ? settle('company', getCompany()) : Promise.resolve(demoCompany()),
     live ? settle('ticktick', getTickTick()) : Promise.resolve(demoTickTick()),

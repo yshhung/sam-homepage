@@ -267,6 +267,29 @@ export async function oneDriveJson(relPath) {
   }
 }
 
+export function demoInbox() {
+  const t = dateStr();
+  return {
+    schema_version: 1, updated: new Date().toISOString(), by: '示範', status: 'ok', stage: 2, note: '',
+    outlook: {
+      scanned: 59,
+      counts: { action: 3, decide: 1, reply: 0, notice: 10, promo: 5, finance_security: 8 },
+      pending_approvals_1hr: 6,
+      items: [
+        { category: 'action', title: '（示範）某機關查核改善說明', org: '（示範）某單位', deadline: addDays(t, 6), link: '', unsure: false },
+        { category: 'decide', title: '（示範）SharePoint 權限申請', org: 'SharePoint Online', deadline: null, link: '', unsure: false },
+        { category: 'action', title: '（示範）每週通報人數確認', org: '（示範）通報系統', deadline: null, link: '', unsure: true },
+      ],
+    },
+    gmail: {
+      scanned: 96,
+      counts: { action: 2, decide: 0, reply: 0, notice: 16, promo: 46, finance_security: 29 },
+      items: [{ category: 'action', title: '（示範）請確認是否本人操作', org: 'GitHub', deadline: null, link: '', unsure: false }],
+    },
+    actions: { labeled_outlook: 0, labeled_gmail: 0, unsure_as_action: 1, trashed: 0, drafts: [] },
+  };
+}
+
 export function getInbox() {
   return oneDriveJson(CONFIG.inboxPath);
 }

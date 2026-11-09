@@ -310,3 +310,26 @@ h2::before { content: ""; width: 3px; height: 13px; background: var(--acc); bord
 .d-num.down { color: var(--bad); }
 .focus-list > li, .f-row, .f-row .f-top { min-width: 0; max-width: 100%; }
 .fam a.fam-src { color: var(--acc); text-decoration: underline; text-underline-offset: 2px; }
+
+/* 信箱分流：六格數字卡、工作與私人信箱並排、待處理清單。同一列等寬等高，手機 2×3、大螢幕 6×1 */
+.ib-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (min-width: 760px) { .ib-tiles { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; } }
+.ib-tile { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 2px; align-content: center; min-height: 64px; }
+.ib-num { font-size: clamp(1.4rem, 4vw, 1.8rem); font-weight: 650; letter-spacing: -.02em; line-height: 1.1; }
+.ib-tile.on .ib-num { color: var(--amb); }
+.ib-tile.dim .ib-num { color: var(--muted); }
+.ib-lab { font-size: 12px; color: var(--muted); }
+.ib-boxes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (min-width: 760px) { .ib-boxes { gap: 10px; } }
+.ib-box { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.ib-box h3 { margin: 0; font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; gap: 6px; }
+.ib-box h3 span { color: var(--muted); font-weight: 400; font-size: 12px; }
+.ib-mini { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 8px; }
+.ib-mini div { display: grid; gap: 1px; }
+.ib-mini b { font-size: 1.05rem; font-weight: 600; }
+.ib-mini span { font-size: 11px; color: var(--muted); }
+.ib-warn { border: 1px solid var(--amb); border-left-width: 3px; border-radius: 10px; padding: 8px 12px; font-size: 13px; line-height: 1.6; color: var(--amb); }
+.ib-warn[hidden] { display: none; }
+.ib-list .f-row a { color: inherit; }
+.chip.unsure { color: var(--amb); border-color: var(--amb); }
+@media (max-width: 420px) { .ib-mini span { font-size: 10px; white-space: nowrap; } .ib-box h3 span { display: none; } }
