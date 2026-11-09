@@ -572,10 +572,11 @@ async function refresh() {
   lastRefresh = Date.now();
   renderStatus();
   const live = state.store.mode === 'live';
+  const dbP = settle('data', state.store.load());
   const [db, events, weather, fx, mail, hecho, company, ticktick, invest, life, news, alerts] = await Promise.all([
-    settle('data', state.store.load()),
+    dbP,
     live ? settle('calendar', getCalendar()) : Promise.resolve(demoCalendar()),
-    settle('weather', getLocation().then(getWeather)),
+    settle('weather', dbP.then((d) => getLocation(!!d?.settings?.用目前位置)).then(getWeather)),
     settle('fx', getFx()),
     live ? settle('mail', getMail()) : Promise.resolve(demoMail()),
     live ? settle('hecho', getHecho()) : Promise.resolve(demoHecho()),

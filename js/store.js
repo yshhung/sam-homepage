@@ -8,6 +8,7 @@ function settingsFrom(rows) {
   const s = { ...CONFIG.defaults };
   for (const r of rows) {
     const k = cellText(r[0]);
+    if (k === '用目前位置') { s[k] = /^(是|yes|true|1|開)$/i.test(cellText(r[1])) ? 1 : 0; continue; }
     const v = Number(cellText(r[1]));
     if (k && Number.isFinite(v)) s[k] = v;
   }

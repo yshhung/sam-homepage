@@ -23,6 +23,7 @@
   - 計算在 `tools/invest_plan.py`（`invest_sync.py` 呼叫）：規則讀 `投資資料/rules.json`（kind：pool、cap＋each、drawdown、floor、budget、playbook、fx、schedule），歸池讀 `plans.json` 的 `pool`。
   - 07:30 每日同步帶 `--alerts` 重新判斷警報（另抓 S&P 500、VIX 與信念股一年的日收盤，52 週高點用收盤高點）；早報帶 `--alerts-if-stale`，只在同步當天沒判斷過時補判斷；晚報沿用。沒有新收盤（休市日）就不重算。
   - 第一次觸發或升級到下一級的警報標 `new`，早報把它們併入推播；之後首頁持續顯示、不再推播，條件解除自動消失。
+- **天氣地點**（2026-11-09 改）：首頁天氣預設固定用 `config.js` 的土城，不呼叫瀏覽器定位，座標也不會送到任何地名服務。出國想看當地天氣時，在 Excel「設定」表新增一列「用目前位置」、值寫「是」，才會用這台裝置的定位；地名只用 `js/sources.js` 內建的台灣地名表（`nearestPlace`），台灣以外顯示座標。改回「否」或刪掉那列就恢復土城。
 - **家屬提醒**（2026-11-09 加；規則在 `投資資料/報告指示/警報.md` 的「家屬提醒」）：每日同步用土城區預報加特報，判斷明天（或今天）會不會偏冷、溫差大、高溫（日照有開的週一到週五），寫進 `alerts_weather.json` 的 `tag:"家屬提醒"` 項目，只寫日期、溫度與「請護理師提醒家屬」，內容由護理師決定。首頁在今日狀態下面列出，新出現時推播一則「🧥 提醒家屬」。
 - **日期卡與月曆頁**（2026-11-09 改）：首頁最上面只放今天的日期、星期、農曆、節氣與宜忌（農民曆離線計算）；整個月的月曆搬到 `calendar.html`（日期卡右邊的「月曆 ›」），可以切月份、點一天看那天的農曆宜忌與 Outlook 行程（只讀）。
 - **投資頁**（`invest.html`，投資卡片的「詳細 →」）：原本 claude.ai「Sam的投資儀表板」整頁搬過來，分頁有總覽（總資產、目標進度、資產趨勢、配置、產業與集中度）、市場、持股、計畫、行事曆、交易紀錄。登入後直接讀 OneDrive「投資資料」（只讀），網頁裡沒有任何數字或代號；補進度標的、定期定額金額等私人設定放在 `投資資料/page_config.json`。圖表用本站的 `vendor/d3-7.9.0.min.js`（npm 官方 d3@7.9.0，已核對 sha512）。
@@ -100,7 +101,7 @@ powershell -ExecutionPolicy Bypass -File tools/serve.ps1
 | 權限最小化：信件只用 `Mail.Read`（首頁不能改、不能刪信），已撤銷 `Mail.ReadWrite` | ✅ |
 | 登入程式放在本站：`vendor/msal-browser-3.28.1.min.js`，已比對與 npm 官方套件 `@azure/msal-browser@3.28.1` 完全相同 | ✅ |
 | 農民曆程式放在本站：`vendor/lunar-javascript-1.7.7.js`（MIT，授權見 `vendor/lunar-javascript-LICENSE.txt`），是 npm 官方 `lunar-javascript@1.7.7` 套件裡的 `lunar.js`，套件 sha512 與 npm 登記的一致；離線計算，不連外網 | ✅ |
-| 內容安全政策（CSP）：程式只能從本站載入；只能連到微軟、天氣、地名（BigDataCloud、OpenStreetMap，只送座標到小數 2 位）、匯率這幾個網址 | ✅ |
+| 內容安全政策（CSP）：程式只能從本站載入；只能連到微軟、天氣（Open-Meteo，預設只送土城座標）、匯率這幾個網址 | ✅ |
 | 和果只讀數字：只讀 `hechotc_handover_stats.json`，完整交班檔（有照護紀錄）一律不下載 | ✅ 2026-11-04 |
 | GitHub 兩步驟驗證 | ⚠️ 請自己確認（見下方） |
 

@@ -16,7 +16,7 @@ function fakeGraph({ exists = true } = {}) {
   const calls = [];
   const tables = {
     Cards: [['領域', '數字', '說明', '更新'], ['工作', '—', '', ''], ['沁耘', '3 篇', '課程規劃中', ''], ['', '', '', '']],
-    Settings: [['項目', '值', '說明'], ['雨機率門檻', 70, ''], ['匯率變動門檻', '0.8', ''], ['不是數字', 'abc', '']],
+    Settings: [['項目', '值', '說明'], ['雨機率門檻', 70, ''], ['匯率變動門檻', '0.8', ''], ['不是數字', 'abc', ''], ['用目前位置', '是', '']],
   };
   async function graph(path, opts = {}) {
     const method = opts.method || 'GET';
@@ -48,6 +48,7 @@ let s = new ExcelStore(g.graph);
 let db = await s.load();
 check('讀到卡片，略過空白列', db.cards.length === 2 && db.cards[1].數字 === '3 篇', JSON.stringify(db.cards));
 check('設定：Excel 的值蓋過預設，非數字略過', db.settings.雨機率門檻 === 70 && db.settings.匯率變動門檻 === 0.8 && db.settings.高溫門檻 === 34 && !('不是數字' in db.settings));
+check('設定：用目前位置 是→1', db.settings.用目前位置 === 1);
 check('webUrl 有帶出來', s.webUrl === 'https://example/xlsx');
 check('只有讀取，沒有任何寫入', g.calls.every((c) => c.startsWith('GET ')), g.calls.join(' | '));
 

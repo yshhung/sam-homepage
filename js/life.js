@@ -90,8 +90,9 @@ async function start() {
   }
   try { await initAuth(); } catch (e) { status('bad', '登入失敗'); banner(`登入失敗：${e.message}`); return; }
   if (!getAccount()) {
+    await show(demoTravels(), demoLife(), demoTickTick());
     status('demo', '未登入');
-    banner('請先登入，才能讀你 OneDrive 裡的足跡與待辦。', el('button', { class: 'btn', type: 'button', onclick: () => login() }, '登入'));
+    banner('未登入，下面是示範資料。登入後才會顯示你 OneDrive 裡的足跡與待辦。', el('button', { class: 'btn', type: 'button', onclick: () => login() }, '登入'));
     return;
   }
   status('loading', '讀取中');

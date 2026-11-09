@@ -638,7 +638,7 @@ const WX = {
   61: '小雨', 63: '雨', 65: '大雨', 80: '陣雨', 81: '陣雨', 82: '強陣雨', 95: '雷雨', 96: '雷雨', 99: '雷雨',
 };
 
-// 目前位置：瀏覽器定位（第一次會問要不要允許），座標只留到小數 2 位（約 1 公里）
+// 目前位置：瀏覽器定位（只有設定開啟才會呼叫，第一次會問要不要允許），座標只留到小數 2 位（約 1 公里），不送出本機
 // 不允許、太久沒回應或沒有定位功能，就用設定裡的土城
 function currentPosition() {
   return new Promise((resolve) => {
@@ -651,54 +651,7 @@ function currentPosition() {
   });
 }
 
-// 座標換地名：先問 BigDataCloud，再問 OpenStreetMap（Nominatim，全世界都有，出國也查得到），
-// 兩個都免費、不用金鑰；都連不到才用下面內建的台灣地名表，最後才顯示座標。
-// 這兩個服務要看到「從哪個網站來的」才肯回答，所以這兩個請求送出本站網址（只有網域，不含路徑）。
-// 成功的結果記在這台裝置，同一個座標不重複問。
-async function placeName(lat, lon) {
-  const key = `place3:${lat},${lon}`;
-  try { const hit = localStorage.getItem(key); if (hit) return hit; } catch { /* 無痕模式等 */ }
-  const ask = async (url, pick) => {
-    try {
-      const r = await fetch(url, { referrerPolicy: 'origin' });
-      return r.ok ? pick(await r.json()) : '';
-    } catch { return ''; }
-  };
-  const q1 = new URLSearchParams({ latitude: lat, longitude: lon, localityLanguage: 'zh-Hant' });
-  const q2 = new URLSearchParams({ lat, lon, format: 'jsonv2', zoom: '14', 'accept-language': 'zh-TW,zh,en' });
-  const name = await ask(`https://api.bigdatacloud.net/data/reverse-geocode-client?${q1}`, geoName)
-    || await ask(`https://nominatim.openstreetmap.org/reverse?${q2}`, osmName);
-  if (name) { try { localStorage.setItem(key, name); } catch { /* 存不了也沒關係 */ } }
-  return name || nearestPlace(lat, lon);
-}
-
-// Nominatim 的回應 → 「新北市土城區」；台灣以外的地方前面加國名，例如「日本東京都千代田區」
-export function osmName(r) {
-  const a = r?.address;
-  if (!a) return '';
-  const big = a.city || a.town || a.county || a.state || '';
-  const small = a.city_district || a.suburb || a.district || a.village || a.town || '';
-  let name = small && small !== big && !big.endsWith(small) ? `${big}${small}` : big || small;
-  if (a.country_code && a.country_code !== 'tw' && a.country) name = `${a.country}${name}`;
-  return name.trim();
-}
-
-// BigDataCloud 的回應 → 「新北市土城區」這種地名；city、locality 都空的時候，改用行政區清單裡最細的兩層
-export function geoName(r) {
-  if (!r) return '';
-  const city = (r.city || '').trim();
-  const loc = (r.locality || '').trim();
-  if (city && loc && !loc.startsWith(city) && !city.endsWith(loc)) return `${city}${loc}`;
-  if (loc || city) return loc || city;
-  const adm = (r.localityInfo?.administrative || [])
-    .filter((a) => a.name && a.adminLevel > 2 && /[\u4e00-\u9fff]/.test(a.name))
-    .sort((a, b) => a.adminLevel - b.adminLevel);
-  const pick = adm.slice(-2).map((a) => a.name);
-  if (pick.length === 2 && pick[1].startsWith(pick[0])) pick.shift();
-  return (pick.join('') || r.principalSubdivision || r.countryName || '').trim();
-}
-
-// 內建台灣地名（雙北桃竹與各縣市中心），地名服務連不到時用：8 公里內直接用這個名字，40 公里內加「附近」
+// 內建台灣地名（雙北桃竹與各縣市中心），定位開啟時用（不呼叫任何外部地名服務）：8 公里內直接用這個名字，40 公里內加「附近」
 const TW_PLACES = [
   ['新北土城', 24.972, 121.443], ['新北板橋', 25.011, 121.459], ['新北中和', 24.999, 121.499], ['新北永和', 25.008, 121.516],
   ['新北三峽', 24.934, 121.369], ['新北樹林', 24.991, 121.425], ['新北鶯歌', 24.955, 121.354], ['新北新莊', 25.036, 121.45],
@@ -728,10 +681,12 @@ export function nearestPlace(lat, lon) {
   return `北緯 ${lat.toFixed(1)}°・東經 ${lon.toFixed(1)}°`;
 }
 
-export async function getLocation() {
+// 預設用 config.js 的土城，不問瀏覽器定位；只有 Excel「設定」表「用目前位置」= 是（enabled 為 true）才定位
+export async function getLocation(enabled = false) {
+  if (!enabled) return { ...CONFIG.weather, here: false };
   const pos = await currentPosition();
   if (!pos) return { ...CONFIG.weather, here: false };
-  return { ...pos, name: await placeName(pos.lat, pos.lon), here: true };
+  return { ...pos, name: nearestPlace(pos.lat, pos.lon), here: true };
 }
 
 export async function getWeather(loc = CONFIG.weather) {
