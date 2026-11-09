@@ -103,7 +103,7 @@ function autoEntries(today) {
     const at = new Date(m.received);
     out.push({
       key: `mail:${m.id}`, cat: '信件', title: m.subject,
-      meta: [m.from, `${shortDate(dateStr(at))} ${timeStr(at)}`, m.flagged ? '已加旗標' : '重要・未讀'].filter(Boolean).join(' · '),
+      meta: [m.from, `${shortDate(dateStr(at))} ${timeStr(at)}`, m.flagged ? '已加旗標' : '未讀'].filter(Boolean).join(' · '),
       level: m.flagged ? 'warn' : 'info', link: m.link, linkLabel: '打開 Outlook', sort: m.flagged ? 0.6 : 0.7,
     });
   }

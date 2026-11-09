@@ -106,6 +106,7 @@ function mailFrom(m) {
     id: m.id,
     subject: m.subject || '（無主旨）',
     from: m.from?.emailAddress?.name || m.from?.emailAddress?.address || '',
+    addr: m.from?.emailAddress?.address || '',
     received: m.receivedDateTime,
     link: m.webLink,
     flagged: m.flag?.flagStatus === 'flagged',
@@ -115,13 +116,20 @@ function mailFrom(m) {
 
 export async function getMail() {
   const since = new Date(Date.now() - CONFIG.mail.importantDays * 86400000).toISOString();
-  const list = (filter) => graph(`/me/mailFolders/inbox/messages?${new URLSearchParams({ $filter: filter, $select: MAIL_SELECT, $top: '25' })}`);
-  const [flagged, important] = await Promise.all([
+  const sinceAct = new Date(Date.now() - (CONFIG.mail.actionDays || 3) * 86400000).toISOString();
+  const list = (filter, top = '25') => graph(`/me/mailFolders/inbox/messages?${new URLSearchParams({ $filter: filter, $select: MAIL_SELECT, $top: top })}`);
+  const [flagged, important, unread] = await Promise.all([
     list("flag/flagStatus eq 'flagged'"),
     list(`isRead eq false and importance eq 'high' and receivedDateTime ge ${since}`),
+    list(`isRead eq false and receivedDateTime ge ${sinceAct}`, '50').catch(() => ({ value: [] })),
   ]);
+  const rules = (CONFIG.mail.actionRules || []).map((r) => r.toLowerCase());
+  const action = unread.value.filter((m) => {
+    const t = `${m.subject || ''} ${m.from?.emailAddress?.address || ''}`.toLowerCase();
+    return rules.some((r) => t.includes(r));
+  });
   const seen = new Set();
-  return [...flagged.value, ...important.value].map(mailFrom).filter((m) => !seen.has(m.id) && seen.add(m.id))
+  return [...flagged.value, ...important.value, ...action].map(mailFrom).filter((m) => !seen.has(m.id) && seen.add(m.id))
     .sort((a, b) => b.received.localeCompare(a.received));
 }
 

@@ -41,7 +41,12 @@ export const CONFIG = {
   },
 
   // 需回覆信件：收件匣裡「已加旗標」的信，加上最近幾天「未讀且重要性高」的信
-  mail: { importantDays: 3 },
+  mail: {
+    importantDays: 3,
+    // 另外把最近幾天「未讀」且符合下列任一規則的信也放進待處理（比對主旨與寄件地址；多半是系統通知，需要你去按一下的那種）
+    actionDays: 3,
+    actionRules: ['待簽核', '尚未進行每週通報', 'wants to access', '存取要求', '簽核逾期'],
+  },
 
   // 細節頁：舊的 claude.ai 儀表板之後不用了。投資連到首頁自己的投資頁；生活連下一趟旅行的頁面
   detailLinks: {
