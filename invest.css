@@ -298,3 +298,5 @@ body { -webkit-text-size-adjust: 100%; overflow-x: hidden; }
 .mk-ns { font-size: 11px; color: var(--dim); margin-top: 2px; }
 .mk-tiles .mk-tile:last-child:nth-child(odd) { grid-column: 1 / -1; }
 #mk-other .sd-item { padding-top: 7px; padding-bottom: 7px; }
+.mk-more { display: block; margin: 10px 0 0; padding: 4px 0; background: none; border: 0; color: var(--mut); font: inherit; font-size: 13px; cursor: pointer; }
+.mk-more:hover { color: var(--fg); }

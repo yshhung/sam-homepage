@@ -119,6 +119,11 @@ def evaluate(holdings, plans, rules, fx, market, pools, total):
     """回傳目前觸發中的警報 {key: {level, title, meta, lvl}}。market：
     {'spx': (close, date, high52), 'vix': (close, date), 'year': {code: (close, date, high52)}}"""
     plan_pool = {p['code']: p.get('pool') for p in plans or [] if p.get('code')}
+    names = {h['code']: h.get('name') for h in holdings if h.get('market') == '台股' and h.get('name')}
+    for p in plans or []:
+        if p.get('market') == '台股' and p.get('name') and p.get('code'):
+            names.setdefault(p['code'], p['name'])
+    nm = lambda code: f"{code} {names[code]}" if code in names else code  # 台股記不住代號，標題加中文名稱
     out = {}
     pb = _rule(rules, 'playbook', 'cash_playbook')
     cash_pct = next((p['pct'] for p in pools if p['key'] == 'cash'), None)
@@ -145,14 +150,14 @@ def evaluate(holdings, plans, rules, fx, market, pools, total):
         if ddr and plan_pool.get(code) == 'conviction' and hi:
             dd = close / hi - 1
             if dd <= ddr['threshold'] + 1e-12:
-                out['dd:' + code] = {'level': 1, 'lvl': 'warn', 'title': f"{code} 從 52 週高點 {dd * 100:.1f}%",
+                out['dd:' + code] = {'level': 1, 'lvl': 'warn', 'title': f"{nm(code)} 從 52 週高點 {dd * 100:.1f}%",
                                      'meta': '觸發兩步驟檢查：① 對照信念卡「錯了的訊號」② 看賣壓來源（融資、Put/Call、空單、成交量、同族群）',
                                      'date': day}
     cap = next((r for r in rules or [] if r.get('active') is not False and r.get('kind') == 'cap' and r.get('each')), None)
     if cap and total:
         for h, v in values_twd(holdings, fx):
             if h['code'] in (cap.get('codes') or []) and v / total > cap['cap']:
-                out['cap:' + h['code']] = {'level': 1, 'lvl': 'warn', 'title': f"{h['code']} 占總資產 {v / total * 100:.1f}%（> {cap['cap'] * 100:.0f}%）",
+                out['cap:' + h['code']] = {'level': 1, 'lvl': 'warn', 'title': f"{nm(h['code'])} 占總資產 {v / total * 100:.1f}%（> {cap['cap'] * 100:.0f}%）",
                                            'meta': '超過單一信念股天花板，只賣超出部分（或有意識地容忍）'}
     fl = _rule(rules, 'floor', 'cash_floor')
     if fl:
@@ -238,6 +243,10 @@ def selftest(check):
     check('超出容許區間標 out', pd['conviction']['out'] and pd['broad']['out'])
     ex = compute_extras(hs, plans, rules, '2026-03-01')
     check('PLTR 類賣出進度：賣了 6 股＝3 批完成', ex['sellPlan']['sold'] == 6 and ex['sellPlan']['batchesDone'] == 3 and ex['sellPlan']['nextPrice'] is None)
+    hn = [{'code': '2308', 'name': '台達電', 'market': '台股', 'currency': 'TWD', 'shares': 1000, 'price': 100}, {'code': 'AAA', 'currency': 'TWD', 'shares': 1, 'price': 1}]
+    pn = [{'code': '2308', 'pool': 'conviction'}]
+    en = evaluate(hn, pn, rules, 30, {'year': {'2308': (100, '2026-01-05', 200)}}, [], 100000)
+    check('台股警報標題加中文名稱', en.get('dd:2308', {}).get('title', '').startswith('2308 台達電 從 52 週高點'))
     check('樂透額度跨年歸零', compute_extras(hs, plans, rules, '2027-01-02')['lotto']['leftUsd'] == 500 and ex['lotto']['leftUsd'] == 400)
     check('下次半年檢查', next_review('2026-11-07') == '2026-12-31' and next_review('2027-01-02') == '2027-06-30')
     mk = {'spx': (69.0, '2026-01-05', 100.0), 'vix': (31.0, '2026-01-05'), 'year': {'BBB': (7.4, '2026-01-05', 10.0), 'AAA': (1, '2026-01-05', 10)}}

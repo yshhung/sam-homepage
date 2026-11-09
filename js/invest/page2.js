@@ -25,8 +25,18 @@
 
   // 綠漲紅跌：把台式「收紅／收黑」等顏色說法改成漲跌，避免和頁面顏色衝突
   const UD = [['收紅', '收漲'], ['收黑', '收跌'], ['收綠', '收跌'], ['翻紅', '翻漲'], ['翻黑', '翻跌'], ['翻綠', '翻跌'], ['開紅', '開高'], ['開黑', '開低'], ['開綠', '開低'], ['紅盤', '漲勢'], ['黑盤', '跌勢'], ['綠盤', '跌勢'], ['一片紅', '全面上漲'], ['一片綠', '全面下跌'], ['一片黑', '全面下跌']];
-  const cw = (t) => UD.reduce((s, [a, b]) => s.split(a).join(b), String(t == null ? '' : t));
+  // 台股只有代號的地方補上中文名稱（名稱來自持股與追蹤清單）：2308 → 2308 台達電；已經有名稱的不重複加
+  let NAMES = new Map();
+  const twNames = () => { const m = new Map(); for (const r of [...(rowsOf('holdings') || []), ...(rowsOf('watchlist') || [])]) if (r.market === '台股' && r.code && r.name) m.set(String(r.code), String(r.name)); return m; };
+  const withNames = (t) => (NAMES.size ? t.replace(/(?<![\w.$,])(\d{4,6}[A-Z]?)(?![\w,])/g, (m, c, off, str) => {
+    const nm = NAMES.get(c);
+    if (!nm || str.slice(off + c.length).trimStart().startsWith(nm) || str.slice(Math.max(0, off - nm.length - 2), off).includes(nm)) return m;
+    return `${c} ${nm}`;
+  }) : t);
+  const cw = (t) => withNames(UD.reduce((s, [a, b]) => s.split(a).join(b), String(t == null ? '' : t)));
+  let showAllWatch = false;
   dash.onData(() => {
+    NAMES = twNames();
     // brief
     const B = rowsOf('inv_brief'), bb = $('#mk-briefs');
     if (bb && B) {
@@ -83,17 +93,29 @@
       const W = N.filter(isWatch);
       if (!W.length) list.replaceChildren(el('div', 'sd-empty', '目前沒有需要留意的項目'));
       else {
-        const secs = [...new Set(W.map((x) => x.section))];
-        list.replaceChildren(...secs.flatMap((s) => {
-          const rows = W.filter((x) => x.section === s);
+        // 紅（已觸及）、黃（留意）一律先看；綠（正常）收在「另有 N 項」，點了才展開
+        const hot = (x) => x.lvl === 'risk' || x.lvl === 'look';
+        const calm = W.filter((x) => !hot(x));
+        const shown = showAllWatch ? W : W.filter(hot);
+        const secs = [...new Set(shown.map((x) => x.section))];
+        const nodes = secs.flatMap((sec) => {
+          const rows = shown.filter((x) => x.section === sec);
           const at = latest(rows), by = (rows.find((r) => r.at === at) || {}).by || '';
-          const head = el('div', 'mk-wh'); head.append(el('b', null, s), el('span', 'sd-chip', by + ' ' + stamp(at)));
+          const head = el('div', 'mk-wh'); head.append(el('b', null, sec), el('span', 'sd-chip', by + ' ' + stamp(at)));
           return [head, ...rows.map((x) => {
             const it = el('div', 'sd-item mk-item ' + (x.lvl || ''));
-            const m = el('div', 'm', cw(x.p)); if (cw(x.p) === x.p) { m.setAttribute('data-source', 'mk_notes'); m.setAttribute('data-field', 'p'); m.setAttribute('data-where', 'id=' + encodeURIComponent(x.id)); } it.appendChild(m);
+            const m = el('div', 'm', cw(x.p)); it.appendChild(m);
             return it;
           })];
-        }));
+        });
+        if (!nodes.length) nodes.push(el('div', 'sd-empty', '沒有需要特別留意的項目'));
+        if (calm.length) {
+          const btn = el('button', 'mk-more', showAllWatch ? '▾ 收起正常的項目' : `▸ 另有 ${calm.length} 項正常`);
+          btn.type = 'button';
+          btn.addEventListener('click', () => { showAllWatch = !showAllWatch; window.dispatchEvent(new Event('resize')); });
+          nodes.push(btn);
+        }
+        list.replaceChildren(...nodes);
       }
       const cc = N.filter((x) => x.section === 'Cover Call 參考');
       if (cc.length) $('#mk-cc-note').textContent = cc.map((x) => x.p).join(' ');
@@ -121,8 +143,8 @@
       const box = $('#mk-news-list');
       box.replaceChildren(...[...F].sort((a, b) => (a.at < b.at ? 1 : -1)).map((r) => {
         const row = el('div', 'mk-n'); row.dataset.key = r.title;
-        row.append(link(r.title, r.url));
-        if (r.rel) row.append(el('div', 'mk-nr', r.rel));
+        row.append(link(cw(r.title), r.url));
+        if (r.rel) row.append(el('div', 'mk-nr', cw(r.rel)));
         row.append(el('div', 'mk-ns', [r.src, (r.by || '') + ' ' + stamp(r.at)].filter(Boolean).join('｜')));
         return row;
       }));
