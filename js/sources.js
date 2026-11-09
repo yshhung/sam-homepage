@@ -129,7 +129,9 @@ export async function getMail() {
     return rules.some((r) => t.includes(r));
   });
   const seen = new Set();
-  return [...flagged.value, ...important.value, ...action].map(mailFrom).filter((m) => !seen.has(m.id) && seen.add(m.id))
+  const core = new Set([...flagged.value, ...important.value].map((m) => m.id));
+  // actionOnly：只因關鍵字規則進來的信；信箱分流檔正常時由分流檔取代，不重複顯示
+  return [...flagged.value, ...important.value, ...action].map((m) => ({ ...mailFrom(m), actionOnly: !core.has(m.id) })).filter((m) => !seen.has(m.id) && seen.add(m.id))
     .sort((a, b) => b.received.localeCompare(a.received));
 }
 
@@ -263,6 +265,10 @@ export async function oneDriveJson(relPath) {
     if (e instanceof GraphError && e.status === 404) return null; // 還沒同步過
     throw e;
   }
+}
+
+export function getInbox() {
+  return oneDriveJson(CONFIG.inboxPath);
 }
 
 export function getTickTick() {

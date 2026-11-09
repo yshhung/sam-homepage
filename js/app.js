@@ -5,7 +5,7 @@ import { getAccount, initAuth, isConfigured, login, logout } from './auth.js';
 import { DemoStore, ExcelStore } from './store.js';
 import {
   demoCalendar, demoCompany, demoHecho, demoInvest, demoLife, demoMail, demoNews, demoTickTick,
-  alertsView, dayView, demoAlerts, getAlerts, getCalendar, getCompany, getFx, getHecho, getHolidayToday, getInvest, getLife, getLocation, getMail, getNews, getTickTick, getWeather, hechoSummary,
+  alertsView, dayView, demoAlerts, getAlerts, getCalendar, getCompany, getFx, getHecho, getHolidayToday, getInbox, getInvest, getLife, getLocation, getMail, getNews, getTickTick, getWeather, hechoSummary,
   digestView, investView, lifeView, newsView, planView,
 } from './sources.js';
 import { addDays, dateStr, diffDays, el, relDay, shortDate, timeStr, weekday } from './util.js';
@@ -26,7 +26,7 @@ const TICKTICK_WEB = 'https://ticktick.com/webapp/';
 const state = {
   store: null,
   cards: [], settings: { ...CONFIG.defaults },
-  events: [], alerts: [], weather: null, fx: null, mail: [], hecho: null, company: null, ticktick: null, invest: null, life: null, news: [], digests: [],
+  events: [], alerts: [], weather: null, fx: null, mail: [], inbox: null, hecho: null, company: null, ticktick: null, invest: null, life: null, news: [], digests: [],
   errors: {}, syncedAt: null, loading: false, holidayToday: false,
   showUpcoming: false, showAllNews: false, showAllFocus: false, showNewsList: false, openMore: new Set(), showAllDay: false, openRows: new Set(), filter: '全部',
 };
@@ -99,7 +99,9 @@ function autoEntries(today) {
   }
 
   // 在 Outlook 取消旗標或標成完成，下次同步就會消失
+  const inboxOk = state.inbox && ['ok', 'partial'].includes(state.inbox.status);
   for (const m of state.mail) {
+    if (inboxOk && m.actionOnly) continue;
     const at = new Date(m.received);
     out.push({
       key: `mail:${m.id}`, cat: '信件', title: m.subject,
@@ -107,6 +109,8 @@ function autoEntries(today) {
       level: m.flagged ? 'warn' : 'info', link: m.link, linkLabel: '打開 Outlook', sort: m.flagged ? 0.6 : 0.7,
     });
   }
+
+  out.push(...inboxEntries(state.inbox, today));
 
   // 天氣與營運警報（颱風、停班停課、特報、停水停電、空品、疫情、道路）：紅的排最上面，黃的排在前面
   const al = alertsView(state.alerts, today);
@@ -149,6 +153,34 @@ function companyEntries(today) {
 }
 
 // 和果：最新一天的交班統計（只用數字），太舊的資料不提醒
+// 信箱分流排程（每天 12:10）寫的 inbox.json：需行動／需你決定／需回覆的信 + 1HR 待簽核件數
+const INBOX_CAT = { action: '行動', decide: '決定', reply: '回覆' };
+function inboxEntries(ib, today) {
+  if (!ib || typeof ib !== 'object') return [];
+  const out = [];
+  const ageH = ib.updated ? (Date.now() - new Date(ib.updated).getTime()) / 3600000 : null;
+  if (ib.status === 'error') out.push({ key: 'inbox:error', cat: '信箱', title: '信箱分流排程出錯', meta: ib.note || '看下一次排程是否恢復', level: 'info', sort: 0.8 });
+  else if (ageH != null && ageH > 36) out.push({ key: 'inbox:stale', cat: '信箱', title: `信箱分流 ${Math.round(ageH)} 小時沒更新`, meta: '排程每天 12:10 執行', level: 'info', sort: 0.8 });
+  for (const [box, name] of [['outlook', '工作信箱'], ['gmail', '私人信箱']]) {
+    const b = ib[box];
+    if (!b) continue;
+    if (box === 'outlook' && b.pending_approvals_1hr > 0) {
+      out.push({ key: 'inbox:1hr', cat: '信箱', title: `1HR 待簽核 ${b.pending_approvals_1hr} 件`, meta: `${name} · 以 1HR 系統為準`, level: 'info', sort: 0.65 });
+    }
+    for (const [i, it] of (b.items || []).entries()) {
+      if (box === 'outlook' && /待簽核/.test(it.title || '') && b.pending_approvals_1hr > 0) continue;
+      const left = it.deadline ? Math.round((new Date(`${it.deadline}T00:00:00`) - new Date(`${today}T00:00:00`)) / 86400000) : null;
+      out.push({
+        key: `inbox:${box}:${it.link || i}:${it.title}`, cat: '信箱',
+        title: `${INBOX_CAT[it.category] || ''}${INBOX_CAT[it.category] ? '：' : ''}${it.title}`,
+        meta: [name, it.org, it.deadline ? `期限 ${shortDate(it.deadline)}` : '', it.unsure ? '待確認' : ''].filter(Boolean).join(' · '),
+        level: left != null && left <= 3 ? 'warn' : 'info', link: it.link || undefined, linkLabel: '打開信件', sort: left != null ? 0.5 + Math.max(left, 0) / 100 : 0.7,
+      });
+    }
+  }
+  return out;
+}
+
 function hechoEntries(today) {
   const h = state.hecho;
   const s = state.settings;
@@ -558,7 +590,7 @@ async function settle(name, p) {
     console.error(name, err);
     state.errors[name] = {
       data: `卡片與門檻：${err.message}`, calendar: '行事曆抓不到', weather: '天氣抓不到', fx: '匯率抓不到',
-      mail: '信件抓不到', hecho: `和果資料抓不到（${err.message}）`, company: '網站與社群數字抓不到', ticktick: 'TickTick 同步檔抓不到',
+      mail: '信件抓不到', inbox: '信箱分流檔抓不到', hecho: `和果資料抓不到（${err.message}）`, company: '網站與社群數字抓不到', ticktick: 'TickTick 同步檔抓不到',
       invest: '投資數字抓不到', life: '旅行資料抓不到', news: '新聞抓不到', month: '本月行程抓不到', alerts: '天氣與營運警報抓不到',
     }[name];
     return undefined;
@@ -573,12 +605,13 @@ async function refresh() {
   renderStatus();
   const live = state.store.mode === 'live';
   const dbP = settle('data', state.store.load());
-  const [db, events, weather, fx, mail, hecho, company, ticktick, invest, life, news, alerts, holiday] = await Promise.all([
+  const [db, events, weather, fx, mail, inbox, hecho, company, ticktick, invest, life, news, alerts, holiday] = await Promise.all([
     dbP,
     live ? settle('calendar', getCalendar()) : Promise.resolve(demoCalendar()),
     settle('weather', dbP.then((d) => getLocation(!!d?.settings?.用目前位置)).then(getWeather)),
     settle('fx', getFx()),
     live ? settle('mail', getMail()) : Promise.resolve(demoMail()),
+    live ? settle('inbox', getInbox()) : Promise.resolve(null),
     live ? settle('hecho', getHecho()) : Promise.resolve(demoHecho()),
     live ? settle('company', getCompany()) : Promise.resolve(demoCompany()),
     live ? settle('ticktick', getTickTick()) : Promise.resolve(demoTickTick()),
@@ -596,6 +629,7 @@ async function refresh() {
   if (weather) state.weather = weather;
   if (fx) state.fx = fx;
   if (mail) state.mail = mail;
+  if (inbox !== undefined) state.inbox = inbox;
   if (hecho) state.hecho = hecho;
   if (company !== undefined) state.company = company;
   if (ticktick !== undefined) state.ticktick = ticktick;
