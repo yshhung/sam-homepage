@@ -32,6 +32,8 @@ clientId: '貼上「應用程式 (用戶端) 識別碼」',
 tenantId: '貼上「目錄 (租用戶) 識別碼」',
 ```
 
+`config.js` 裡其他設定（登入以外）：`syncTimes`（首頁顯示的同步時間，排程時間以它為準）、`holidayCalendars`（Outlook 國定假日行事曆名稱）、`inboxPath`（信箱分流檔路徑）、`mail`（信件待處理的天數與關鍵字規則）、`detailLinks`（卡片的「詳細」連結）。各項用途見 `docs/FEATURES.md`。
+
 ## 步驟三：在辦公室電腦測試
 
 在 PowerShell 執行（或請 Claude 幫你開）：
