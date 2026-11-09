@@ -12,6 +12,14 @@
   - 信箱：由主線維護（跨工作與私人兩個信箱，不屬單一領域）。排程「信箱分流」每天 00:10 與 12:10 掃描工作 Outlook 與私人 Gmail，寫 OneDrive `Sam Homepage/inbox.json`；規則與階段寫在 `投資資料/報告指示/信箱分流.md`（階段由 Sam 決定，排程自己不可升級）；首頁「待處理」讀 inbox.json（`js/app.js` 的 `inboxEntries`）。
 - 分支做完一件事，更新 OneDrive `Sam Homepage/首頁總覽.md` 的「各分支目前狀態」，主線看這份就知道全局。
 
+## 文件地圖（各管一件事，不要重複寫）
+- `CLAUDE.md`（這份）：分工與工作規則。
+- OneDrive `Sam Homepage/首頁總覽.md`：交接手冊，排程表、資料檔表、目前進度與待辦（唯一一份）。
+- `SETUP.md`：建立、上線、安裝、資安、平常怎麼用。
+- `docs/FEATURES.md`：各功能與資料檔格式的細節。
+- OneDrive `投資資料/報告指示/*.md`：各排程的完整工作指示。
+- OneDrive `Sam Homepage/首頁審查_2026-11-09.md`：審查歷史與分派狀態欄。
+
 ## 共用規則
 - 首頁只負責「看」：資料都在 Sam 的 OneDrive（沁耘帳號，用 Microsoft 365 連接器讀寫）；網頁裡不放任何持股、金額、權杖。
 - 改計畫、規則、指示一律**直接寫回 OneDrive**，不要只在對話裡回報。
