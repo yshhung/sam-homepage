@@ -256,6 +256,12 @@ body { -webkit-text-size-adjust: 100%; overflow-x: hidden; }
 .pa.bad { border-left-color: var(--down); }
 .pa-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 14px; }
 .pa .chip { font-size: 11px; color: var(--mut); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
+.pa.acked { opacity: .6; border-left-color: var(--line); background: transparent; }
+.pa.acked b { font-weight: 500; color: var(--mut); }
+.pools-highs { margin-top: 12px; display: grid; gap: 2px; }
+.pools-highs[hidden] { display: none; }
+.pools-highs .k { font-size: 11px; letter-spacing: .1em; color: var(--mut); }
+.pools-highs .s { font-size: 12px; color: var(--mut); }
 .pools-stats { margin-top: 12px; }
 .pools-note { margin: 10px 0 0; }
 

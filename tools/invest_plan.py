@@ -7,7 +7,11 @@
   extras  樂透額度餘額、美金累積、下次半年檢查日、PLTR 賣出進度
 結果放進 invest.json 與 state.json 的 "plan"；state.json 的 "plan_state" 記每個警報目前的級別，
 用來判斷「第一次觸發」或「升級到下一級」（new: true，早報只推播這些）。
-一律用收盤價；52 週高點也用收盤高點。休市日沒有新收盤就不重算、不標 new。
+一律用收盤價；52 週高點也用收盤高點（忽略單日尖刺，見 invest_sync.yahoo_year）。
+已知悉（ack）：plans.json 每檔可加 ack:{"cap"或"dd":"YYYY-MM-DD","note":"…"}。被 ack 的警報照樣列在投資頁（灰色），
+但首頁待處理與投資卡的警報數不算它；條件消失後再出現（since 晚於 ack 日）或級別升高（raised 晚於 ack 日），ack 自動失效。
+回撤警報有遲滯：跌到 threshold 觸發，回到 release（預設 threshold+5 點）以內才解除。
+四池可設過渡目標 interim:{until,max,min}：期限內只要在過渡範圍內就不標超出區間。休市日沒有新收盤就不重算、不標 new。
 """
 import calendar
 from datetime import date
@@ -37,7 +41,7 @@ def values_twd(holdings, fx):
     return [(h, h['shares'] * (h.get('price') or 0) * (fx if h.get('currency') == 'USD' else 1)) for h in holdings]
 
 
-def compute_pools(holdings, plans, rules, fx):
+def compute_pools(holdings, plans, rules, fx, today=None):
     plan_pool = {p['code']: p.get('pool') for p in plans or [] if p.get('code')}
     vals = values_twd(holdings, fx)
     total = sum(v for _, v in vals)
@@ -54,9 +58,22 @@ def compute_pools(holdings, plans, rules, fx):
         pct = sums[key] / total if total else 0
         target, band = r.get('target'), r.get('band')
         dev = pct - target if target is not None else None
+        lo = hi = None
+        if target is not None and band is not None:
+            lo, hi = target - band, target + band
+        im = r.get('interim')
+        active_im = bool(im and today and (not im.get('until') or today <= im['until']))
+        if active_im:  # 過渡期：有設的那一側用過渡門檻，沒設的那一側沿用原區間
+            if im.get('max') is not None:
+                hi = im['max']
+            if im.get('min') is not None:
+                lo = im['min']
         row = {'key': key, 'label': label, 'pct': round(pct, 4), 'target': target, 'band': band,
                'dev': round(dev, 4) if dev is not None else None,
-               'out': bool(dev is not None and band is not None and abs(dev) > band + 1e-9)}
+               'out': bool(lo is not None and (pct > hi + 1e-9 or pct < lo - 1e-9))}
+        if active_im:
+            row['interim'] = {k: im.get(k) for k in ('until', 'max', 'min') if im.get(k) is not None}
+            row['outNormal'] = bool(dev is not None and band is not None and abs(dev) > band + 1e-9)
         if key == 'broad' and total:
             row['split'] = {'us': round(broad_us / total, 4), 'tw': round((sums[key] - broad_us) / total, 4)}
         out.append(row)
@@ -71,6 +88,18 @@ def next_review(today, months=(6, 12)):
             if d >= today:
                 return d
     return None
+
+
+def review_compare(rules, pools):
+    """半年檢查的信念池比例要比上次低：rules.json 的 schedule/review 有 history:[{date,conviction}] 就比較。"""
+    sch = _rule(rules, 'schedule', 'review')
+    hist = (sch or {}).get('history') or []
+    now = next((p['pct'] for p in pools if p['key'] == 'conviction'), None)
+    if not hist or now is None:
+        return None
+    last = sorted(hist, key=lambda h: h['date'])[-1]
+    return {'date': last['date'], 'conviction': last.get('conviction'), 'now': now,
+            'down': now < last.get('conviction', 9) - 1e-9}
 
 
 def compute_extras(holdings, plans, rules, today):
@@ -115,7 +144,7 @@ def put_collateral_usd(holdings):
     return c
 
 
-def evaluate(holdings, plans, rules, fx, market, pools, total):
+def evaluate(holdings, plans, rules, fx, market, pools, total, prev_state=None):
     """回傳目前觸發中的警報 {key: {level, title, meta, lvl}}。market：
     {'spx': (close, date, high52), 'vix': (close, date), 'year': {code: (close, date, high52)}}"""
     plan_pool = {p['code']: p.get('pool') for p in plans or [] if p.get('code')}
@@ -146,17 +175,24 @@ def evaluate(holdings, plans, rules, fx, market, pools, total):
         out['vix'] = {'level': 1, 'lvl': 'warn', 'title': f"VIX {vix[0]:.1f}（> {pb.get('vix_alert', 30)}，恐慌）",
                       'meta': '恐慌確實存在，現金劇本可以更有信心執行，但比例仍照表', 'date': vix[1]}
     ddr = _rule(rules, 'drawdown', 'conviction_dd')
-    for code, (close, day, hi) in (market.get('year') or {}).items():
+    prev_state = prev_state or {}
+    release = ddr.get('release', ddr['threshold'] + 0.05) if ddr else None
+    for code, v in (market.get('year') or {}).items():
+        close, day, hi = v[0], v[1], v[2]
         if ddr and plan_pool.get(code) == 'conviction' and hi:
             dd = close / hi - 1
-            if dd <= ddr['threshold'] + 1e-12:
+            # 遲滯：已在觸發中就要回到 release（例如 -20%）以內才解除，避免在門檻附近天天進出
+            on = dd <= ddr['threshold'] + 1e-12 or ('dd:' + code in prev_state and dd <= release + 1e-12)
+            if on:
                 out['dd:' + code] = {'level': 1, 'lvl': 'warn', 'title': f"{nm(code)} 從 52 週高點 {dd * 100:.1f}%",
                                      'meta': '觸發兩步驟檢查：① 對照信念卡「錯了的訊號」② 看賣壓來源（融資、Put/Call、空單、成交量、同族群）',
                                      'date': day}
     cap = next((r for r in rules or [] if r.get('active') is not False and r.get('kind') == 'cap' and r.get('each')), None)
     if cap and total:
+        # 單一信念股上限：依 plans.json 裡 pool 是 conviction 的全部（規則有 pool 時），沒有 pool 才退回 codes
+        cap_codes = ({c for c, pl in plan_pool.items() if pl == cap['pool']} if cap.get('pool') else set(cap.get('codes') or []))
         for h, v in values_twd(holdings, fx):
-            if h['code'] in (cap.get('codes') or []) and v / total > cap['cap']:
+            if h['code'] in cap_codes and v / total > cap['cap']:
                 out['cap:' + h['code']] = {'level': 1, 'lvl': 'warn', 'title': f"{nm(h['code'])} 占總資產 {v / total * 100:.1f}%（> {cap['cap'] * 100:.0f}%）",
                                            'meta': '超過單一信念股天花板，只賣超出部分（或有意識地容忍）'}
     fl = _rule(rules, 'floor', 'cash_floor')
@@ -175,6 +211,23 @@ def evaluate(holdings, plans, rules, fx, market, pools, total):
     return out
 
 
+def apply_ack(alerts, plans):
+    """依 plans.json 的 ack 標記已知悉。alerts 是 merge 之後的清單（有 key、since、raised）。"""
+    acks = {p['code']: p.get('ack') or {} for p in plans or [] if p.get('code')}
+    out = []
+    for a in alerts:
+        kind, _, code = a['key'].partition(':')
+        ack = (acks.get(code) or {}).get(kind) if code else None
+        a = {k: v for k, v in a.items() if k not in ('acked', 'ackNote', 'ackDate')}
+        # 有效條件：這一輪觸發從 ack 當天（含）以前就開始，而且之後沒有升級
+        if ack and a.get('since', '9999') <= ack and a.get('raised', '9999') <= ack:
+            a.update(acked=True, ackDate=ack, ackNote=(acks[code].get('note') or ''), new=False)
+        out.append(a)
+    order = {'risk': 0, 'warn': 1}
+    out.sort(key=lambda a: (bool(a.get('acked')), not a.get('new'), order.get(a.get('lvl'), 2), a['key']))
+    return out
+
+
 def merge(current, prev_state, today):
     """跟上次比：沒觸發過或級別升高＝new（第一次觸發／升級）。回傳 (alerts 清單, 新的 plan_state)。"""
     prev_state = prev_state or {}
@@ -190,28 +243,36 @@ def merge(current, prev_state, today):
     return alerts, state
 
 
-def build(holdings, plans, rules, fx, today, state, market=None, evaluate_alerts=False):
+def build(holdings, plans, rules, fx, today, state, market=None, evaluate_alerts=False, evaluated_by=None):
     """回傳要放進 invest.json 的 plan 區塊，並更新 state（plan、plan_state）。"""
     prev = state.get('plan') or {}
     if plans is None or rules is None:  # 這次沒抄到規則檔（例如早晚報）：沿用上次
         return prev or None
-    pools, total = compute_pools(holdings, plans, rules, fx)
+    pools, total = compute_pools(holdings, plans, rules, fx, today)
     plan = {'pools': pools, 'extras': compute_extras(holdings, plans, rules, today),
             # 沿用：當天升級的保留 new（早報要推播），隔天就不算 new
             'alerts': [dict(a, new=bool(a.get('new')) and a.get('raised') == today) for a in prev.get('alerts', [])],
-            'evaluated': prev.get('evaluated'), 'dataAsOf': prev.get('dataAsOf'), 'market': prev.get('market')}
+            'evaluated': prev.get('evaluated'), 'evaluatedBy': prev.get('evaluatedBy'), 'dataAsOf': prev.get('dataAsOf'),
+            'market': prev.get('market'), 'highs': prev.get('highs')}
+    rv = review_compare(rules, pools)
+    if rv:
+        plan['extras']['review'] = rv
     if evaluate_alerts and market is not None:
         asof = {'spx': (market.get('spx') or (None, None))[1],
                 'tw': max([h.get('price_date') or '' for h in holdings if h.get('currency') == 'TWD' and h['code'] not in CASH_CODES] or ['']),
                 'us': max([h.get('price_date') or '' for h in holdings if h.get('currency') == 'USD' and h['code'] not in CASH_CODES] or [''])}
         plan['evaluated'] = today
+        plan['evaluatedBy'] = evaluated_by or prev.get('evaluatedBy')
         if asof != prev.get('dataAsOf'):  # 有新收盤才重算；休市日沿用、不標 new
-            cur = evaluate(holdings, plans, rules, fx, market, pools, total)
+            cur = evaluate(holdings, plans, rules, fx, market, pools, total, state.get('plan_state'))
             plan['alerts'], state['plan_state'] = merge(cur, state.get('plan_state'), today)
             plan['dataAsOf'] = asof
+            plan['highs'] = {c: {'close': v[0], 'date': v[1], 'high52': v[2], 'highDate': v[3] if len(v) > 3 else None, 'dd': round(v[0] / v[2] - 1, 4)}
+                             for c, v in (market.get('year') or {}).items() if v[2]}
             spx, vix = market.get('spx'), market.get('vix')
             plan['market'] = {'spx': {'close': spx[0], 'date': spx[1], 'high52': spx[2], 'dd': round(spx[0] / spx[2] - 1, 4)} if spx and spx[2] else None,
                               'vix': {'close': vix[0], 'date': vix[1]} if vix else None}
+    plan['alerts'] = apply_ack(plan['alerts'], plans)  # ack 每次都重新套（Sam 剛加 ack、或升級後失效，不用等下一次判斷）
     state['plan'] = plan
     return plan
 
@@ -271,3 +332,54 @@ def selftest(check):
     check('沒抄到規則檔就沿用上次', build(hs, None, None, 30, '2026-01-09', st) == st['plan'])
     hs.append({'code': 'BBB 2/20/2026 8.00 P', 'occ': 'BBB260220P00008000', 'kind': 'option', 'currency': 'USD', 'shares': -100, 'price': 0.1})
     check('Sell Put 擔保額從美金扣掉', put_collateral_usd(hs) == 800)
+    # ---- 已知悉（ack）、遲滯、過渡目標、依 pool 的上限、半年檢查比較 ----
+    plans_a = [dict(p) for p in plans]
+    plans_a[1]['ack'] = {'cap': '2026-01-06', 'dd': '2026-01-06', 'note': '已掛單'}
+    al = apply_ack(p1['alerts'], plans_a)
+    ak = {a['key']: a for a in al}
+    check('ack：被 ack 的警報標 acked、其他警報不受影響、排到最後',
+          ak['cap:BBB'].get('acked') and ak['dd:BBB'].get('acked') and ak['cap:BBB']['ackNote'] == '已掛單'
+          and not ak['spx'].get('acked') and [a['key'] for a in al][-2:] == ['cap:BBB', 'dd:BBB'])
+    plans_late = [dict(p) for p in plans]
+    plans_late[1]['ack'] = {'cap': '2026-01-05'}  # ack 早於這輪觸發開始＝條件消失後再出現，ack 失效
+    check('ack：條件消失再出現（since 晚於 ack 日）ack 自動失效', not apply_ack(p1['alerts'], plans_late)[0].get('acked')
+          and not any(a.get('acked') for a in apply_ack(p1['alerts'], plans_late)))
+    raised = [dict(a, raised='2026-01-08') for a in p1['alerts'] if a['key'] == 'cap:BBB']
+    check('ack：級別升高（raised 晚於 ack 日）ack 失效', not apply_ack(raised, plans_a)[0].get('acked'))
+    stA = {}
+    pa = build(hs, plans_a, rules, 30, '2026-01-06', stA, mk, True)
+    check('ack：build 之後 acked 的警報不算 new、仍列在清單裡', sum(1 for a in pa['alerts'] if a.get('acked')) == 2
+          and not any(a['new'] for a in pa['alerts'] if a.get('acked')))
+    ddr_rules = [r for r in rules if r['kind'] == 'drawdown']
+    hs2 = [h for h in hs if h['code'] in ('AAA', 'BBB', 'CASH', 'TWCASH')]
+    def dd_keys(close, prev):
+        out = evaluate(hs2, plans, rules, 30, {'year': {'BBB': (close, '2026-02-02', 10.0)}}, [], 100000, prev)
+        return 'dd:BBB' in out
+    check('遲滯：-25% 觸發', dd_keys(7.4, {}))
+    check('遲滯：-22% 沒觸發過就不觸發', not dd_keys(7.8, {}))
+    check('遲滯：已觸發的 -22% 維持、-19% 才解除', dd_keys(7.8, {'dd:BBB': {}}) and not dd_keys(8.1, {'dd:BBB': {}}))
+    ddr_rules[0]['release'] = -0.1
+    check('遲滯：rules 的 release 可自訂', dd_keys(8.8, {'dd:BBB': {}}) and not dd_keys(9.1, {'dd:BBB': {}}))
+    ddr_rules[0].pop('release')
+    # 過渡目標
+    rules_i = [dict(r) for r in rules]
+    rules_i[1] = dict(rules_i[1], interim={'until': '2026-06-30', 'max': 0.99})
+    pi, _ = compute_pools(hs, plans, rules_i, 30, '2026-03-01')
+    pj, _ = compute_pools(hs, plans, rules_i, 30, '2026-07-01')
+    pc = {p['key']: p for p in pi}['conviction']
+    check('過渡期：在過渡上限內不標超出區間，仍記下與原區間的關係', not pc['out'] and pc['outNormal'] and pc['interim']['max'] == 0.99)
+    check('過渡期過了就回到原區間', {p['key']: p for p in pj}['conviction']['out'] and 'interim' not in {p['key']: p for p in pj}['conviction'])
+    rules_i[1]['interim'] = {'until': '2026-06-30', 'max': 0.5}
+    check('過渡期：超過過渡上限仍標超出', {p['key']: p for p in compute_pools(hs, plans, rules_i, 30, '2026-03-01')[0]}['conviction']['out'])
+    # 單一信念股上限依 pool
+    hp = [{'code': 'AAA', 'currency': 'TWD', 'shares': 100, 'price': 10}, {'code': 'ZZZ', 'currency': 'USD', 'shares': 10, 'price': 100},
+          {'code': 'CASH', 'currency': 'USD', 'shares': 1, 'price': 1}]
+    rp = [{'key': 'c', 'kind': 'cap', 'each': True, 'pool': 'conviction', 'example_codes': ['BBB'], 'cap': 0.25}]
+    ev = evaluate(hp, [{'code': 'ZZZ', 'pool': 'conviction'}, {'code': 'AAA', 'pool': 'broad'}], rp, 30, {}, [], 31000)
+    check('上限依 pool：plans.json 新增的信念股自動納入、其他池不算', 'cap:ZZZ' in ev and 'cap:AAA' not in ev)
+    # 半年檢查比較
+    rv = review_compare([{'key': 'review', 'kind': 'schedule', 'history': [{'date': '2026-06-30', 'conviction': 0.5}, {'date': '2026-12-31', 'conviction': 0.45}]}],
+                        [{'key': 'conviction', 'pct': 0.44}])
+    check('半年檢查：跟最近一次比，下降才算 down', rv['conviction'] == 0.45 and rv['down'] and not review_compare([{'key': 'review', 'kind': 'schedule', 'history': [{'date': 'x', 'conviction': 0.4}]}], [{'key': 'conviction', 'pct': 0.44}])['down'])
+    pe = build(hs, plans, rules, 30, '2026-01-11', {}, mk, True, evaluated_by='早報')
+    check('evaluated_by 記下是同步或早報判斷的', pe['evaluatedBy'] == '早報' and pe['highs']['BBB']['high52'] == 10.0)

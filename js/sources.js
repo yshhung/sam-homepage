@@ -285,7 +285,7 @@ export function demoInvest() {
     totalTwd: 1234567, cathayTwd: 234567, schwabUsd: 33333.33, schwabTwd: 1000000, fx: 30,
     dayPct: -2.5, cathayDayPct: -1.1, schwabDayPct: -3.0, monthPct: 1.2, monthBase: addDays(dateStr(), -10), stalePrices: 0,
     plan: {
-      evaluated: dateStr(),
+      evaluated: dateStr(), evaluatedBy: '示範',
       pools: [
         { key: 'broad', label: '大盤', pct: 0.33, target: 0.4, band: 0.05, dev: -0.07, out: true, split: { us: 0.05, tw: 0.28 } },
         { key: 'conviction', label: '信念', pct: 0.44, target: 0.4, band: 0.05, dev: 0.04, out: false },
@@ -331,6 +331,13 @@ export function investView(inv, today, threshold) {
 const pp = (v, d = 1) => (typeof v === 'number' ? `${(v * 100).toFixed(d)}%` : '—');
 const pt = (v) => (typeof v === 'number' ? `${v > 0 ? '+' : v < 0 ? '−' : '±'}${Math.abs(v * 100).toFixed(1)} 點` : '—');
 
+const interimText = (x) => {
+  const im = x.interim, parts = [];
+  if (im.max !== undefined && im.max !== null) parts.push(`≤${pp(im.max, 0)}`);
+  if (im.min !== undefined && im.min !== null) parts.push(`≥${pp(im.min, 0)}`);
+  return `過渡目標 ${parts.join(' ')}${im.until ? `（到 ${im.until.slice(0, 4)}/${Number(im.until.slice(5, 7))}）` : ''}`;
+};
+
 export function planView(inv, today) {
   const p = inv?.plan;
   if (!p?.pools?.length) return null;
@@ -338,9 +345,13 @@ export function planView(inv, today) {
     key: x.key, label: x.label, pct: pp(x.pct), out: x.out,
     target: x.target === null || x.target === undefined ? '—' : `目標 ${pp(x.target, 0)}（±${Math.round((x.band || 0) * 100)}）`,
     dev: `偏離 ${pt(x.dev)}`, tone: x.out ? (x.dev > 0 ? 'over' : 'under') : '',
-    sub: x.split ? `SPYM ${pp(x.split.us)}・台股 ${pp(x.split.tw)}` : x.key === 'swing' ? '未歸池的持股暫列這裡' : '',
+    sub: x.interim ? interimText(x) : x.split ? `SPYM ${pp(x.split.us)}・台股 ${pp(x.split.tw)}` : x.key === 'swing' ? '未歸池的持股暫列這裡' : '',
   }));
-  const alerts = (p.alerts || []).map((a) => ({ key: a.key, title: a.title, meta: a.meta, lvl: a.lvl, isNew: !!a.new && a.raised === today, since: a.since }));
+  const all = (p.alerts || []).map((a) => ({ key: a.key, title: a.title, meta: a.meta, lvl: a.lvl, isNew: !!a.new && a.raised === today, since: a.since,
+    acked: !!a.acked, ackDate: a.ackDate, ackNote: a.ackNote }));
+  // 已知悉的警報：投資頁照樣列（灰色），首頁待處理與投資卡的警報數都不算
+  const alerts = all.filter((a) => !a.acked);
+  const acked = all.filter((a) => a.acked);
   const ex = p.extras || {};
   const stats = [];
   if (ex.lotto) stats.push({ k: `樂透額度 ${ex.lotto.year}`, v: `US$${ex.lotto.leftUsd}`, s: `已用 US$${ex.lotto.usedUsd}／${ex.lotto.limitUsd}` });
@@ -355,14 +366,21 @@ export function planView(inv, today) {
     const s = ex.sellPlan;
     stats.push({ k: `${s.code} 賣出進度`, v: `${s.sold}／${s.total} 股`, s: s.nextPrice ? `第 ${s.batchesDone + 1} 批 $${s.nextPrice}・底線 ${shortDate(s.deadline)}` : '已賣完' });
   }
+  if (ex.review) {
+    const r = ex.review;
+    stats.push({ k: '信念池 vs 上次檢查', v: `${pp(r.now)}`, s: `${shortDate(r.date)} 檢查時 ${pp(r.conviction)}・${r.down ? '比上次低，照進度' : '沒有比上次低'}`, tone: r.down ? 'go' : '' });
+  }
+  const highs = Object.entries(p.highs || {}).map(([code, h]) => ({ code, text: `52 週高 ${h.high52 < 20 ? h.high52.toFixed(2) : Math.round(h.high52 * 100) / 100}${h.highDate ? `（${shortDate(h.highDate)}）` : ''}・收 ${h.close < 20 ? h.close.toFixed(2) : Math.round(h.close * 100) / 100}（${pp(h.dd)}）` }));
   const age = p.evaluated ? diffDays(today, p.evaluated) : null;
-  const note = p.evaluated ? `警報判斷於 ${shortDate(p.evaluated)} 07:30 同步（收盤價）${age >= 2 ? `・已 ${age} 天沒判斷` : ''}` : '警報還沒判斷過（下次 07:30 同步）';
+  const by = p.evaluatedBy || '每日同步';
+  const note = p.evaluated ? `警報判斷於 ${shortDate(p.evaluated)} ${by}（收盤價）${age >= 2 ? `・已 ${age} 天沒判斷` : ''}` : '警報還沒判斷過（下次每日同步）';
   // 首頁投資卡的一句話：有池子超出區間或有警報才標黃
   const off = p.pools.filter((x) => x.out);
   const parts = off.map((x) => `${x.label}${x.dev > 0 ? '偏高' : '偏低'} ${pt(x.dev)}`);
   if (alerts.length) parts.push(`${alerts.length} 個警報觸發中`);
-  const summary = parts.length ? { text: `⚠️ 四池：${parts.join('、')}`, warn: true } : { text: '四池都在區間內，沒有警報', warn: false };
-  return { pools, alerts, stats, note, summary };
+  const summary = parts.length ? { text: `⚠️ 四池：${parts.join('、')}`, warn: true, short: alerts.length ? `⚠️ ${alerts.length} 警報` : '⚠️ 四池偏離' }
+    : { text: acked.length ? `四池都在區間內，${acked.length} 個已知悉的警報` : '四池都在區間內，沒有警報', warn: false };
+  return { pools, alerts, acked, highs, stats, note, summary };
 }
 
 // ---------- 天氣與營運警報 ----------

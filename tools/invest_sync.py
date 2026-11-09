@@ -80,15 +80,63 @@ def yahoo_quote(symbol):
     return price, round(prev, 4) if prev is not None else None, day
 
 
+def robust_high(bars, spike=0.15):
+    """bars＝[(日期, 收盤)]。52 週收盤高點，忽略單日尖刺：前後一天都比它低 spike 以上的點不算
+    （Yahoo 偶爾有一根壞資料，會讓回撤警報變成永久警報）。第一根與最後一根只有一邊鄰居，不當尖刺判斷。回傳 (高點, 日期)。"""
+    best = None
+    for i, (d, c) in enumerate(bars):
+        if 0 < i < len(bars) - 1 and bars[i - 1][1] < c * (1 - spike) and bars[i + 1][1] < c * (1 - spike):
+            continue
+        if best is None or c > best[0]:
+            best = (c, d)
+    return best
+
+
+def parse_twse_stock_day(js):
+    """證交所 STOCK_DAY（個股月成交資訊）→ [(日期, 收盤)]；休市或沒成交的列（收盤價 --）略過。"""
+    out = []
+    fields = js.get('fields') or []
+    try:
+        ci = fields.index('收盤價')
+    except ValueError:
+        ci = 6
+    for row in js.get('data') or []:
+        c = num(row[ci])
+        if c:
+            out.append((roc_date(row[0].replace('/', '')), c))
+    return out
+
+
+def twse_year_high(code, today):
+    """台股上市個股一年收盤高點（證交所，過去 12 個月逐月抓）；抓不到回傳 None。只用來核對 Yahoo。"""
+    y, m = int(today[:4]), int(today[5:7])
+    bars = []
+    for k in range(12):
+        yy, mm = y, m - k
+        while mm < 1:
+            mm += 12
+            yy -= 1
+        try:
+            js = get_json(f'https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?date={yy}{mm:02d}01&stockNo={code}&response=json')
+            bars += parse_twse_stock_day(js)
+        except Exception:
+            return None
+    bars.sort()
+    cutoff = f'{y - 1}{today[4:]}'
+    bars = [b for b in bars if b[0] >= cutoff]
+    return robust_high(bars) if len(bars) > 150 else None
+
+
 def yahoo_year(symbol):
-    """一年的日收盤：回傳 (最新收盤, 日期, 52 週收盤高點)。"""
+    """一年的日收盤：回傳 (最新收盤, 日期, 52 週收盤高點, 高點日期)；高點已忽略單日尖刺。"""
     r = get_json(f'https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=1y&interval=1d')['chart']['result'][0]
     off = r['meta'].get('gmtoffset', 0)
     bars = [(datetime.fromtimestamp(t + off, timezone.utc).strftime('%Y-%m-%d'), c)
             for t, c in zip(r.get('timestamp') or [], r['indicators']['quote'][0].get('close') or []) if c is not None]
     if not bars:
         raise ValueError('沒有收盤資料')
-    return bars[-1][1], bars[-1][0], max(c for _, c in bars)
+    hi, hi_day = robust_high(bars)
+    return bars[-1][1], bars[-1][0], hi, hi_day
 
 
 def fetch_market(plans, errors):
@@ -117,6 +165,13 @@ def fetch_market(plans, errors):
                 continue
         else:
             errors.append(f'{code} 52 週高點抓不到')
+            continue
+        if p.get('market') == '台股':  # 台股另用證交所核對；兩邊差 2% 以上就採證交所並留下紀錄
+            tw = twse_year_high(code, market['spx'][1])
+            y = market['year'][code]
+            if tw and abs(tw[0] / y[2] - 1) > 0.02:
+                errors.append(f'{code} 52 週高點 Yahoo {y[2]:.2f}、證交所 {tw[0]:.2f}，採證交所')
+                market['year'][code] = (y[0], y[1], tw[0], tw[1])
     return market
 
 
@@ -264,10 +319,10 @@ def update_state(state, holdings, out, keep=70, watch=None):
 
 
 def watch_items(watchlist):
-    """追蹤清單轉成跟持股一樣的格式，才能用同一套方式抓價（未上市的 price 是 null，抓不到就略過）"""
+    """追蹤清單轉成跟持股一樣的格式，才能用同一套方式抓價（未上市的標的在 watchlist.json 設 "skip_quote": true，就不抓價、不報錯）"""
     return [{'code': w['code'], 'currency': 'TWD' if w.get('market') == '台股' else 'USD', 'shares': 0,
              'price': w.get('price'), 'prev_price': w.get('prev_price'), 'price_date': w.get('price_date')}
-            for w in watchlist or [] if w.get('code')]
+            for w in watchlist or [] if w.get('code') and not w.get('skip_quote')]
 
 
 # ---------- 讀寫檔 ----------
@@ -292,6 +347,11 @@ def load_json(path, default=None):
         return json.load(f)
 
 
+def size_ok(actual, expected, tol=1):
+    """抄下來的檔案大小核對：容許差 tol 個位元組（結尾少一個換行很常見）；差更多才是抄錯。"""
+    return abs(actual - expected) <= tol
+
+
 def run(base, expect=None, dry=False, alerts=False):
     """base 底下要有「投資資料/holdings.json」（state.json 可以沒有）；
     結果寫到「投資資料/state.json」與「Sam Homepage/invest.json」，最後一行印出每個檔的位元組數。"""
@@ -302,7 +362,7 @@ def run(base, expect=None, dry=False, alerts=False):
     # 雲端是先從 OneDrive 抄下來再算：大小不對就是抄錯了，寧可不更新
     for name, size in (expect or {}).items():
         actual = os.path.getsize(os.path.join(data_dir, name))
-        if actual != size:
+        if not size_ok(actual, size):
             raise SystemExit(f'{name} 大小 {actual} 跟 OneDrive 的 {size} 不一樣，停止（沒有寫任何檔）')
     holdings = load_json(os.path.join(data_dir, 'holdings.json'))
     state = load_json(state_path, {'prices': {}, 'daily': []})
@@ -339,10 +399,12 @@ def run(base, expect=None, dry=False, alerts=False):
     for k in ('plan', 'plan_state'):
         if k in state:
             new_state[k] = state[k]
+    by_morning = alerts == 'if-stale'  # 早報的備援判斷；其他（--alerts）是每日同步
     if alerts == 'if-stale':  # 早報的備援：07:30 同步今天沒判斷過才判斷
         alerts = ((state.get('plan') or {}).get('evaluated') != now[:10])
     market = fetch_market(plans, errors) if alerts and plans is not None else None
-    plan = invest_plan.build(holdings, plans, rules, fx, now[:10], new_state, market, alerts and market is not None)
+    plan = invest_plan.build(holdings, plans, rules, fx, now[:10], new_state, market, alerts and market is not None,
+                             evaluated_by='早報' if by_morning else '同步')
     if plan:
         out['plan'] = plan
     if errors:
@@ -398,6 +460,17 @@ def selftest():
     check('追蹤清單轉成持股格式', wi[0]['currency'] == 'USD' and wi[1]['currency'] == 'TWD' and wi[1]['shares'] == 0)
     st2 = update_state({'watch': {'DDD': [5, 4, '2026-01-02']}}, hs, s)
     check('這次沒讀追蹤清單就沿用上次的價格', st2['watch']['DDD'][0] == 5)
+    check('追蹤清單 skip_quote 的標的不抓價', [w['code'] for w in watch_items([{'code': 'X', 'market': '美股', 'skip_quote': True}, {'code': 'Y', 'market': '美股'}])] == ['Y'])
+    check('--expect 容許差 1 個位元組（結尾換行），差更多才停止', size_ok(100, 101) and size_ok(101, 100) and size_ok(100, 100) and not size_ok(100, 102))
+    bars = [('d%02d' % i, 100.0) for i in range(10)]
+    bars[5] = ('d05', 140.0)
+    check('52 週高點：單日尖刺（前後都低 15% 以上）不算', robust_high(bars) == (100.0, 'd00'))
+    bars[5], bars[6] = ('d05', 140.0), ('d06', 140.0)
+    check('52 週高點：連續兩天的高點是真的', robust_high(bars)[0] == 140.0)
+    check('52 週高點：最後一根是新高照算', robust_high([('a', 100.0), ('b', 100.0), ('c', 130.0)]) == (130.0, 'c'))
+    tw = parse_twse_stock_day({'fields': ['日期', '成交股數', '成交金額', '開盤價', '最高價', '最低價', '收盤價'],
+                               'data': [['115/11/03', '1', '1', '1', '1', '1', '1,880.00'], ['115/11/04', '1', '1', '--', '--', '--', '--']]})
+    check('證交所個股月資料：民國日期轉西元、無成交的列略過', tw == [('2026-11-03', 1880.0)])
     invest_plan.selftest(check)
     print('PASS' if ok else 'FAIL')
     return ok

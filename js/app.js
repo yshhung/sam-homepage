@@ -390,7 +390,7 @@ function renderDomains(focus) {
       auto?.text ? el('p', { class: 'd-text auto' }, auto.text) : null,
       // 手機上卡片窄，四池只顯示「⚠️ 四池」，有問題才出現
       auto?.plan ? el('a', { class: `d-plan ${auto.plan.warn ? 'warn' : 'ok'}`, href: 'invest.html#plans' },
-        el('span', { class: 'd-long' }, auto.plan.text), el('span', { class: 'd-short' }, '⚠️ 四池')) : null,
+        el('span', { class: 'd-long' }, auto.plan.text), el('span', { class: 'd-short' }, auto.plan.short || '⚠️ 四池偏離')) : null,
       ...notes.map((t) => el('p', { class: 'd-text' }, t)),
       d === '工作' && state.hecho ? el('button', { class: 'act d-ask', type: 'button', title: '複製最近的數字（沒有姓名），打開 Claude', onclick: askHecho }, '問 AI') : null,
       el('div', { class: 'd-foot' },

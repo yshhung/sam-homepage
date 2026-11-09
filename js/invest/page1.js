@@ -737,7 +737,10 @@ function drawOptions(pos) {
 function drawEvents() {
   const cal = document.getElementById('ev-cal'), det = document.getElementById('ev-detail');
   cal.textContent = ''; det.textContent = '';
-  const E = rows('events'); if (!E) return;
+  const E0 = rows('events'); if (!E0) return;
+  // 選擇權到期不存在 events.json，由 options.json 推導（避免買回後還留著過期提醒）
+  const E = E0.filter(e => e.kind !== 'option').concat((rows('options') || []).filter(o => o.kind === 'option' && o.expiry)
+    .map(o => ({date: o.expiry, title: (o.code || '') + ' 選擇權到期（' + (o.title || '') + '）', code: o.code || '', kind: 'option', approx: false})));
   const KIND = {earnings: '財報', option: '到期', plan: '計畫', dividend: '配息', macro: '總經'};
   const td = today(); const [ty, tm] = td.split('-').map(Number);
   const byDate = {}; E.forEach(e => { (byDate[e.date] = byDate[e.date] || []).push(e); });
