@@ -15,5 +15,7 @@
 - 首頁只負責「看」：資料都在 Sam 的 OneDrive（沁耘帳號，用 Microsoft 365 連接器讀寫）；網頁裡不放任何持股、金額、權杖。
 - 改計畫、規則、指示一律**直接寫回 OneDrive**，不要只在對話裡回報。
 - 排程的完整指示放在 OneDrive `投資資料/報告指示/*.md`（Sam 維護），排程提示詞只叫它去讀那個檔；要改排程內容就改檔，不用改排程。排程本身（claude.ai/code/routines）是 Sam 建立的，Claude 改不了，需要改時給 Sam 文字讓他貼。
+- 改寫 OneDrive `報告指示/*.md` 一律先讀舊檔，改完比對長度：新檔不得比舊檔短 30% 以上（除非指示裡說明為何刪減）。2026-11-09 週回顧.md 曾被覆寫成只剩「placeholder」。
+- 同步排程的時間以 `config.js` 的 `syncTimes` 為準，文件與提示文字都從它來，不要另外寫死。
 - 程式改動要附自我測試（`python3 tools/invest_sync.py --selftest`），改完推到 `main`（GitHub Pages 約一分鐘上線），並遞增 `sw.js` 的 `VERSION`。
 - 繁體中文回覆；不給買賣建議；漲跌用「漲／跌」，不用顏色說法。
