@@ -276,3 +276,25 @@ body { -webkit-text-size-adjust: 100%; overflow-x: hidden; }
   .sd-kpi .sd-v small { display: inline-block; margin-left: 6px; white-space: nowrap; }
   .sd-kpi .sd-s, .sd-kpi .sd-s span { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 }
+
+/* 市場分頁（2026-11-09 重排）：摘要、觀察放前面，數字改成緊湊的兩欄，新聞一則一塊 */
+#pane-market > section, #pane-market #mk-groups > section, #pane-market #mk-other > section { margin-bottom: 12px; }
+.mk-gh { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.mk-gh h2 { margin: 0; }
+.mk-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.mk-tile { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; column-gap: 8px; padding: 7px 10px; }
+.mk-tile .n { grid-column: 1; grid-row: 1; }
+.mk-tile .v { grid-column: 2; grid-row: 1; margin: 0; font-size: 1rem; text-align: right; }
+.mk-tile .p { grid-column: 2; grid-row: 2; margin: 0; text-align: right; font-size: 11px; }
+.mk-tile .sb { grid-column: 1 / -1; }
+.mk-wh { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 10px 0 4px; font-size: 13px; }
+.mk-wh:first-child { margin-top: 0; }
+.mk-item { padding-top: 6px; padding-bottom: 6px; }
+.mk-n { padding: 9px 0; border-top: 1px solid var(--line); line-height: 1.5; }
+.mk-n:first-child { border-top: 0; padding-top: 0; }
+.mk-n a { color: var(--fg); text-decoration: underline; text-decoration-color: var(--dim); text-underline-offset: 3px; }
+.mk-n a::after { content: " ↗"; font-size: .85em; color: var(--acc); }
+.mk-nr { font-size: 12px; color: var(--acc); margin-top: 2px; }
+.mk-ns { font-size: 11px; color: var(--dim); margin-top: 2px; }
+.mk-tiles .mk-tile:last-child:nth-child(odd) { grid-column: 1 / -1; }
+#mk-other .sd-item { padding-top: 7px; padding-bottom: 7px; }

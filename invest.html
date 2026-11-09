@@ -200,22 +200,20 @@
   </section>
 </div>
 <div class="mk-pane" id="pane-market" hidden>
+  <section class="sd-card" id="mk-brief-card">
+    <h2>重點摘要</h2>
+    <div class="mk-briefs" id="mk-briefs" data-source="inv_brief"></div>
+  </section>
+  <section class="sd-card" id="mk-watch">
+    <h2>今日觀察</h2>
+    <div class="sd-list" id="mk-watch-list" data-source="mk_notes"></div>
+  </section>
   <div id="mk-groups" data-source="mk_tiles"></div>
-  <div class="sd-grid">
-    <section class="sd-card" id="mk-watch">
-      <h2>今日觀察</h2>
-      <p class="sd-note">計畫價距離、漲跌超過門檻的持股與追蹤標的、近期事件；顏色：綠＝正常、黃＝留意、紅＝已觸及</p>
-      <div class="sd-list" id="mk-watch-list" data-source="mk_notes"></div>
-    </section>
-    <section class="sd-card" id="mk-news">
-      <h2>財經新聞</h2>
-      <p class="sd-note">總經與投資相關新聞，含個股漲跌原因；保留最近一天半</p>
-      <div class="sd-scroll"><table class="sd-table mk-news" id="mk-news-tbl" data-source="fin_news" data-row-key="title">
-        <thead><tr><th class="l" data-field="title">標題</th><th class="l" data-field="rel">跟你的關係</th></tr></thead>
-        <tbody></tbody></table></div>
-    </section>
-  </div>
   <div id="mk-other"></div>
+  <section class="sd-card" id="mk-news">
+    <h2>財經新聞</h2>
+    <div class="mk-nl" id="mk-news-list" data-source="fin_news"></div>
+  </section>
 </div>
 </div>
 </div>

@@ -33,7 +33,7 @@
       bb.textContent = '';
       const all = [...B].filter((r) => r && r.text).sort((a, b) => (a.at < b.at ? -1 : 1));
       let k = -1; for (let i = all.length - 1; i >= 0; i--) { if (all[i].slot === '午報') { k = i; break; } }
-      const show = (k >= 0 ? all.slice(k) : all.slice(-4)).reverse();
+      const show = (k >= 0 ? all.slice(k) : all.slice(-4)).reverse().slice(0, 2);
       const SL = {};
       if (!show.length) bb.appendChild(el('p', 'mk-brief', '下一份報告寫入後顯示。'));
       show.forEach((r, i) => {
@@ -53,9 +53,8 @@
       box.replaceChildren(...groups.map((g) => {
         const rows = T.filter((r) => r.group === g);
         const card = el('section', 'sd-card'); card.id = 'mk-g-' + groups.indexOf(g);
-        card.appendChild(el('h2', null, TT(g)));
         const at = latest(rows); const by = (rows.find((r) => r.at === at) || {}).by || '';
-        card.appendChild(el('p', 'sd-note', '更新：' + stamp(at) + ' ' + by));
+        card.appendChild(el('div', 'mk-gh', '')); const gh = card.lastChild; gh.append(el('h2', null, TT(g)), el('span', 'sd-chip', by + ' ' + stamp(at)));
         const grid = el('div', 'mk-tiles');
         rows.forEach((r) => {
           const t = el('div', 'mk-tile');
@@ -83,12 +82,19 @@
       const list = $('#mk-watch-list');
       const W = N.filter(isWatch);
       if (!W.length) list.replaceChildren(el('div', 'sd-empty', '目前沒有需要留意的項目'));
-      else list.replaceChildren(...W.map((x) => {
-        const it = el('div', 'sd-item mk-item ' + (x.lvl || ''));
-        const t = el('div', 't'); t.appendChild(el('b', null, x.section)); t.appendChild(el('span', 'sd-chip', (x.by || '') + ' ' + stamp(x.at))); it.appendChild(t);
-        const m = el('div', 'm', cw(x.p)); if (cw(x.p) === x.p) { m.setAttribute('data-source', 'mk_notes'); m.setAttribute('data-field', 'p'); m.setAttribute('data-where', 'id=' + encodeURIComponent(x.id)); } it.appendChild(m);
-        return it;
-      }));
+      else {
+        const secs = [...new Set(W.map((x) => x.section))];
+        list.replaceChildren(...secs.flatMap((s) => {
+          const rows = W.filter((x) => x.section === s);
+          const at = latest(rows), by = (rows.find((r) => r.at === at) || {}).by || '';
+          const head = el('div', 'mk-wh'); head.append(el('b', null, s), el('span', 'sd-chip', by + ' ' + stamp(at)));
+          return [head, ...rows.map((x) => {
+            const it = el('div', 'sd-item mk-item ' + (x.lvl || ''));
+            const m = el('div', 'm', cw(x.p)); if (cw(x.p) === x.p) { m.setAttribute('data-source', 'mk_notes'); m.setAttribute('data-field', 'p'); m.setAttribute('data-where', 'id=' + encodeURIComponent(x.id)); } it.appendChild(m);
+            return it;
+          })];
+        }));
+      }
       const cc = N.filter((x) => x.section === 'Cover Call 參考');
       if (cc.length) $('#mk-cc-note').textContent = cc.map((x) => x.p).join(' ');
       const rest = N.filter((x) => !isWatch(x) && !tileGroups.has(x.section) && x.section !== 'Cover Call 參考');
@@ -96,8 +102,7 @@
       $('#mk-other').replaceChildren(...secs.map((s, i) => {
         const rows = rest.filter((x) => x.section === s);
         const card = el('section', 'sd-card'); card.id = 'mk-s-' + i;
-        card.appendChild(el('h2', null, TT(s)));
-        const at = latest(rows); card.appendChild(el('p', 'sd-note', '更新：' + stamp(at) + ' ' + ((rows.find((r) => r.at === at) || {}).by || '')));
+        const at = latest(rows); const gh = el('div', 'mk-gh'); gh.append(el('h2', null, TT(s)), el('span', 'sd-chip', ((rows.find((r) => r.at === at) || {}).by || '') + ' ' + stamp(at))); card.appendChild(gh);
         const l = el('div', 'sd-list');
         rows.forEach((x) => {
           const it = el('div', 'sd-item');
@@ -113,12 +118,13 @@
     // news
     const F = rowsOf('fin_news');
     if (F) {
-      const tb = $('#mk-news-tbl').tBodies[0];
-      tb.replaceChildren(...[...F].sort((a, b) => (a.at < b.at ? 1 : -1)).map((r) => {
-        const tr = document.createElement('tr'); tr.dataset.key = r.title;
-        const a = el('td', 'l'); a.appendChild(link(r.title, r.url)); a.appendChild(el('span', 's', [r.src, (r.by || '') + ' ' + stamp(r.at)].filter(Boolean).join('｜')));
-        tr.append(a, el('td', 'l', r.rel || ''));
-        return tr;
+      const box = $('#mk-news-list');
+      box.replaceChildren(...[...F].sort((a, b) => (a.at < b.at ? 1 : -1)).map((r) => {
+        const row = el('div', 'mk-n'); row.dataset.key = r.title;
+        row.append(link(r.title, r.url));
+        if (r.rel) row.append(el('div', 'mk-nr', r.rel));
+        row.append(el('div', 'mk-ns', [r.src, (r.by || '') + ' ' + stamp(r.at)].filter(Boolean).join('｜')));
+        return row;
       }));
     }
 
