@@ -160,7 +160,7 @@ function inboxEntries(ib, today) {
   const out = [];
   const ageH = ib.updated ? (Date.now() - new Date(ib.updated).getTime()) / 3600000 : null;
   if (ib.status === 'error') out.push({ key: 'inbox:error', cat: '信箱', title: '信箱分流排程出錯', meta: ib.note || '看下一次排程是否恢復', level: 'info', sort: 0.8 });
-  else if (ageH != null && ageH > 36) out.push({ key: 'inbox:stale', cat: '信箱', title: `信箱分流 ${Math.round(ageH)} 小時沒更新`, meta: '排程每天 12:10 執行', level: 'info', sort: 0.8 });
+  else if (ageH != null && ageH > 36) out.push({ key: 'inbox:stale', cat: '信箱', title: `信箱分流 ${Math.round(ageH)} 小時沒更新`, meta: '排程每天 00:10 與 12:10 執行', level: 'info', sort: 0.8 });
   for (const [box, name] of [['outlook', '工作信箱'], ['gmail', '私人信箱']]) {
     const b = ib[box];
     if (!b) continue;
