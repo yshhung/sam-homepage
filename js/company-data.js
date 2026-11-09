@@ -38,3 +38,22 @@ export function sumLast(series, days = 7) {
   const pts = series.slice(-days).filter((p) => p.value !== null);
   return pts.length ? pts.reduce((a, p) => a + p.value, 0) : null;
 }
+
+// 示範資料（還沒登入時，沁耘頁畫這份；明顯是假的數字）
+export function demoCompanyHistory(today = new Date().toISOString().slice(0, 10)) {
+  const day = (i) => new Date(Date.parse(`${today}T12:00:00Z`) - i * 86400000).toISOString().slice(0, 10);
+  const social = [];
+  for (let i = 34; i >= 0; i--) {
+    const t = 34 - i;
+    social.push({ date: day(i), network: 'instagram', followers: 60 + Math.floor(t / 5), views: 20 + ((t * 7) % 30), posts: 0, interactions: 3 });
+    social.push({ date: day(i), network: 'facebook', followers: 95 + Math.floor(t / 4), views: 40 + ((t * 11) % 50), posts: 0, interactions: 5 });
+    social.push({ date: day(i), network: 'google', followers: null, views: 80 + ((t * 13) % 60), posts: 0, interactions: 6 + (t % 9) });
+  }
+  const m = new Date(`${today}T12:00:00Z`);
+  const web = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() - i, 1));
+    web.push({ month: `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`, views: 300 + i * 40, visitors: 100 + i * 12, posts: 2 });
+  }
+  return { updated: `${today} 07:30`, web, social };
+}

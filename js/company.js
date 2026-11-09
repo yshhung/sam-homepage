@@ -1,8 +1,8 @@
 // 沁耘頁：登入後讀 OneDrive「Sam Homepage」的 company_history.json（只讀）與 company_stats.json，畫幾張圖
 import { CONFIG } from '../config.js';
 import { getAccount, initAuth, isConfigured, login } from './auth.js';
-import { oneDriveJson } from './sources.js';
-import { dailySeries, latestWithChange, sumLast, webSeries } from './company-data.js';
+import { demoCompany, oneDriveJson } from './sources.js';
+import { dailySeries, demoCompanyHistory, latestWithChange, sumLast, webSeries } from './company-data.js';
 import { el } from './util.js';
 import { barChart, fmt, lineChart } from './charts.js';
 
@@ -52,11 +52,11 @@ function banner(text, button) {
 }
 
 async function start() {
-  if (!isConfigured()) { status('demo', '未登入'); banner('還沒設定 Microsoft 登入，這一頁需要登入才能看。'); return; }
+  const demo = (text, button) => { render(demoCompanyHistory(), demoCompany()); status('demo', '示範模式'); banner(text, button); };
+  if (!isConfigured()) { demo('示範模式：還沒設定 Microsoft 登入，下面是示範數字。'); return; }
   try { await initAuth(); } catch (e) { status('bad', '登入失敗'); banner(`登入失敗：${e.message}`); return; }
   if (!getAccount()) {
-    status('demo', '未登入');
-    banner('請先登入，才能讀你 OneDrive 裡的網站與社群數字。', el('button', { class: 'btn', type: 'button', onclick: () => login() }, '登入'));
+    demo('示範模式：下面是示範數字，登入後才會看到沁耘真實的網站與社群數字。', el('button', { class: 'btn', type: 'button', onclick: () => login() }, '登入'));
     return;
   }
   status('loading', '讀取中');

@@ -173,7 +173,10 @@ function hechoEntries(today) {
 
   // 平日 18:00 後還沒有今天的交班紀錄
   const dow = new Date(`${today}T12:00:00+08:00`).getUTCDay();
-  if (dow >= 1 && dow <= 5 && timeStr() >= '18:00' && L.date < today) {
+  // 國定假日不提醒：Outlook 當天有標題含「休假、放假、補假、連假、國定假日」的整天事件就當成休息日
+  const offDay = (state.events || []).some((e) => e.allDay && /休假|放假|補假|連假|國定假日/.test(e.subject || '')
+    && e.start.slice(0, 10) <= today && addDays(e.end.slice(0, 10), -1) >= today);
+  if (dow >= 1 && dow <= 5 && !offDay && timeStr() >= '18:00' && L.date < today) {
     out.push(hk('missing', '和果今天的交班紀錄還沒匯出', `最新一筆是 ${shortDate(L.date)}`, 'warn', 0.3));
   }
   return out;

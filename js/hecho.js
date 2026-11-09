@@ -58,8 +58,9 @@ async function start() {
   if (!isConfigured()) { render(demoHechoDetail()); status('demo', '示範模式'); banner('示範模式：還沒設定 Microsoft 登入，下面是示範數字。'); return; }
   try { await initAuth(); } catch (e) { status('bad', '登入失敗'); banner(`登入失敗：${e.message}`); return; }
   if (!getAccount()) {
-    status('demo', '未登入');
-    banner('請先登入，才能讀和果的統計數字。', el('button', { class: 'btn', type: 'button', onclick: () => login() }, '登入'));
+    render(demoHechoDetail());
+    status('demo', '示範模式');
+    banner('示範模式：下面是示範數字，登入後才會看到和果真實的統計。', el('button', { class: 'btn', type: 'button', onclick: () => login() }, '登入'));
     return;
   }
   status('loading', '讀取中');
