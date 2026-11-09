@@ -7,6 +7,7 @@
       "mcp__Gmail__create_label",
       "mcp__Gmail__label_thread",
       "mcp__Gmail__label_message",
+      "mcp__Gmail__unlabel_thread",
       "mcp__Microsoft_365__outlook_email_search",
       "mcp__Microsoft_365__outlook_modify_labels",
       "mcp__Microsoft_365__outlook_batch_modify_labels",
