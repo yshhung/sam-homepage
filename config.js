@@ -22,6 +22,8 @@ export const CONFIG = {
   // 天氣與營運警報：每日同步（syncTimes 的每一次）寫第一個（颱風、停班停課、氣象署特報），
   // 早報與晚報寫第二個（停水停電、空品、疫情、道路）；各寫各的檔，首頁兩個都讀
   alertsPaths: ['Sam Homepage/alerts_weather.json', 'Sam Homepage/alerts_ops.json'],
+  // 國定假日：Outlook 裡加一個「台灣假日」行事曆；今天在這些行事曆有整天事件就是假日（和果交班不提醒）。名稱對不到就當沒有假日
+  holidayCalendars: ['台灣假日', 'Taiwan holidays', 'Taiwan Holidays'],
   // 旅行：行程確定或改變時由 Claude 更新
   lifePath: 'Sam Homepage/life.json',
   // 足跡：去過的地方（生活頁的世界地圖），由 Claude 依你說的更新

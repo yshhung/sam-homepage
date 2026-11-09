@@ -53,6 +53,23 @@ export async function getMonthDays(today = dateStr()) {
 }
 
 // 跨天的行程每天都算；整天行程的結束日是隔天 00:00，不算那天
+// 今天是不是國定假日：找名稱在 CONFIG.holidayCalendars 裡的行事曆，今天有整天事件就是（不看標題）。
+// 找不到行事曆或任何錯誤都當沒有假日，不報錯
+export async function getHolidayToday() {
+  try {
+    const names = new Set((CONFIG.holidayCalendars || []).map((n) => n.toLowerCase()));
+    const cals = await graph('/me/calendars?$select=id,name&$top=50');
+    const hit = (cals.value || []).filter((c) => names.has((c.name || '').toLowerCase()));
+    const today = dateStr();
+    const q = new URLSearchParams({ startDateTime: `${today}T00:00:00`, endDateTime: `${addDays(today, 1)}T00:00:00`, $select: 'isAllDay,isCancelled', $top: '20' });
+    for (const c of hit) {
+      const r = await graph(`/me/calendars/${encodeURIComponent(c.id)}/calendarView?${q}`, { headers: { Prefer: 'outlook.timezone="Asia/Taipei"' } });
+      if ((r.value || []).some((e) => e.isAllDay && !e.isCancelled)) return true;
+    }
+  } catch (e) { console.warn('holiday calendar', e); }
+  return false;
+}
+
 export function eventDays(events) {
   const days = new Set();
   for (const e of events) {

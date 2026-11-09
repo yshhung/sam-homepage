@@ -5,7 +5,7 @@ import { getAccount, initAuth, isConfigured, login, logout } from './auth.js';
 import { DemoStore, ExcelStore } from './store.js';
 import {
   demoCalendar, demoCompany, demoHecho, demoInvest, demoLife, demoMail, demoNews, demoTickTick,
-  alertsView, dayView, demoAlerts, getAlerts, getCalendar, getCompany, getFx, getHecho, getInvest, getLife, getLocation, getMail, getNews, getTickTick, getWeather, hechoSummary,
+  alertsView, dayView, demoAlerts, getAlerts, getCalendar, getCompany, getFx, getHecho, getHolidayToday, getInvest, getLife, getLocation, getMail, getNews, getTickTick, getWeather, hechoSummary,
   digestView, investView, lifeView, newsView, planView,
 } from './sources.js';
 import { addDays, dateStr, diffDays, el, relDay, shortDate, timeStr, weekday } from './util.js';
@@ -27,7 +27,7 @@ const state = {
   store: null,
   cards: [], settings: { ...CONFIG.defaults },
   events: [], alerts: [], weather: null, fx: null, mail: [], hecho: null, company: null, ticktick: null, invest: null, life: null, news: [], digests: [],
-  errors: {}, syncedAt: null, loading: false,
+  errors: {}, syncedAt: null, loading: false, holidayToday: false,
   showUpcoming: false, showAllNews: false, showAllFocus: false, showNewsList: false, openMore: new Set(), showAllDay: false, openRows: new Set(), filter: '全部',
 };
 
@@ -173,8 +173,8 @@ function hechoEntries(today) {
 
   // 平日 18:00 後還沒有今天的交班紀錄
   const dow = new Date(`${today}T12:00:00+08:00`).getUTCDay();
-  // 國定假日不提醒：Outlook 當天有標題含「休假、放假、補假、連假、國定假日」的整天事件就當成休息日
-  const offDay = (state.events || []).some((e) => e.allDay && /休假|放假|補假|連假|國定假日/.test(e.subject || '')
+  // 國定假日不提醒：Outlook「台灣假日」行事曆（config.holidayCalendars）今天有整天事件；備援：預設行事曆當天有標題含「休假、放假、補假、連假、國定假日」的整天事件就當成休息日
+  const offDay = state.holidayToday || (state.events || []).some((e) => e.allDay && /休假|放假|補假|連假|國定假日/.test(e.subject || '')
     && e.start.slice(0, 10) <= today && addDays(e.end.slice(0, 10), -1) >= today);
   if (dow >= 1 && dow <= 5 && !offDay && timeStr() >= '18:00' && L.date < today) {
     out.push(hk('missing', '和果今天的交班紀錄還沒匯出', `最新一筆是 ${shortDate(L.date)}`, 'warn', 0.3));
@@ -573,7 +573,7 @@ async function refresh() {
   renderStatus();
   const live = state.store.mode === 'live';
   const dbP = settle('data', state.store.load());
-  const [db, events, weather, fx, mail, hecho, company, ticktick, invest, life, news, alerts] = await Promise.all([
+  const [db, events, weather, fx, mail, hecho, company, ticktick, invest, life, news, alerts, holiday] = await Promise.all([
     dbP,
     live ? settle('calendar', getCalendar()) : Promise.resolve(demoCalendar()),
     settle('weather', dbP.then((d) => getLocation(!!d?.settings?.用目前位置)).then(getWeather)),
@@ -586,10 +586,13 @@ async function refresh() {
     live ? settle('life', getLife()) : Promise.resolve(demoLife()),
     live ? settle('news', getNews()) : Promise.resolve(demoNews()),
     live ? settle('alerts', getAlerts()) : Promise.resolve(demoAlerts()),
+    // 只有平日 18:00 後（和果交班提醒要判斷假日）才多問一次假日行事曆
+    live && timeStr() >= '18:00' ? getHolidayToday() : Promise.resolve(false),
   ]);
   if (db) Object.assign(state, db);
   if (events) state.events = events;
   if (alerts) state.alerts = alerts;
+  state.holidayToday = !!holiday;
   if (weather) state.weather = weather;
   if (fx) state.fx = fx;
   if (mail) state.mail = mail;
