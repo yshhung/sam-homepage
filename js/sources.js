@@ -1,7 +1,7 @@
 // 即時資料：Outlook 行事曆、天氣、匯率。每個來源只抓一次，再分給各區塊用。
 import { CONFIG } from '../config.js';
 import { graph, GraphError } from './auth.js';
-import { addDays, dateStr, diffDays, relDay, shortDate } from './util.js';
+import { addDays, dateStr, diffDays, relDay, shortDate, timeStr } from './util.js';
 
 export async function getCalendar() {
   const today = dateStr();
@@ -632,7 +632,7 @@ export function digestView(digests, now = new Date()) {
   }).filter(Boolean);
   if (!items.length) return null;
   const at = new Date(d.at);
-  return { by: d.by || '', day: dateStr(at), time: `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`, items };
+  return { by: d.by || '', day: dateStr(at), time: timeStr(at), items };
 }
 
 // 只留 7 天內、網址是 http(s) 的；同一個網址只留最新一次；新的在前
