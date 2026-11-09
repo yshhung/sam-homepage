@@ -53,7 +53,9 @@ export async function getMonthDays(today = dateStr()) {
 }
 
 // 跨天的行程每天都算；整天行程的結束日是隔天 00:00，不算那天
-// 今天是不是國定假日：找名稱在 CONFIG.holidayCalendars 裡的行事曆，今天有整天事件就是（不看標題）。
+// 訂閱式假日行事曆也混了節氣與不放假的紀念日（立冬、國父誕辰紀念日…），所以只算標題命中放假名單的整天事件
+const HOLIDAY_TITLE = /元旦|開國紀念日|除夕|春節|農曆新年|和平紀念日|兒童節|清明|勞動節|端午|中秋|國慶|調整放假|補假|連假|國定假日|休假|放假/;
+// 今天是不是國定假日：找名稱在 CONFIG.holidayCalendars 裡的行事曆，今天有標題命中 HOLIDAY_TITLE 的整天事件就是。
 // 找不到行事曆或任何錯誤都當沒有假日，不報錯
 export async function getHolidayToday() {
   try {
@@ -61,10 +63,10 @@ export async function getHolidayToday() {
     const cals = await graph('/me/calendars?$select=id,name&$top=50');
     const hit = (cals.value || []).filter((c) => names.has((c.name || '').toLowerCase()));
     const today = dateStr();
-    const q = new URLSearchParams({ startDateTime: `${today}T00:00:00`, endDateTime: `${addDays(today, 1)}T00:00:00`, $select: 'isAllDay,isCancelled', $top: '20' });
+    const q = new URLSearchParams({ startDateTime: `${today}T00:00:00`, endDateTime: `${addDays(today, 1)}T00:00:00`, $select: 'subject,isAllDay,isCancelled', $top: '20' });
     for (const c of hit) {
       const r = await graph(`/me/calendars/${encodeURIComponent(c.id)}/calendarView?${q}`, { headers: { Prefer: 'outlook.timezone="Asia/Taipei"' } });
-      if ((r.value || []).some((e) => e.isAllDay && !e.isCancelled)) return true;
+      if ((r.value || []).some((e) => e.isAllDay && !e.isCancelled && HOLIDAY_TITLE.test(e.subject || ''))) return true;
     }
   } catch (e) { console.warn('holiday calendar', e); }
   return false;
