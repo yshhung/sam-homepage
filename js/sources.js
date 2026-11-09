@@ -52,7 +52,6 @@ export async function getMonthDays(today = dateStr()) {
   })));
 }
 
-// 跨天的行程每天都算；整天行程的結束日是隔天 00:00，不算那天
 // 訂閱式假日行事曆也混了節氣與不放假的紀念日（立冬、國父誕辰紀念日…），所以只算標題命中放假名單的整天事件
 const HOLIDAY_TITLE = /元旦|開國紀念日|除夕|春節|農曆新年|和平紀念日|兒童節|清明|勞動節|端午|中秋|國慶|調整放假|補假|連假|國定假日|休假|放假/;
 // 今天是不是國定假日：找名稱在 CONFIG.holidayCalendars 裡的行事曆，今天有標題命中 HOLIDAY_TITLE 的整天事件就是。
@@ -72,6 +71,7 @@ export async function getHolidayToday() {
   return false;
 }
 
+// 跨天的行程每天都算；整天行程的結束日是隔天 00:00，不算那天
 export function eventDays(events) {
   const days = new Set();
   for (const e of events) {

@@ -9,6 +9,7 @@
   - 生活：旅行倒數（`life.json`）、TickTick 生活清單、天氣、農民曆
   - 和果與沁耘：和果交班統計與出席率（只用數字，不含姓名）、沁耘網站與社群數字
   - 新聞區：早晚報新聞與摘要（`tools/report_sync.py`）
+  - 信箱：由主線維護（跨工作與私人兩個信箱，不屬單一領域）。排程「信箱分流」每天 00:10 與 12:10 掃描工作 Outlook 與私人 Gmail，寫 OneDrive `Sam Homepage/inbox.json`；規則與階段寫在 `投資資料/報告指示/信箱分流.md`（階段由 Sam 決定，排程自己不可升級）；首頁「待處理」讀 inbox.json（`js/app.js` 的 `inboxEntries`）。
 - 分支做完一件事，更新 OneDrive `Sam Homepage/首頁總覽.md` 的「各分支目前狀態」，主線看這份就知道全局。
 
 ## 共用規則
