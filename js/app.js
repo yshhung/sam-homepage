@@ -4,8 +4,8 @@ import { CONFIG } from '../config.js';
 import { getAccount, initAuth, isConfigured, login, logout } from './auth.js';
 import { DemoStore, ExcelStore } from './store.js';
 import {
-  demoCalendar, demoCompany, demoHecho, demoInbox, demoInvest, demoLife, demoMail, demoNews, demoTickTick,
-  alertsView, dayView, demoAlerts, getAlerts, getCalendar, getCompany, getFx, getHecho, getHolidayToday, getInbox, getInvest, getLife, getLocation, getMail, getNews, getTickTick, getWeather, hechoSummary,
+  demoCalendar, demoCompany, demoHecho, demoInbox, demoPendingTrades, demoInvest, demoLife, demoMail, demoNews, demoTickTick,
+  alertsView, dayView, demoAlerts, getAlerts, getCalendar, getCompany, getFx, getHecho, getHolidayToday, getInbox, getPendingTrades, getInvest, getLife, getLocation, getMail, getNews, getTickTick, getWeather, hechoSummary,
   digestView, investView, lifeView, newsView, planView,
 } from './sources.js';
 import { addDays, dateStr, diffDays, el, relDay, shortDate, timeStr, weekday } from './util.js';
@@ -26,7 +26,7 @@ const TICKTICK_WEB = 'https://ticktick.com/webapp/';
 const state = {
   store: null,
   cards: [], settings: { ...CONFIG.defaults },
-  events: [], alerts: [], weather: null, fx: null, mail: [], inbox: null, hecho: null, company: null, ticktick: null, invest: null, life: null, news: [], digests: [],
+  events: [], alerts: [], weather: null, fx: null, mail: [], inbox: null, trades: null, hecho: null, company: null, ticktick: null, invest: null, life: null, news: [], digests: [],
   errors: {}, syncedAt: null, loading: false, holidayToday: false,
   showUpcoming: false, showAllNews: false, showAllFocus: false, showNewsList: false, openMore: new Set(), showAllDay: false, openRows: new Set(), filter: '全部',
 };
@@ -308,6 +308,7 @@ function render() {
 
   renderDomains(focus);
   renderInbox();
+  renderTrades();
   renderNews(today);
 
   const foot = [];
@@ -481,6 +482,26 @@ function renderDomains(focus) {
 // 新聞：早報、晚報整理的，點標題開原文（新分頁）
 const NEWS_FIRST = 6;
 const FOCUS_FIRST = 3;
+// 待處理成交：成交提醒排程偵測到、還沒記進持股的成交。檔案不存在、讀不到或 pending 為空，整區不顯示
+function renderTrades() {
+  const card = $('trades');
+  const list = Array.isArray(state.trades?.pending) ? state.trades.pending.filter((x) => x && typeof x === 'object') : [];
+  card.hidden = list.length === 0;
+  if (!list.length) return;
+  const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  $('trades-count').textContent = String(list.length);
+  $('trades-note').textContent = '信件偵測到的成交，還沒記進持股；請回報給 Claude，確認後才會寫入。';
+  $('trades-list').replaceChildren(...list.map((x) => {
+    const qty = num(x.qty), price = num(x.price);
+    const d = String(x.date || '');
+    const when = /^\d{4}-\d\d-\d\d$/.test(d) ? shortDate(d) : d;
+    return el('li', { class: 'f-row info' },
+      el('div', { class: 'f-title' }, [String(x.code || ''), String(x.side || '')].filter(Boolean).join(' ')),
+      el('div', { class: 'f-meta' }, el('span', { class: 'chip' }, String(x.broker || '')),
+        ` ${[when, qty !== null ? `${qty} 股` : '', price !== null ? `單價 ${price}` : ''].filter(Boolean).join(' · ')}`));
+  }));
+}
+
 // 每種資料最後一次由排程（或 Claude）寫進 OneDrive 的時間；不是首頁讀取的時間。超過 36 小時沒更新的標 ⚠
 function stampDate(v) {
   if (!v) return null;
@@ -494,7 +515,7 @@ function freshnessLine() {
   const rows = [
     ['待辦', state.ticktick?.updated, true], ['投資', state.invest?.updated, true],
     ['天氣警報', alertAt('weather'), true], ['營運警報', alertAt('ops'), true],
-    ['沁耘數字', state.company?.updated, true], ['信箱', state.inbox?.updated, true],
+    ['沁耘數字', state.company?.updated, true], ['信箱', state.inbox?.updated, true], ['成交提醒', state.trades?.updated, true],
     ['新聞', newest, true], ['和果', state.hecho?.exported, false], ['旅行', state.life?.updated, false],
   ];
   const parts = rows.map(([name, v, watch]) => {
@@ -674,13 +695,14 @@ async function refresh() {
   renderStatus();
   const live = state.store.mode === 'live';
   const dbP = settle('data', state.store.load());
-  const [db, events, weather, fx, mail, inbox, hecho, company, ticktick, invest, life, news, alerts, holiday] = await Promise.all([
+  const [db, events, weather, fx, mail, inbox, trades, hecho, company, ticktick, invest, life, news, alerts, holiday] = await Promise.all([
     dbP,
     live ? settle('calendar', getCalendar()) : Promise.resolve(demoCalendar()),
     settle('weather', dbP.then((d) => getLocation(!!d?.settings?.用目前位置)).then(getWeather)),
     settle('fx', getFx()),
     live ? settle('mail', getMail()) : Promise.resolve(demoMail()),
     live ? settle('inbox', getInbox()) : Promise.resolve(demoInbox()),
+    live ? getPendingTrades() : Promise.resolve(demoPendingTrades()),
     live ? settle('hecho', getHecho()) : Promise.resolve(demoHecho()),
     live ? settle('company', getCompany()) : Promise.resolve(demoCompany()),
     live ? settle('ticktick', getTickTick()) : Promise.resolve(demoTickTick()),
@@ -699,6 +721,7 @@ async function refresh() {
   if (fx) state.fx = fx;
   if (mail) state.mail = mail;
   if (inbox !== undefined) state.inbox = inbox;
+  state.trades = trades || null;
   if (hecho) state.hecho = hecho;
   if (company !== undefined) state.company = company;
   if (ticktick !== undefined) state.ticktick = ticktick;

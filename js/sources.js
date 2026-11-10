@@ -290,6 +290,27 @@ export function demoInbox() {
   };
 }
 
+// 待處理成交：{updated, pending:[{key, broker, date, code, side, qty, price}]}；檔案不存在或讀不到都當沒有，不報錯
+export async function getPendingTrades() {
+  try {
+    return await oneDriveJson(CONFIG.pendingTradesPath);
+  } catch (e) {
+    console.warn('pending trades', e);
+    return null;
+  }
+}
+
+export function demoPendingTrades() {
+  const t = dateStr();
+  return {
+    updated: `${t} 12:30`,
+    pending: [
+      { key: 'd1#1', broker: '國泰', date: t, code: '（示範）006208', side: '買進', qty: 85, price: 212.75 },
+      { key: 'd2#1', broker: '嘉信', date: addDays(t, -1), code: '（示範）NVDA', side: '買回平倉', qty: null, price: null },
+    ],
+  };
+}
+
 export function getInbox() {
   return oneDriveJson(CONFIG.inboxPath);
 }

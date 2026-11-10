@@ -4,6 +4,7 @@
 目前的內容：
 - **首頁**：待處理（只放要決定或動手的事，可按領域篩選；可完成、延後、編輯、問 Claude）、天氣、美元匯率、Outlook 今明行程，以及三張領域卡片一列排（生活、投資、工作；工作＝沁耘＋和果＋信件行程，並排顯示和果本月出席率與沁耘網站瀏覽。手機上只留大數字、重點件數與詳細）。
 - **右上角狀態與「↻」**：「已讀取 HH:MM」是首頁最後一次讀資料的時間；「↻」只是重新讀取（Outlook 行程與旗標信、天氣、匯率是直接問來源，其餘讀 OneDrive 裡排程寫好的檔），**不會觸發排程**。頁尾列出每種資料最後一次由排程寫入的時間（待辦、投資、天氣警報、營運警報、沁耘數字、信箱、新聞、和果、旅行），超過 36 小時沒更新的標 ⚠（和果、旅行不標）。
+- **待處理成交**：待處理下面的一張卡，讀 `Sam Homepage/pending_trades.json`（成交提醒排程寫的）的 `pending` 陣列，每筆顯示券商、日期、代號、動作；有股數（`qty`）和單價（`price`）才顯示（嘉信的是空的）。格式：`{updated, by, pending:[{key, broker, date, code, side, qty, price, pushed}]}`。檔案不存在、讀不到或 `pending` 為空時整區不顯示，也不報錯。這些只是信件偵測到的成交，持股一律由 Sam 在聊天回報、確認後才寫入。
 - **待處理裡的信件**：Outlook 收件匣裡加了旗標的信、最近 3 天未讀且重要性高的信，以及信箱分流排程寫的 `inbox.json`（見最下面「信箱分流」）。按「已回覆」只會從首頁拿掉；在 Outlook 取消旗標或標成完成，首頁也會自動拿掉。想讓某封信出現在待處理，在 Outlook 幫它加旗標就好。
 - **和果日照營運異常**：讀和果的交班匯出檔，異常事件、出席率偏低、員工請假偏多、還沒點名、平日 18:00 後還沒交班（國定假日不提醒，見 `config.js` 的 `holidayCalendars`），都會列進重點。工作卡片會自動顯示和果本月出席率。只讀統計數字，不讀長輩或員工的姓名。
 - **每日同步**（claude.ai 雲端排程「Sam 首頁：每日同步」，跑在雲端環境「Sam 首頁同步」，不用開任何電腦）：排程時間、模型、各時段做什麼，唯一一份在 OneDrive `Sam Homepage/首頁總覽.md` 的排程表（首頁顯示用的時間以 `config.js` 的 `syncTimes` 為準）；工作指示都在 OneDrive `投資資料/報告指示/同步.md`（排程只負責叫它去讀這個檔，要改做法就改這個檔）。全做的那次：TickTick（`ticktick.json`）、網站與社群（`company_stats.json`、`company_history.json`）、價格與總資產與四池與計畫書警報（`invest.json`）、天氣警報（`alerts_weather.json`）；其他時段只做其中一部分（TickTick 與天氣警報，或只更新價格與總資產），分工看排程表與 `同步.md`。這個環境的網路只放行證交所、櫃買中心、Yahoo Finance、jsDelivr、currency-api，加上天氣警報要用的 `opendata.cwa.gov.tw`、`www.dgpa.gov.tw`；連接器接 Microsoft 365、TickTick、WordPress.com、Metricool。

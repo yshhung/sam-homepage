@@ -17,6 +17,8 @@ export const CONFIG = {
   tickTickPath: 'Sam Homepage/ticktick.json',
   // 信箱分流排程（每天 12:10）寫的檔：只有件數、分類、標題、單位、期限、連結
   inboxPath: 'Sam Homepage/inbox.json',
+  // 成交提醒（Haiku 同步）寫的檔：國泰、嘉信有新成交但還沒記進持股的清單
+  pendingTradesPath: 'Sam Homepage/pending_trades.json',
   // 沁耘網站與社群的歷史：每日同步（07:30）更新；沁耘頁（company.html）畫每月瀏覽、追蹤人數、每日觸及與 Google 商家
   companyHistoryPath: 'Sam Homepage/company_history.json',
   // 投資彙總（總資產、國泰、嘉信、變動 %）：每天 07:30 排程用 tools/invest_sync.py 更新，沒有持股明細
