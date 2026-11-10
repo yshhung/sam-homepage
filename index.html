@@ -28,11 +28,13 @@
         <h1 class="wk-title" id="greeting">—</h1>
       </div>
       <div class="wk-head-r">
-        <div class="wk-status" id="status"><span class="wk-dot"></span><span id="status-text">載入中</span></div>
-        <div class="wk-status-data" id="status-data"></div>
+        <div class="wk-statusbar">
+          <div class="wk-status" id="status"><span class="wk-dot"></span><span id="status-text">載入中</span></div>
+          <div class="wk-status-data" id="status-data"></div>
+        </div>
         <div class="wk-actions">
-          <button class="btn" id="btn-refresh" type="button" aria-label="重新讀取資料（不會觸發排程）" title="重新讀取資料（不會觸發排程）">↻</button>
-          <button class="btn" id="btn-sync" type="button" title="立即同步：複製請求並打開 Claude，由 Claude 觸發全部排程（跑完再按 ↻）">同步</button>
+          <button class="btn" id="btn-refresh" type="button" aria-label="重新讀取資料（不會觸發排程）" title="重新讀取資料（不會觸發排程）">讀取</button>
+          <button class="btn" id="btn-sync" type="button" title="立即同步：複製請求並打開 Claude，由 Claude 觸發全部排程（跑完再按「讀取」）">同步</button>
           <button class="btn" id="btn-account" type="button">登入</button>
         </div>
       </div>
