@@ -64,7 +64,7 @@ async function start() {
     const [history, stats] = await Promise.all([oneDriveJson(CONFIG.companyHistoryPath), oneDriveJson(CONFIG.companyStatsPath)]);
     if (!history && !stats) { status('bad', '沒有資料'); banner('OneDrive 的「Sam Homepage/company_history.json」還沒有。每日同步 07:30 跑過一次就會出現。'); return; }
     render(history || {}, stats);
-    status('live', '已同步');
+    status('live', '已讀取');
   } catch (e) {
     console.error(e);
     status('bad', '讀取失敗');

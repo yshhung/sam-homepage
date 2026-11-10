@@ -61,7 +61,7 @@ function render() {
 async function go(ym) {
   S.month = ym;
   if (S.sel.slice(0, 7) !== ym) S.sel = ym === today.slice(0, 7) ? today : `${ym}-01`;
-  try { S.events = await loadMonth(ym); status('live', S.live ? '已同步' : '示範資料'); } catch (e) { console.error(e); S.events = []; status('bad', '行程讀不到'); }
+  try { S.events = await loadMonth(ym); status('live', S.live ? '已讀取' : '示範資料'); } catch (e) { console.error(e); S.events = []; status('bad', '行程讀不到'); }
   render();
 }
 

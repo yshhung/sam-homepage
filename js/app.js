@@ -311,9 +311,10 @@ function render() {
   renderNews(today);
 
   const foot = [];
-  if (state.ticktick?.updated) foot.push(document.createTextNode(`TickTick 更新於 ${state.ticktick.updated.slice(5)}`));
+  const fresh = freshnessLine();
+  if (fresh) foot.push(el('span', { class: 'foot-fresh' }, fresh));
   if (state.store?.webUrl) foot.push(el('a', { href: state.store.webUrl, target: '_blank', rel: 'noopener' }, '在 Excel 改卡片與門檻'));
-  $('foot').replaceChildren(...foot.flatMap((a, i) => (i ? [' · ', a] : [a])));
+  $('foot').replaceChildren(...foot.flatMap((a, i) => (i ? [el('br'), a] : [a])));
 }
 
 function renderStatus() {
@@ -321,10 +322,10 @@ function renderStatus() {
   const errs = Object.values(state.errors);
   let cls;
   let text;
-  if (state.loading) { cls = 'loading'; text = '同步中…'; }
+  if (state.loading) { cls = 'loading'; text = '讀取中…'; }
   else if (state.store?.mode === 'demo') { cls = 'demo'; text = '示範模式'; }
   else if (errs.length) { cls = 'bad'; text = '部分資料沒抓到'; }
-  else { cls = 'live'; text = state.syncedAt ? `已同步 ${state.syncedAt}` : '已連線'; }
+  else { cls = 'live'; text = state.syncedAt ? `已讀取 ${state.syncedAt}` : '已連線'; }
   box.className = `wk-status ${cls}`;
   $('status-text').textContent = text;
   box.title = errs.join('\n');
@@ -480,6 +481,31 @@ function renderDomains(focus) {
 // 新聞：早報、晚報整理的，點標題開原文（新分頁）
 const NEWS_FIRST = 6;
 const FOCUS_FIRST = 3;
+// 每種資料最後一次由排程（或 Claude）寫進 OneDrive 的時間；不是首頁讀取的時間。超過 36 小時沒更新的標 ⚠
+function stampDate(v) {
+  if (!v) return null;
+  const s = String(v);
+  const d = /^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(s) ? new Date(`${s.replace(' ', 'T')}:00+08:00`) : new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+function freshnessLine() {
+  const alertAt = (key) => (Array.isArray(state.alerts) ? state.alerts : []).filter((f) => String(f?.path || '').includes(key)).map((f) => f.updated).sort().pop();
+  const newest = (Array.isArray(state.digests) ? state.digests : []).map((d) => d?.at).filter(Boolean).sort().pop();
+  const rows = [
+    ['待辦', state.ticktick?.updated, true], ['投資', state.invest?.updated, true],
+    ['天氣警報', alertAt('weather'), true], ['營運警報', alertAt('ops'), true],
+    ['沁耘數字', state.company?.updated, true], ['信箱', state.inbox?.updated, true],
+    ['新聞', newest, true], ['和果', state.hecho?.exported, false], ['旅行', state.life?.updated, false],
+  ];
+  const parts = rows.map(([name, v, watch]) => {
+    const d = stampDate(v);
+    if (!d) return null;
+    const old = watch && Date.now() - d.getTime() > 36 * 3600000;
+    return `${name} ${dateStr(d).slice(5).replace('-', '/')} ${timeStr(d)}${old ? ' ⚠' : ''}`;
+  }).filter(Boolean);
+  return parts.length ? `資料更新時間（排程寫入，不是首頁讀取的時間）：${parts.join(' · ')}` : '';
+}
+
 function renderNews(today) {
   const items = newsView(state.news);
   const dg = digestView(state.digests);

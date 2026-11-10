@@ -100,7 +100,7 @@ async function start() {
     const [travels, life, tt] = await Promise.all([oneDriveJson(CONFIG.travelsPath), oneDriveJson(CONFIG.lifePath), getTickTick()]);
     await show(travels || { places: [] }, life, tt);
     if (!travels) banner('OneDrive 的「Sam Homepage/travels.json」還沒有。告訴 Claude 你去過哪些地方，就會建立。');
-    status('live', '已同步');
+    status('live', '已讀取');
   } catch (e) {
     console.error(e);
     status('bad', '讀取失敗');

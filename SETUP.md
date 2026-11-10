@@ -43,7 +43,7 @@ powershell -ExecutionPolicy Bypass -File tools/serve.ps1
 ```
 
 打開 <http://localhost:5173/> → 右上角 **登入** → 選裕勝的帳號。
-登入後狀態會變成綠燈「已同步」，OneDrive 裡會多一個 `Sam Homepage` 資料夾。
+登入後狀態會變成綠燈「已讀取」，OneDrive 裡會多一個 `Sam Homepage` 資料夾。
 
 ## 步驟四：上線（已完成）
 

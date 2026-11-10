@@ -66,7 +66,7 @@ async function start() {
   status('loading', '讀取中');
   try {
     render(await getHechoDetail());
-    status('live', '已同步');
+    status('live', '已讀取');
   } catch (e) {
     console.error(e);
     status('bad', '讀取失敗');
