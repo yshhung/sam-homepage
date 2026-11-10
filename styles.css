@@ -335,3 +335,6 @@ h2::before { content: ""; width: 3px; height: 13px; background: var(--acc); bord
 .wk-tabs a { padding: 6px 14px; border: 1px solid var(--line, #444); border-radius: 999px; font-size: 14px; text-decoration: none; color: inherit; }
 .wk-tabs a[aria-current="page"] { background: var(--fg, #fff); color: var(--bg, #000); border-color: transparent; font-weight: 600; }
 .foot-fresh { display: inline-block; line-height: 1.7; }
+
+.wk-status-data { font-size: 11px; color: var(--muted); text-align: right; white-space: nowrap; }
+.wk-status-data:empty { display: none; }

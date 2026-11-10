@@ -330,6 +330,8 @@ function renderStatus() {
   box.className = `wk-status ${cls}`;
   $('status-text').textContent = text;
   box.title = errs.join('\n');
+  const last = latestDataStamp();
+  $('status-data').textContent = last ? `資料更新 ${fmtStamp(last)}` : '';
 
   const acc = getAccount();
   $('btn-account').textContent = acc ? '登出' : '登入';
@@ -509,22 +511,25 @@ function stampDate(v) {
   const d = /^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(s) ? new Date(`${s.replace(' ', 'T')}:00+08:00`) : new Date(s);
   return Number.isNaN(d.getTime()) ? null : d;
 }
-function freshnessLine() {
+function freshnessRows() {
   const alertAt = (key) => (Array.isArray(state.alerts) ? state.alerts : []).filter((f) => String(f?.path || '').includes(key)).map((f) => f.updated).sort().pop();
   const newest = (Array.isArray(state.digests) ? state.digests : []).map((d) => d?.at).filter(Boolean).sort().pop();
-  const rows = [
+  return [
     ['待辦', state.ticktick?.updated, true], ['投資', state.invest?.updated, true],
     ['天氣警報', alertAt('weather'), true], ['營運警報', alertAt('ops'), true],
     ['沁耘數字', state.company?.updated, true], ['信箱', state.inbox?.updated, true], ['成交提醒', state.trades?.updated, true],
     ['新聞', newest, true], ['和果', state.hecho?.exported, false], ['旅行', state.life?.updated, false],
-  ];
-  const parts = rows.map(([name, v, watch]) => {
-    const d = stampDate(v);
-    if (!d) return null;
-    const old = watch && Date.now() - d.getTime() > 36 * 3600000;
-    return `${name} ${dateStr(d).slice(5).replace('-', '/')} ${timeStr(d)}${old ? ' ⚠' : ''}`;
-  }).filter(Boolean);
+  ].map(([name, v, watch]) => ({ name, d: stampDate(v), watch }));
+}
+const fmtStamp = (d) => `${dateStr(d).slice(5).replace('-', '/')} ${timeStr(d)}`;
+function freshnessLine() {
+  const parts = freshnessRows().filter((r) => r.d).map((r) => `${r.name} ${fmtStamp(r.d)}${r.watch && Date.now() - r.d.getTime() > 36 * 3600000 ? ' ⚠' : ''}`);
   return parts.length ? `資料更新時間（排程寫入，不是首頁讀取的時間）：${parts.join(' · ')}` : '';
+}
+// 所有資料裡最新的一次寫入時間（右上角「資料更新」）
+function latestDataStamp() {
+  const ds = freshnessRows().filter((r) => r.d).map((r) => r.d.getTime());
+  return ds.length ? new Date(Math.max(...ds)) : null;
 }
 
 function renderNews(today) {
@@ -628,15 +633,27 @@ function askHecho() {
   ].join('\n'));
 }
 
+
+// 「同步」：首頁只能讀檔，不能直接叫排程；複製一段請求，打開 Claude 由 Claude 觸發全部排程，跑完再按 ↻
+function askSync() {
+  copyAndOpenClaude([
+    '請現在立即同步 Sam 首頁的全部資料，依序觸發這三個排程（用 fire_trigger），觸發時各加註明：',
+    '1. 「每日同步」（Sonnet）：加註「不論現在幾點，全做 Part A、B、C、W」。',
+    '2. 「每日同步 Haiku」：加註「全做，含成交提醒 Part T」。',
+    '3. 「信箱分流」。',
+    '觸發完告訴我，並在它們跑完後回報各排程的結果；我會再按首頁的 ↻ 重新讀取。',
+  ].join('\n'), '已複製請求，到 Claude 貼上；跑完再按 ↻');
+}
+
 const UA = navigator.userAgent;
 const IS_IOS = /iPhone|iPad|iPod/.test(UA) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const IS_ANDROID = /Android/.test(UA);
 const CLAUDE_WEB = 'https://claude.ai/new';
 
 // 複製要在按下的當下就開始（iPhone 規定），不能等打開 Claude 之後
-function copyAndOpenClaude(text) {
+function copyAndOpenClaude(text, doneMsg = '已複製，到 Claude 貼上就好') {
   const copied = navigator.clipboard ? navigator.clipboard.writeText(text).then(() => true, () => false) : Promise.resolve(false);
-  copied.then((ok) => toast(ok ? '已複製，到 Claude 貼上就好' : '無法複製，請手動告訴 Claude'));
+  copied.then((ok) => toast(ok ? doneMsg : '無法複製，請手動告訴 Claude'));
   openClaude();
 }
 
@@ -662,6 +679,7 @@ function openClaude() {
 }
 
 $('btn-refresh').addEventListener('click', () => refresh());
+$('btn-sync').addEventListener('click', () => askSync());
 $('btn-upcoming').addEventListener('click', () => { state.showUpcoming = !state.showUpcoming; render(); });
 $('btn-focus-more').addEventListener('click', () => { state.showAllFocus = !state.showAllFocus; render(); });
 $('btn-day-more').addEventListener('click', () => { state.showAllDay = !state.showAllDay; render(); });
