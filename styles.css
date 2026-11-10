@@ -328,3 +328,9 @@ h2::before { content: ""; width: 3px; height: 13px; background: var(--acc); bord
 .ib-panel { display: grid; gap: 8px; }
 .ib-panel[hidden] { display: none; }
 .ib-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--muted); }
+
+/* 工作卡的連結、工作子頁的分頁（沁耘／土城和果） */
+.d-links { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; }
+.wk-tabs { display: flex; gap: 8px; margin: 4px 0 8px; }
+.wk-tabs a { padding: 6px 14px; border: 1px solid var(--line, #444); border-radius: 999px; font-size: 14px; text-decoration: none; color: inherit; }
+.wk-tabs a[aria-current="page"] { background: var(--fg, #fff); color: var(--bg, #000); border-color: transparent; font-weight: 600; }

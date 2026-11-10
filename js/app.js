@@ -469,8 +469,10 @@ function renderDomains(focus) {
       el('div', { class: 'd-foot' },
         el('span', { class: n ? `pill on ${lvl}` : 'pill' }, n ? `${n} 件待處理` : '沒有待處理'),
         // 首頁自己的頁面（例如投資頁）在同一個畫面打開；外部連結開新分頁
-        link ? (/^https?:/.test(link) ? el('a', { href: link, target: '_blank', rel: 'noopener' }, '詳細 ↗') : el('a', { href: link }, '詳細 →'))
-          : el('span', { 'aria-hidden': 'true' }, '\u00a0'))); // 沒有連結也留位置，三張的最下面一行才對齊
+        // 工作卡：沁耘、土城和果各有自己的頁
+        d === '工作' ? el('span', { class: 'd-links' }, ...CONFIG.workPages.map(([name, href]) => el('a', { href }, `${name} →`)))
+          : link ? (/^https?:/.test(link) ? el('a', { href: link, target: '_blank', rel: 'noopener' }, '詳細 ↗') : el('a', { href: link }, '詳細 →'))
+            : el('span', { 'aria-hidden': 'true' }, '\u00a0'))); // 沒有連結也留位置，三張的最下面一行才對齊
   });
   $('domains').replaceChildren(...cards);
 }

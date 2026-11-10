@@ -57,6 +57,9 @@ export const CONFIG = {
     生活: 'life.html',
   },
 
+  // 工作卡與工作子頁的分頁：沁耘、土城和果各一頁
+  workPages: [['沁耘', 'company.html'], ['土城和果', 'hecho.html']],
+
   // 預設門檻（可在 Excel「設定」表裡改）
   defaults: {
     雨機率門檻: 60,
