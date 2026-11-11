@@ -30,11 +30,8 @@ button { font: inherit; color: inherit; }
 .wk-eyebrow { font-size: 11px; letter-spacing: .18em; color: var(--acc); text-transform: uppercase; }
 .wk-title { font-weight: 700; letter-spacing: -.01em; font-size: clamp(1.6rem, 4.5vw, 2.4rem); margin: 2px 0; }
 .wk-brief { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
-.wk-head-r { display: grid; gap: 8px; margin-left: auto; justify-items: end; }
-.wk-actions { display: grid; grid-template-columns: repeat(3, minmax(4.6rem, 1fr)); gap: 6px; }
-.wk-actions .btn { white-space: nowrap; text-align: center; padding-left: 10px; padding-right: 10px; }
+.wk-head-r { display: grid; gap: 8px; margin-left: auto; justify-items: end; min-width: 0; }
 .wk-statusbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px 12px; }
-@media (max-width: 600px) { .wk-head-r { width: 100%; justify-items: stretch; margin-left: 0; } .wk-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); } .wk-statusbar { justify-content: flex-start; } }
 
 .wk-status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
 .wk-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
@@ -348,3 +345,23 @@ h2::before { content: ""; width: 3px; height: 13px; background: var(--acc); bord
   font-family: var(--mono), "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
 }
 .d-num, .ib-mini b { letter-spacing: -.01em; }
+
+/* 表頭：狀態與帳號在上，讀取與同步在下；手機上讀取與同步固定在畫面底部，拇指好按。登出收進帳號選單，避免誤按 */
+.wk-toprow { display: flex; align-items: center; justify-content: flex-end; gap: 12px; flex-wrap: wrap; }
+.wk-acc { position: relative; }
+.acc-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px; box-shadow: 0 8px 24px rgba(0, 0, 0, .4); }
+.acc-menu[hidden] { display: none; }
+.wk-bar { display: grid; grid-template-columns: repeat(2, minmax(5.5rem, 1fr)); gap: 6px; }
+.wk-bar .btn, .wk-acc .btn { white-space: nowrap; text-align: center; padding-left: 12px; padding-right: 12px; }
+@media (max-width: 600px) {
+  .wk-head-r { width: 100%; margin-left: 0; justify-items: stretch; }
+  .wk-toprow { justify-content: space-between; flex-wrap: nowrap; }
+  .wk-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 10px max(16px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    background: color-mix(in srgb, var(--bg) 92%, transparent); border-top: 1px solid var(--line); backdrop-filter: blur(8px);
+  }
+  .wk-bar .btn { min-height: 44px; }
+  .wk { gap: 14px; }
+  .wk-card { padding: 14px; gap: 8px; }
+}

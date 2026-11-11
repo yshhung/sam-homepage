@@ -334,7 +334,8 @@ function renderStatus() {
   $('status-data').textContent = last ? `資料更新 ${fmtStamp(last)}` : '';
 
   const acc = getAccount();
-  $('btn-account').textContent = acc ? '登出' : '登入';
+  $('btn-account').textContent = acc ? '帳號 ▾' : '登入';
+  if (!acc) $('acc-menu').hidden = true;
   $('btn-account').hidden = !isConfigured();
 
   const banner = $('banner');
@@ -685,7 +686,16 @@ $('btn-focus-more').addEventListener('click', () => { state.showAllFocus = !stat
 $('btn-day-more').addEventListener('click', () => { state.showAllDay = !state.showAllDay; render(); });
 $('btn-news-list').addEventListener('click', () => { state.showNewsList = !state.showNewsList; render(); });
 $('btn-news-more').addEventListener('click', () => { state.showAllNews = !state.showAllNews; render(); });
-$('btn-account').addEventListener('click', () => (getAccount() ? logout() : login()));
+// 登入後「帳號」按鈕開選單，登出放在選單裡，避免誤按；點選單外面就關起來
+const accMenu = $('acc-menu');
+$('btn-account').addEventListener('click', (ev) => {
+  if (!getAccount()) { login(); return; }
+  ev.stopPropagation();
+  accMenu.hidden = !accMenu.hidden;
+  $('btn-account').setAttribute('aria-expanded', String(!accMenu.hidden));
+});
+$('btn-logout').addEventListener('click', () => { accMenu.hidden = true; logout(); });
+document.addEventListener('click', (ev) => { if (!accMenu.hidden && !ev.target.closest('.wk-acc')) { accMenu.hidden = true; $('btn-account').setAttribute('aria-expanded', 'false'); } });
 
 // ---------- 讀資料 ----------
 
