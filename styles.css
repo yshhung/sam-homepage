@@ -3,6 +3,7 @@
   --bg: #000; --panel: #0b0c0e; --panel2: #111316; --line: #1e2126;
   --fg: #e6edf3; --muted: #8696a7;
   --acc: #38bdf8; --amb: #f5b942; --vio: #a78bfa; --live: #2fd47a; --bad: #f87171;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Menlo, Consolas, "Noto Sans Mono", monospace;
   --sans: "Inter", "SF Pro Display", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", "Segoe UI", system-ui, -apple-system, sans-serif;
   color-scheme: dark;
 }
@@ -341,3 +342,9 @@ h2::before { content: ""; width: 3px; height: 13px; background: var(--acc); bord
 
 .wk-status-data { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .wk-status-data:empty { display: none; }
+
+/* 終端機風格：英文、數字、標題、標籤、按鈕與時間用等寬字型；中文字退回系統的蘋方／微軟正黑，內文維持好讀 */
+.wk-eyebrow, h2, .wk-sec, .d-num, .d-k, .count, .chip, .btn, .wk-status, .wk-status-data, .f-meta, .wk-foot, .pill, .ib-mini b, .ib-mini span, .ib-head, .f-filter button, .d-stat {
+  font-family: var(--mono), "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+}
+.d-num, .ib-mini b { letter-spacing: -.01em; }
