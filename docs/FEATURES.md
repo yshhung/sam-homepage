@@ -19,7 +19,8 @@
   - 總資產單日或本月變動超過「投資變動門檻」（Excel「設定」表，預設 2%）、數字超過 3 天沒更新、有價格沒抓到，都會列進重點。
   - 買賣或入金出金後，在 Claude App 告訴 Claude，由「首頁投資與旅行」技能改持股檔；下一次全做的同步後首頁就會更新。
 - **投資計畫（四池與觸發警報，2026-11-06 投資計畫書 v1）**：投資頁「計畫」分頁最上面的「四池配置」顯示四池（大盤／信念／波段・待處理／現金）目前比例、目標與偏離，超出容許區間標黃；首頁投資卡只留一句狀態（「四池都在區間內」，或哪一池超出、幾個警報，標黃），點了打開這個分頁（2026-11-07 從首頁搬過去）。分頁裡列觸發中的警報（信念股從 52 週收盤高點 −25%、S&P 500 從 52 週收盤高點 −10%／−20%／−30%、VIX > 30、單一信念股 > 25%、現金低於底線），沒觸發就不顯示；最下面是樂透額度、美金累積、下次半年檢查、PLTR 賣出進度。警報照樣列進首頁今日重點。
-  - 計算在 `tools/invest_plan.py`（`invest_sync.py` 呼叫）：規則讀 `投資資料/rules.json`（kind：pool、cap＋each、drawdown、floor、budget、playbook、fx、schedule），歸池讀 `plans.json` 的 `pool`。
+  - 計算在 `tools/invest_plan.py`（`invest_sync.py` 呼叫）：規則讀 `投資資料/rules.json`（kind：pool、cap＋each、drawdown、floor、budget、playbook、fx、schedule、price_alert），歸池讀 `plans.json` 的 `pool`。其他 kind（pause、screen、options_rules 等）首頁不讀，只是給 Claude 與排程看的文字規則。
+  - **價格警報（kind：price_alert，2026-11-11 加）**：欄位 `codes`（代號陣列）、`direction`（above／below）、`trigger_price`、`until`（YYYY-MM-DD，含當天；過了就停用，沒寫＝沒有期限）、`label`、`action`。該代號收盤價碰到觸發價（含剛好等於）就產生警報 `price:<代號>:<規則 key>`，標題是 `label`＋收盤價與觸發價，說明是 `action`，等級與單一信念股上限相同；收盤價依序取信念股一年日收盤、持股最新收盤、追蹤清單。照一般警報流程（new、since、條件解除自動消失）；已知悉寫在 `plans.json` 該代號的 `ack:{"price":"YYYY-MM-DD"}`。規則過期、`active:false` 或被刪掉時，舊警報在下一次任何報告就拿掉；欄位缺漏或格式不對的規則直接略過。
   - 07:30 每日同步帶 `--alerts` 重新判斷警報（另抓 S&P 500、VIX 與信念股一年的日收盤，52 週高點用收盤高點）；早報帶 `--alerts-if-stale`，只在同步當天沒判斷過時補判斷；晚報沿用。沒有新收盤（休市日）就不重算。
   - 第一次觸發或升級到下一級的警報標 `new`，早報把它們併入推播；之後首頁持續顯示、不再推播，條件解除自動消失。
   - **已知悉（ack）**：`plans.json` 每檔可加 `ack:{"cap"或"dd":"YYYY-MM-DD","note":"…"}`。被 ack 的警報在投資頁「計畫」分頁灰色列出，首頁待處理與投資卡的警報數不算它；條件消失再出現（觸發起算日晚於 ack 日）或級別升高，ack 自動失效。回撤警報有遲滯：−25% 觸發、回到 `release`（預設 −20%）以內才解除。

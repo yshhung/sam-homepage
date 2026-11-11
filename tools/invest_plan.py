@@ -1,6 +1,6 @@
 """投資計畫書 v1（2026-11-06）的四池配置與觸發警報，由 invest_sync.py 呼叫。
 
-讀 OneDrive「投資資料/rules.json」（kind：pool、cap+each、floor、budget、playbook、drawdown、fx、schedule）
+讀 OneDrive「投資資料/rules.json」（kind：pool、cap+each、floor、budget、playbook、drawdown、fx、schedule、price_alert）
 與「投資資料/plans.json」（每檔的 pool、PLTR 的 sell_plan），算出：
   pools   四池目前比例、目標、偏離、是否超出容許區間（每次跑都算）
   alerts  觸發中的警報（只有 07:30 每日同步帶 --alerts 才重新判斷；其他報告沿用上次結果）
@@ -11,6 +11,8 @@
 已知悉（ack）：plans.json 每檔可加 ack:{"cap"或"dd":"YYYY-MM-DD","note":"…"}。被 ack 的警報照樣列在投資頁（灰色），
 但首頁待處理與投資卡的警報數不算它；條件消失後再出現（since 晚於 ack 日）或級別升高（raised 晚於 ack 日），ack 自動失效。
 回撤警報有遲滯：跌到 threshold 觸發，回到 release（預設 threshold+5 點）以內才解除。
+價格警報（price_alert）：codes 裡的代號收盤價依 direction（above／below）碰到 trigger_price 就觸發，until（含當天）過後或 active 為 false 就停用；
+已知悉寫在該代號的 ack:{"price":"YYYY-MM-DD"}。規則缺欄位或格式不對就略過，不影響其他警報。
 四池可設過渡目標 interim:{until,max,min}：期限內只要在過渡範圍內就不標超出區間。休市日沒有新收盤就不重算、不標 new。
 """
 import calendar
@@ -144,7 +146,65 @@ def put_collateral_usd(holdings):
     return c
 
 
-def evaluate(holdings, plans, rules, fx, market, pools, total, prev_state=None):
+def _num(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def _is_day(v):
+    try:
+        return isinstance(v, str) and len(v) == 10 and v[4] == v[7] == '-' and date.fromisoformat(v) is not None
+    except ValueError:
+        return False
+
+
+def price_rules(rules, today=None):
+    """有效的價格警報規則：沒停用、欄位齊全、還沒過 until（until 沒寫＝沒有期限；寫了但格式不對就略過）。"""
+    out = []
+    for r in rules or []:
+        if not isinstance(r, dict) or r.get('kind') != 'price_alert' or r.get('active') is False:
+            continue
+        codes, tp, until = r.get('codes'), r.get('trigger_price'), r.get('until')
+        if not r.get('key') or r.get('direction') not in ('above', 'below') or not _num(tp) or tp <= 0:
+            continue
+        if not isinstance(codes, list) or not any(isinstance(c, str) and c for c in codes):
+            continue
+        if until is not None and (not _is_day(until) or (today and today > until)):
+            continue
+        out.append(r)
+    return out
+
+
+def price_alerts(rules, holdings, market, watch=None, today=None, nm=str):
+    """價格警報：收盤價依 direction 碰到 trigger_price（含剛好等於）就觸發。
+    收盤價來源跟其他警報一樣：信念股一年日收盤（market['year']）→ 持股最新收盤 → 追蹤清單（state 的 watch）。"""
+    px = {}
+    for c, w in (watch or {}).items():
+        if isinstance(w, (list, tuple)) and w and _num(w[0]):
+            px[c] = (w[0], w[2] if len(w) > 2 else None)
+    for h in holdings or []:
+        if h.get('kind') != 'option' and h.get('code') not in CASH_CODES and _num(h.get('price')):
+            px[h['code']] = (h['price'], h.get('price_date'))
+    for c, v in ((market or {}).get('year') or {}).items():
+        if v and _num(v[0]):
+            px[c] = (v[0], v[1])
+    out = {}
+    for r in price_rules(rules, today):
+        tp, above = r['trigger_price'], r['direction'] == 'above'
+        for code in r['codes']:
+            if not isinstance(code, str) or code not in px:
+                continue
+            close, day = px[code]
+            if (close >= tp - 1e-9) if above else (close <= tp + 1e-9):
+                label = r.get('label') if isinstance(r.get('label'), str) and r.get('label') else f"{nm(code)} 價格警報"
+                a = {'level': 1, 'lvl': 'warn', 'title': f"{label}：{nm(code)} 收 {close:,.2f}（{'≥' if above else '≤'} {tp:g}）",
+                     'meta': (r.get('action') if isinstance(r.get('action'), str) else '') + (f"（到 {r['until']} 為止）" if r.get('until') else '')}
+                if day:
+                    a['date'] = day
+                out[f"price:{code}:{r['key']}"] = a
+    return out
+
+
+def evaluate(holdings, plans, rules, fx, market, pools, total, prev_state=None, today=None, watch=None):
     """回傳目前觸發中的警報 {key: {level, title, meta, lvl}}。market：
     {'spx': (close, date, high52), 'vix': (close, date), 'year': {code: (close, date, high52)}}"""
     plan_pool = {p['code']: p.get('pool') for p in plans or [] if p.get('code')}
@@ -208,6 +268,7 @@ def evaluate(holdings, plans, rules, fx, market, pools, total, prev_state=None):
         if twd is not None and fl.get('twd') is not None and twd < fl['twd']:
             out['floor:twd'] = {'level': 1, 'lvl': 'risk', 'title': f"台幣現金低於底線 NT${fl['twd']:,}",
                                 'meta': f"國泰交割戶約 NT${twd:,.0f}；每月新資金先補現金池"}
+    out.update(price_alerts(rules, holdings, market, watch, today, nm))
     return out
 
 
@@ -217,6 +278,7 @@ def apply_ack(alerts, plans):
     out = []
     for a in alerts:
         kind, _, code = a['key'].partition(':')
+        code = code.split(':')[0]  # price:<代號>:<規則 key> 的 ack 也記在該代號
         ack = (acks.get(code) or {}).get(kind) if code else None
         a = {k: v for k, v in a.items() if k not in ('acked', 'ackNote', 'ackDate')}
         # 有效條件：這一輪觸發從 ack 當天（含）以前就開始，而且之後沒有升級
@@ -254,6 +316,9 @@ def build(holdings, plans, rules, fx, today, state, market=None, evaluate_alerts
             'alerts': [dict(a, new=bool(a.get('new')) and a.get('raised') == today) for a in prev.get('alerts', [])],
             'evaluated': prev.get('evaluated'), 'evaluatedBy': prev.get('evaluatedBy'), 'dataAsOf': prev.get('dataAsOf'),
             'market': prev.get('market'), 'highs': prev.get('highs')}
+    # 價格警報有期限：規則過了 until、被停用或刪掉，沿用的舊警報也馬上拿掉（不用等下一個有收盤的日子）
+    live = {r['key'] for r in price_rules(rules, today)}
+    plan['alerts'] = [a for a in plan['alerts'] if not a['key'].startswith('price:') or a['key'].split(':', 2)[-1] in live]
     rv = review_compare(rules, pools)
     if rv:
         plan['extras']['review'] = rv
@@ -264,7 +329,7 @@ def build(holdings, plans, rules, fx, today, state, market=None, evaluate_alerts
         plan['evaluated'] = today
         plan['evaluatedBy'] = evaluated_by or prev.get('evaluatedBy')
         if asof != prev.get('dataAsOf'):  # 有新收盤才重算；休市日沿用、不標 new
-            cur = evaluate(holdings, plans, rules, fx, market, pools, total, state.get('plan_state'))
+            cur = evaluate(holdings, plans, rules, fx, market, pools, total, state.get('plan_state'), today, state.get('watch'))
             plan['alerts'], state['plan_state'] = merge(cur, state.get('plan_state'), today)
             plan['dataAsOf'] = asof
             plan['highs'] = {c: {'close': v[0], 'date': v[1], 'high52': v[2], 'highDate': v[3] if len(v) > 3 else None, 'dd': round(v[0] / v[2] - 1, 4)}
@@ -383,3 +448,51 @@ def selftest(check):
     check('半年檢查：跟最近一次比，下降才算 down', rv['conviction'] == 0.45 and rv['down'] and not review_compare([{'key': 'review', 'kind': 'schedule', 'history': [{'date': 'x', 'conviction': 0.4}]}], [{'key': 'conviction', 'pct': 0.44}])['down'])
     pe = build(hs, plans, rules, 30, '2026-01-11', {}, mk, True, evaluated_by='早報')
     check('evaluated_by 記下是同步或早報判斷的', pe['evaluatedBy'] == '早報' and pe['highs']['BBB']['high52'] == 10.0)
+    # ---- 價格警報（price_alert）----
+    hq = [{'code': 'ZZZ', 'currency': 'USD', 'shares': 1, 'price': 50.0, 'price_date': '2026-03-10'},
+          {'code': 'CASH', 'currency': 'USD', 'shares': 9999, 'price': 1}, {'code': 'TWCASH', 'currency': 'TWD', 'shares': 99999, 'price': 1}]
+    pr = {'key': 'q_call', 'kind': 'price_alert', 'codes': ['ZZZ'], 'occ': 'ZZZ260320C00055000', 'direction': 'above',
+          'trigger_price': 50, 'until': '2026-03-20', 'action': '先看能不能 Roll', 'label': 'ZZZ Call 防被買走', 'note': 'x'}
+    def pa(rule, price=50.0, today='2026-03-11', mkt=None, watch=None, hold=None):
+        h = [dict(x) for x in (hq if hold is None else hold)]
+        if hold is None:
+            h[0]['price'] = price
+        return evaluate(h, [], [rule] if isinstance(rule, dict) else rule, 30, mkt or {}, [], 100000, None, today, watch)
+    a1 = pa(pr)
+    check('價格警報：above 剛好等於觸發價會觸發，key、標題、等級比照 cap', list(a1) == ['price:ZZZ:q_call']
+          and a1['price:ZZZ:q_call']['title'] == 'ZZZ Call 防被買走：ZZZ 收 50.00（≥ 50）'
+          and a1['price:ZZZ:q_call']['lvl'] == 'warn' and a1['price:ZZZ:q_call']['level'] == 1
+          and a1['price:ZZZ:q_call']['meta'] == '先看能不能 Roll（到 2026-03-20 為止）')
+    check('價格警報：above 低於觸發價不觸發、高於會觸發', not pa(pr, 49.99) and pa(pr, 52))
+    pb_ = dict(pr, direction='below', trigger_price=40)
+    check('價格警報：below 等於或低於觸發、高於不觸發', pa(pb_, 40) and pa(pb_, 39.5) and not pa(pb_, 40.01)
+          and '≤ 40' in pa(pb_, 40)['price:ZZZ:q_call']['title'])
+    check('價格警報：until 當天還算、過了 until 不觸發', pa(pr, today='2026-03-20') and not pa(pr, today='2026-03-21'))
+    check('價格警報：active 為 false 不觸發', not pa(dict(pr, active=False), 200))
+    bad = [{k: v for k, v in pr.items() if k != miss} for miss in ('codes', 'direction', 'trigger_price', 'key')]
+    bad += [dict(pr, codes='ZZZ'), dict(pr, codes=[]), dict(pr, codes=[None, 5]), dict(pr, direction='up'), dict(pr, trigger_price='50'),
+            dict(pr, trigger_price=None), dict(pr, trigger_price=True), dict(pr, until='3/20'), dict(pr, until=20260320), dict(pr, codes=['NOPE'])]
+    check('價格警報：規則缺欄位或格式不對不當機、不觸發，也不影響同檔其他規則', all(not pa(b, 999) for b in bad)
+          and list(pa(bad + [pr], 999)) == ['price:ZZZ:q_call'])
+    lite = {'key': 'm', 'kind': 'price_alert', 'codes': ['ZZZ'], 'direction': 'above', 'trigger_price': 10}
+    check('價格警報：label、action、until 沒寫也能顯示（until 沒寫＝沒有期限）', pa(lite, today='2099-01-01')['price:ZZZ:m']['title'] == 'ZZZ 價格警報：ZZZ 收 50.00（≥ 10）')
+    check('價格警報：收盤價優先用一年日收盤，沒有持股時用追蹤清單', 'price:ZZZ:q_call' in pa(pr, 10, mkt={'year': {'ZZZ': (51.0, '2026-03-10', 200.0)}})
+          and 'price:ZZZ:q_call' in pa(pr, hold=[], watch={'ZZZ': [53.0, 52.0, '2026-03-10']}) and not pa(pr, hold=[], watch={'ZZZ': [None, None, None]}))
+    t_ = a1['price:ZZZ:q_call']
+    check('價格警報：文字沒有股數與金額', '股' not in t_['title'] + t_['meta'] and 'NT$' not in t_['title'] + t_['meta'] and 'US$' not in t_['title'] + t_['meta'])
+    stP, mkP = {}, {'spx': (100.0, '2026-03-10', 100.0), 'year': {}}
+    hP = [dict(x) for x in hq]
+    q1 = build(hP, [{'code': 'ZZZ', 'pool': 'swing'}], [pr], 30, '2026-03-11', stP, mkP, True)
+    hP[0].update(price=51.0, price_date='2026-03-11')
+    q2 = build(hP, [{'code': 'ZZZ', 'pool': 'swing'}], [pr], 30, '2026-03-12', stP, dict(mkP, spx=(100.0, '2026-03-11', 100.0)), True)
+    check('價格警報：走 merge 流程，第一次 new、隔天還在就不算 new、since 不變', [a['key'] for a in q1['alerts'] if a['new']] == ['price:ZZZ:q_call']
+          and [(a['key'], a['new'], a['since']) for a in q2['alerts']] == [('price:ZZZ:q_call', False, '2026-03-11')])
+    q3 = build(hP, [{'code': 'ZZZ', 'pool': 'swing', 'ack': {'price': '2026-03-12', 'note': '已處理'}}], [pr], 30, '2026-03-12', stP, None, False)
+    check('價格警報：ack 寫在該代號的 ack.price', q3['alerts'][0].get('acked') and q3['alerts'][0]['ackNote'] == '已處理')
+    q4 = build(hP, [{'code': 'ZZZ', 'pool': 'swing'}], [pr], 30, '2026-03-21', stP, None, False)
+    q5 = build(hP, [{'code': 'ZZZ', 'pool': 'swing'}], [dict(pr, active=False)], 30, '2026-03-13', dict(stP, plan=q2), None, False)
+    check('價格警報：過了 until 或規則停用，沿用的舊警報也拿掉', q4['alerts'] == [] and q5['alerts'] == [])
+    hP[0].update(price=45.0, price_date='2026-03-12')
+    stQ = {'plan': q2, 'plan_state': {'price:ZZZ:q_call': {'level': 1, 'since': '2026-03-11', 'raised': '2026-03-11'}}}
+    q6 = build(hP, [{'code': 'ZZZ', 'pool': 'swing'}], [pr], 30, '2026-03-13', stQ, dict(mkP, spx=(100.0, '2026-03-12', 100.0)), True)
+    check('價格警報：收盤回到觸發價以內自動解除', q6['alerts'] == [] and stQ['plan_state'] == {})
