@@ -127,26 +127,40 @@ def twse_year_high(code, today):
     return robust_high(bars) if len(bars) > 150 else None
 
 
-def yahoo_year(symbol):
-    """一年的日收盤：回傳 (最新收盤, 日期, 52 週收盤高點, 高點日期)；高點已忽略單日尖刺。"""
+def yahoo_bars(symbol):
+    """一年的日收盤 [(日期, 收盤)]。"""
     r = get_json(f'https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=1y&interval=1d')['chart']['result'][0]
     off = r['meta'].get('gmtoffset', 0)
     bars = [(datetime.fromtimestamp(t + off, timezone.utc).strftime('%Y-%m-%d'), c)
             for t, c in zip(r.get('timestamp') or [], r['indicators']['quote'][0].get('close') or []) if c is not None]
     if not bars:
         raise ValueError('沒有收盤資料')
+    return bars
+
+
+def year_stats(bars):
+    """日線 → (最新收盤, 日期, 52 週收盤高點, 高點日期)；高點已忽略單日尖刺。"""
     hi, hi_day = robust_high(bars)
     return bars[-1][1], bars[-1][0], hi, hi_day
 
 
-def fetch_market(plans, errors):
-    """警報用：S&P 500 與 VIX 的收盤、信念股的 52 週收盤高點。S&P 500 抓不到就回傳 None（這次不判斷警報）。"""
+def yahoo_year(symbol, with_bars=False):
+    """一年的日收盤：回傳 (最新收盤, 日期, 52 週收盤高點, 高點日期)；with_bars 時回傳 (上述四個, 日線)。"""
+    bars = yahoo_bars(symbol)
+    st = year_stats(bars)
+    return (st, bars) if with_bars else st
+
+
+def fetch_market(plans, errors, rules=None):
+    """警報用：S&P 500 與 VIX 的收盤、信念股的 52 週收盤高點；rules.json 有 watch 規則的標的另存日線（market['bars']，算連漲與月線、季線）。
+    S&P 500 抓不到就回傳 None（這次不判斷警報）。IV Rank 沒有資料來源，不抓（market['iv_rank'] 保持沒有）。"""
     try:
         spx = yahoo_year('%5EGSPC')
     except Exception as e:
         errors.append(f'S&P 500 抓不到，警報沿用上次：{e}')
         return None
-    market = {'spx': spx, 'year': {}}
+    market = {'spx': spx, 'year': {}, 'bars': {}}
+    watch_codes = {c for r in rules or [] if r.get('kind') == 'watch' and r.get('active') is not False for c in r.get('codes') or []}
     try:
         v = yahoo_year('%5EVIX')
         market['vix'] = (v[0], v[1])
@@ -159,7 +173,7 @@ def fetch_market(plans, errors):
         syms = [f'{code}.TW', f'{code}.TWO'] if p.get('market') == '台股' else [code]
         for sym in syms:
             try:
-                market['year'][code] = yahoo_year(sym)
+                market['year'][code], market['bars'][code] = yahoo_year(sym, True)
                 break
             except Exception:
                 continue
@@ -172,6 +186,15 @@ def fetch_market(plans, errors):
             if tw and abs(tw[0] / y[2] - 1) > 0.02:
                 errors.append(f'{code} 52 週高點 Yahoo {y[2]:.2f}、證交所 {tw[0]:.2f}，採證交所')
                 market['year'][code] = (y[0], y[1], tw[0], tw[1])
+    for code in sorted(watch_codes - set(market['bars'])):  # 觀察標的不是信念股時另外抓日線
+        for sym in ([f'{code}.TW', f'{code}.TWO'] if code[:1].isdigit() else [code]):
+            try:
+                market['bars'][code] = yahoo_bars(sym)
+                break
+            except Exception:
+                continue
+        else:
+            errors.append(f'{code} 日線抓不到，連漲與月線、季線沒有判斷')
     return market
 
 
@@ -402,7 +425,7 @@ def run(base, expect=None, dry=False, alerts=False):
     by_morning = alerts == 'if-stale'  # 早報的備援判斷；其他（--alerts）是每日同步
     if alerts == 'if-stale':  # 早報的備援：07:30 同步今天沒判斷過才判斷
         alerts = ((state.get('plan') or {}).get('evaluated') != now[:10])
-    market = fetch_market(plans, errors) if alerts and plans is not None else None
+    market = fetch_market(plans, errors, rules) if alerts and plans is not None else None
     plan = invest_plan.build(holdings, plans, rules, fx, now[:10], new_state, market, alerts and market is not None,
                              evaluated_by='早報' if by_morning else '同步')
     if plan:

@@ -1,6 +1,6 @@
 """投資計畫書 v1（2026-11-06）的四池配置與觸發警報，由 invest_sync.py 呼叫。
 
-讀 OneDrive「投資資料/rules.json」（kind：pool、cap+each、floor、budget、playbook、drawdown、fx、schedule）
+讀 OneDrive「投資資料/rules.json」（kind：pool、cap+each、floor、budget、playbook、drawdown、fx、schedule、price_alert、watch）
 與「投資資料/plans.json」（每檔的 pool、PLTR 的 sell_plan），算出：
   pools   四池目前比例、目標、偏離、是否超出容許區間（每次跑都算）
   alerts  觸發中的警報（只有 07:30 每日同步帶 --alerts 才重新判斷；其他報告沿用上次結果）
@@ -12,6 +12,12 @@
 但首頁待處理與投資卡的警報數不算它；條件消失後再出現（since 晚於 ack 日）或級別升高（raised 晚於 ack 日），ack 自動失效。
 回撤警報有遲滯：跌到 threshold 觸發，回到 release（預設 threshold+5 點）以內才解除。
 四池可設過渡目標 interim:{until,max,min}：期限內只要在過渡範圍內就不標超出區間。休市日沒有新收盤就不重算、不標 new。
+價格提醒 price_alert（2026-11-19 補）：codes 的最新收盤達 trigger_price（direction 預設 above）就列入警報；until 之後不顯示；
+  有 occ 的規則在持股檔找不到那一檔選擇權（已平倉或到期）就不顯示；checkpoint（YYYY-MM-DD）當天與前一天另列一條「檢查點」提醒。
+觀察 watch（2026-11-19 補）：只提醒、不下單。codes 的目前沒有賣出中的 Cover Call，而且「當天反彈（漲 ≥1%）或連漲 ≥2 天、
+  靠近月線／季線／近 60 日前高（3% 內）、IV Rank ≥ 50」任一成立、又沒有「大跌（當天 ≤ -3%）或恐慌殺盤（VIX ≥ 30 且當天下跌）」才列入警報。
+  月線＝20 日均線、季線＝60 日均線；日線來自 fetch_market 的 market['bars']，沒有就只用持股檔的現價與前收判斷、並註明缺哪些資料；
+  IV Rank 沒有資料來源（market['iv_rank'] 有才用），一律註明「IV Rank 無資料」。
 """
 import calendar
 from datetime import date
@@ -144,7 +150,134 @@ def put_collateral_usd(holdings):
     return c
 
 
-def evaluate(holdings, plans, rules, fx, market, pools, total, prev_state=None):
+REBOUND, NEAR, AVOID_DROP, VIX_PANIC, IVR_MIN = 0.01, 0.03, -0.03, 30, 50
+
+
+def _stock(holdings, code):
+    return next((h for h in holdings if h.get('code') == code and h.get('kind') != 'option' and code not in CASH_CODES), None)
+
+
+def _short_call_on(holdings, code):
+    """持股檔裡這檔股票已經有賣出中的 Call（occ 的第 11 個字元是 C、股數為負）。"""
+    for h in holdings:
+        occ = h.get('occ') or ''
+        if h.get('kind') == 'option' and h.get('shares', 0) < 0 and len(occ) > 15 and occ[-9] == 'C' and occ[:-15] == code:
+            return True
+    return False
+
+
+def _fmt_md(d):
+    return f'{d.month}/{d.day}'
+
+
+def price_alerts(holdings, rules, today):
+    """rules.json 的 price_alert：最新收盤達提醒價，以及 checkpoint 當天與前一天的檢查點。回傳 {key: alert}。"""
+    out = {}
+    td = date.fromisoformat(today)
+    for r in rules or []:
+        if r.get('kind') != 'price_alert' or r.get('active') is False:
+            continue
+        if r.get('until') and today > r['until']:
+            continue
+        occ = r.get('occ')
+        if occ and not any(h.get('occ') == occ for h in holdings):
+            continue  # 對應的選擇權已經平倉或到期，不再提醒
+        key, label = r.get('key') or 'price_alert', r.get('label') or r.get('key') or '價格提醒'
+        action = r.get('action') or ''
+        trig = r.get('trigger_price')
+        below = r.get('direction') == 'below'
+        for code in r.get('codes') or []:
+            h = _stock(holdings, code)
+            price = h.get('price') if h else None
+            if price is None or trig is None:
+                continue
+            if (price <= trig) if below else (price >= trig):
+                out[f'pa:{key}:{code}'] = {'level': 1, 'lvl': 'warn', 'date': h.get('price_date'),
+                                           'title': f"{code} 收 ${price:,.2f}，{'跌到' if below else '達'} ${trig:g} 提醒線（{label}）", 'meta': action}
+        cp = r.get('checkpoint')
+        if cp:
+            cd = date.fromisoformat(cp)
+            if 0 <= (cd - td).days <= 1:
+                segs = [x.strip() for x in action.replace(';', '；').split('；') if x.strip()]
+                text = next((x for x in segs if '檢查點' in x), segs[-1] if segs else '')
+                out[f'pc:{key}'] = {'level': 1, 'lvl': 'warn', 'title': f"{label}：{_fmt_md(cd)} 檢查點（{'今天' if cd == td else '明天'}）", 'meta': text or '今天要決定'}
+    return out
+
+
+def _bars_stats(bars):
+    """日線 [(日期, 收盤)] → 連漲天數、20 日與 60 日均線、近 60 日最高收盤；資料不夠的項目回傳 None。"""
+    closes = [c for _, c in bars or []]
+    st = {'streak': None, 'ma20': None, 'ma60': None, 'hi60': None}
+    if len(closes) >= 2:
+        n = 0
+        for i in range(len(closes) - 1, 0, -1):
+            if closes[i] > closes[i - 1]:
+                n += 1
+            else:
+                break
+        st['streak'] = n
+    if len(closes) >= 20:
+        st['ma20'] = sum(closes[-20:]) / 20
+    if len(closes) >= 60:
+        st['ma60'] = sum(closes[-60:]) / 60
+        st['hi60'] = max(closes[-60:])
+    return st
+
+
+def watch_alerts(holdings, rules, market, today):
+    """rules.json 的 watch（重賣 Cover Call 觀察）：只提醒、不下單。條件見檔頭說明。"""
+    out = {}
+    market = market or {}
+    vix = (market.get('vix') or (None,))[0]
+    for r in rules or []:
+        if r.get('kind') != 'watch' or r.get('active') is False:
+            continue
+        if r.get('until') and today > r['until']:
+            continue
+        for code in r.get('codes') or []:
+            if _short_call_on(holdings, code):
+                continue  # 已經有 Cover Call，不用再提醒
+            h = _stock(holdings, code)
+            bars = (market.get('bars') or {}).get(code)
+            if bars and len(bars) >= 2:
+                close, prev = bars[-1][1], bars[-2][1]
+            elif h and h.get('price') and h.get('prev_price'):
+                close, prev = h['price'], h['prev_price']
+            else:
+                continue
+            day = close / prev - 1
+            if day <= AVOID_DROP or (vix is not None and vix >= VIX_PANIC and day < 0):
+                continue  # 剛大跌或恐慌殺盤當天不賣
+            st = _bars_stats(bars)
+            ivr = (market.get('iv_rank') or {}).get(code)
+            hit, notes = [], []
+            if day >= REBOUND:
+                hit.append(f'當天反彈 +{day * 100:.1f}%')
+            if st['streak'] is not None and st['streak'] >= 2:
+                hit.append(f"連漲 {st['streak']} 天")
+            for name, v in (('月線', st['ma20']), ('季線', st['ma60'])):
+                if v and abs(close / v - 1) <= NEAR:
+                    hit.append(f'靠近{name}（${v:,.2f}，差 {(close / v - 1) * 100:+.1f}%）')
+            if st['hi60'] and close >= st['hi60'] * (1 - NEAR):
+                hit.append(f"靠近近 60 日前高（${st['hi60']:,.2f}）")
+            if ivr is not None and ivr >= IVR_MIN:
+                hit.append(f'IV Rank {ivr:.0f}（≥{IVR_MIN}）')
+            if not hit:
+                continue
+            if ivr is None:
+                notes.append('IV Rank 無資料')
+            if not bars:
+                notes.append('日線抓不到：連漲、月線、季線、前高沒有判斷，只用當天漲跌')
+            elif st['ma60'] is None:
+                notes.append('日線不足 60 根：季線與前高沒有判斷')
+            out[f"wt:{r.get('key') or 'watch'}:{code}"] = {
+                'level': 1, 'lvl': 'warn', 'date': (bars[-1][0] if bars else h.get('price_date') if h else None),
+                'title': f"{code} 可以考慮重賣 Cover Call（{'、'.join(hit)}）",
+                'meta': '；'.join([x for x in [r.get('spec') or '賣 1 口 Cover Call（以 100 股擔保）', '只提醒、不下單，由 Sam 決定'] + notes if x])}
+    return out
+
+
+def evaluate(holdings, plans, rules, fx, market, pools, total, prev_state=None, today=None):
     """回傳目前觸發中的警報 {key: {level, title, meta, lvl}}。market：
     {'spx': (close, date, high52), 'vix': (close, date), 'year': {code: (close, date, high52)}}"""
     plan_pool = {p['code']: p.get('pool') for p in plans or [] if p.get('code')}
@@ -208,6 +341,9 @@ def evaluate(holdings, plans, rules, fx, market, pools, total, prev_state=None):
         if twd is not None and fl.get('twd') is not None and twd < fl['twd']:
             out['floor:twd'] = {'level': 1, 'lvl': 'risk', 'title': f"台幣現金低於底線 NT${fl['twd']:,}",
                                 'meta': f"國泰交割戶約 NT${twd:,.0f}；每月新資金先補現金池"}
+    if today:
+        out.update(price_alerts(holdings, rules, today))
+        out.update(watch_alerts(holdings, rules, market, today))
     return out
 
 
@@ -260,11 +396,12 @@ def build(holdings, plans, rules, fx, today, state, market=None, evaluate_alerts
     if evaluate_alerts and market is not None:
         asof = {'spx': (market.get('spx') or (None, None))[1],
                 'tw': max([h.get('price_date') or '' for h in holdings if h.get('currency') == 'TWD' and h['code'] not in CASH_CODES] or ['']),
-                'us': max([h.get('price_date') or '' for h in holdings if h.get('currency') == 'USD' and h['code'] not in CASH_CODES] or [''])}
+                'us': max([h.get('price_date') or '' for h in holdings if h.get('currency') == 'USD' and h['code'] not in CASH_CODES] or ['']),
+                'day': today}  # 加日期：檢查點這類「看日期」的提醒，休市日也要每天重算（key 沒變就不標 new）
         plan['evaluated'] = today
         plan['evaluatedBy'] = evaluated_by or prev.get('evaluatedBy')
         if asof != prev.get('dataAsOf'):  # 有新收盤才重算；休市日沿用、不標 new
-            cur = evaluate(holdings, plans, rules, fx, market, pools, total, state.get('plan_state'))
+            cur = evaluate(holdings, plans, rules, fx, market, pools, total, state.get('plan_state'), today)
             plan['alerts'], state['plan_state'] = merge(cur, state.get('plan_state'), today)
             plan['dataAsOf'] = asof
             plan['highs'] = {c: {'close': v[0], 'date': v[1], 'high52': v[2], 'highDate': v[3] if len(v) > 3 else None, 'dd': round(v[0] / v[2] - 1, 4)}
@@ -383,3 +520,56 @@ def selftest(check):
     check('半年檢查：跟最近一次比，下降才算 down', rv['conviction'] == 0.45 and rv['down'] and not review_compare([{'key': 'review', 'kind': 'schedule', 'history': [{'date': 'x', 'conviction': 0.4}]}], [{'key': 'conviction', 'pct': 0.44}])['down'])
     pe = build(hs, plans, rules, 30, '2026-01-11', {}, mk, True, evaluated_by='早報')
     check('evaluated_by 記下是同步或早報判斷的', pe['evaluatedBy'] == '早報' and pe['highs']['BBB']['high52'] == 10.0)
+    # ---- 價格提醒 price_alert 與觀察 watch（2026-11-19；全部是假代號、假價格）----
+    hw = [{'code': 'XXX', 'currency': 'USD', 'shares': 100, 'price': 205.0, 'prev_price': 198.0, 'price_date': '2026-11-18'},
+          {'code': 'XXX 12/18/2026 210.00 C', 'occ': 'XXX261218C00210000', 'kind': 'option', 'currency': 'USD', 'shares': -100, 'price': 3},
+          {'code': 'YYY', 'currency': 'USD', 'shares': 100, 'price': 100.0, 'prev_price': 99.0, 'price_date': '2026-11-18'},
+          {'code': 'CASH', 'currency': 'USD', 'shares': 10, 'price': 1}]
+    rpa = {'key': 'xxx_watch', 'kind': 'price_alert', 'label': 'XXX 12/18 $210 Call 追蹤', 'codes': ['XXX'], 'occ': 'XXX261218C00210000',
+           'direction': 'above', 'trigger_price': 200, 'until': '2026-12-18', 'checkpoint': '2026-11-25',
+           'action': 'XXX ≥ $200：評估 Roll up & out；11/25 最後檢查點：決定續抱、買回或 Roll'}
+    pa1 = price_alerts(hw, [rpa], '2026-11-19')
+    check('price_alert：最新收盤達提醒價就列入警報（標題有收盤價、meta 是規則的 action）',
+          list(pa1) == ['pa:xxx_watch:XXX'] and '205.00' in pa1['pa:xxx_watch:XXX']['title'] and pa1['pa:xxx_watch:XXX']['meta'] == rpa['action'])
+    hw_low = [dict(h, price=190.0) if h['code'] == 'XXX' else h for h in hw]
+    check('price_alert：沒到提醒價不提醒', price_alerts(hw_low, [rpa], '2026-11-19') == {})
+    check('price_alert：direction below 是跌到提醒價以下', list(price_alerts(hw_low, [dict(rpa, direction='below', trigger_price=195)], '2026-11-19')) == ['pa:xxx_watch:XXX'])
+    check('price_alert：checkpoint 只在當天與前一天出現（含「明天」「今天」字樣）',
+          'pc:xxx_watch' not in price_alerts(hw_low, [rpa], '2026-11-23') and '明天' in price_alerts(hw_low, [rpa], '2026-11-24')['pc:xxx_watch']['title']
+          and '今天' in price_alerts(hw_low, [rpa], '2026-11-25')['pc:xxx_watch']['title'] and 'pc:xxx_watch' not in price_alerts(hw_low, [rpa], '2026-11-26')
+          and '決定續抱、買回或 Roll' in price_alerts(hw_low, [rpa], '2026-11-25')['pc:xxx_watch']['meta'])
+    check('price_alert：過了 until、active=false、對應的選擇權已平倉都不顯示',
+          price_alerts(hw, [dict(rpa, until='2026-11-18')], '2026-11-19') == {} and price_alerts(hw, [dict(rpa, active=False)], '2026-11-19') == {}
+          and price_alerts([h for h in hw if h.get('kind') != 'option'], [rpa], '2026-11-19') == {})
+    rw = {'key': 'wt', 'kind': 'watch', 'codes': ['YYY'], 'spec': '賣 1 口 Cover Call（以 100 股擔保）'}
+    w1 = watch_alerts(hw, [rw], {}, '2026-11-19')
+    check('watch：當天漲 ≥1% 就列入；沒有日線時註明缺什麼、IV Rank 無資料、只提醒不下單',
+          list(w1) == ['wt:wt:YYY'] and '當天反彈' in w1['wt:wt:YYY']['title'] and 'IV Rank 無資料' in w1['wt:wt:YYY']['meta']
+          and '日線抓不到' in w1['wt:wt:YYY']['meta'] and '只提醒、不下單' in w1['wt:wt:YYY']['meta'])
+    check('watch：已經有賣出中的 Cover Call 就不提醒（XXX 有 12/18 Call）', watch_alerts(hw, [dict(rw, codes=['XXX'])], {}, '2026-11-19') == {})
+    hw_drop = [dict(h, price=96.0) if h['code'] == 'YYY' else h for h in hw]
+    check('watch：當天大跌（-4%）是 avoid，不提醒', watch_alerts(hw_drop, [rw], {}, '2026-11-19') == {})
+    hw_dn = [dict(h, price=98.5) if h['code'] == 'YYY' else h for h in hw]
+    check('watch：VIX ≥ 30 且當天下跌是恐慌殺盤，不提醒；VIX 低就沒有 avoid（但這天下跌、沒條件成立也不提醒）',
+          watch_alerts(hw_dn, [rw], {'vix': (31.0, 'd')}, '2026-11-19') == {} and watch_alerts(hw_dn, [rw], {}, '2026-11-19') == {})
+    flat = [('d%02d' % i, 100.0) for i in range(68)] + [('d68', 100.2), ('d69', 100.4)]
+    hw_f = [dict(h, price=100.4, prev_price=100.2) if h['code'] == 'YYY' else h for h in hw]
+    wf = watch_alerts(hw_f, [rw], {'bars': {'YYY': flat}}, '2026-11-19')['wt:wt:YYY']
+    check('watch：用日線算連漲 2 天、靠近月線與季線與近 60 日前高', '連漲 2 天' in wf['title'] and '靠近月線' in wf['title'] and '靠近季線' in wf['title'] and '靠近近 60 日前高' in wf['title']
+          and '日線抓不到' not in wf['meta'])
+    falling = [('d%02d' % i, 100.0 * 0.995 ** i) for i in range(70)]
+    hw_fall = [dict(h, price=falling[-1][1], prev_price=falling[-2][1]) if h['code'] == 'YYY' else h for h in hw]
+    check('watch：一路下跌、離月線季線前高都遠、沒有 IV Rank，就沒有條件成立', watch_alerts(hw_fall, [rw], {'bars': {'YYY': falling}}, '2026-11-19') == {})
+    wi = watch_alerts(hw_fall, [rw], {'bars': {'YYY': falling}, 'iv_rank': {'YYY': 62}}, '2026-11-19')['wt:wt:YYY']
+    check('watch：有 IV Rank ≥ 50 就成立，且不再寫「IV Rank 無資料」', 'IV Rank 62' in wi['title'] and 'IV Rank 無資料' not in wi['meta'])
+    check('watch：active=false 不提醒', watch_alerts(hw, [dict(rw, active=False)], {}, '2026-11-19') == {})
+    rules_pw = [rpa, rw]
+    mk0 = {'spx': (100.0, '2026-11-18', 100.0)}
+    stw = {}
+    bw = build(hw, [], rules_pw, 30, '2026-11-19', stw, mk0, True)
+    check('build：price_alert 與 watch 進 plan.alerts、第一次觸發標 new', {a['key'] for a in bw['alerts']} == {'pa:xxx_watch:XXX', 'wt:wt:YYY'} and all(a['new'] for a in bw['alerts']))
+    bw2 = build(hw, [], rules_pw, 30, '2026-11-20', stw, mk0, True)
+    check('build：隔天（市場資料沒變）照樣重算、不重複標 new', {a['key'] for a in bw2['alerts']} == {'pa:xxx_watch:XXX', 'wt:wt:YYY'} and not any(a['new'] for a in bw2['alerts']))
+    bw3 = build(hw, [], rules_pw, 30, '2026-11-24', stw, mk0, True)
+    check('build：檢查點前一天（市場資料沒變）也會出現、標 new', 'pc:xxx_watch' in {a['key'] for a in bw3['alerts']} and next(a for a in bw3['alerts'] if a['key'] == 'pc:xxx_watch')['new'])
+    check('evaluate 沒帶 today 不判斷 price_alert 與 watch（相容舊呼叫）', not any(k[:3] in ('pa:', 'pc:', 'wt:') for k in evaluate(hw, [], rules_pw, 30, mk0, [], 100000)))
