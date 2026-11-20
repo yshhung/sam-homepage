@@ -291,6 +291,7 @@ function render() {
   renderDay(today);
   renderCal(today);
 
+  renderChief(focus);
   renderFilter(focus);
   const shown0 = state.filter === '全部' ? focus : focus.filter((e) => domainOf(e) === state.filter);
   const list = $('focus-list');
@@ -358,7 +359,7 @@ function focusRow(e) {
   const open = state.openRows.has(e.key);
   const toggle = () => { if (open) state.openRows.delete(e.key); else state.openRows.add(e.key); render(); };
   const top = el('button', { class: 'f-top', type: 'button', 'aria-expanded': String(open), onclick: toggle },
-    el('span', { class: 'chip' }, e.cat), el('span', { class: 'f-title' }, e.title), el('span', { class: 'f-caret', 'aria-hidden': 'true' }, open ? '▾' : '▸'));
+    el('span', { class: 'chip' }, e.cat), el('span', { class: 'chip who', title: CONFIG.chiefs[domainOf(e)]?.name || '' }, domainOf(e)), el('span', { class: 'f-title' }, e.title), el('span', { class: 'f-caret', 'aria-hidden': 'true' }, open ? '▾' : '▸'));
   const kids = [top];
   if (open) {
     if (e.meta) kids.push(el('div', { class: 'f-meta' }, e.meta));
@@ -452,6 +453,33 @@ function renderFilter(focus) {
   }, `${d} ${count(d)}`)));
 }
 
+// 特助看板：最上面一張，把三位主管各自要你處理的件數放在一起；點主管就只看那一位的待辦
+function renderChief(focus) {
+  const worst = focus.find((e) => e.level === 'bad') || focus.find((e) => e.level === 'warn');
+  const chips = DOMAINS.map((d) => {
+    const mine = focus.filter((e) => domainOf(e) === d);
+    const lvl = mine.some((e) => e.level === 'bad') ? 'bad' : mine.some((e) => e.level === 'warn') ? 'warn' : '';
+    return el('button', { class: `ch-dom${state.filter === d ? ' on' : ''} ${lvl}`, type: 'button', 'aria-pressed': String(state.filter === d),
+      onclick: () => { setFilter(d); $('focus-h').scrollIntoView({ behavior: 'smooth', block: 'start' }); } },
+      el('span', { class: 'ch-name' }, CONFIG.chiefs[d].name), el('b', {}, String(mine.length)));
+  });
+  $('chief').replaceChildren(
+    el('div', { class: 'focus-head' }, el('h2', { id: 'chief-h' }, '特助'),
+      el('span', { class: 'count' }, focus.length ? `今天 ${focus.length} 件待處理` : '今天沒有待處理')),
+    el('p', { class: 'ch-line' }, worst ? `先看：${worst.title}` : '三位主管都沒有要你處理的事'),
+    el('div', { class: 'ch-doms' }, ...chips));
+}
+
+// 某位主管負責的資料，最近一次排程寫入的時間；任何一項（有在監看的）超過 36 小時就標 ⚠
+function chiefFresh(d) {
+  const names = CONFIG.chiefs[d].fresh;
+  const rows = freshnessRows().filter((r) => names.includes(r.name) && r.d);
+  if (!rows.length) return '';
+  const newest = new Date(Math.max(...rows.map((r) => r.d.getTime())));
+  const stale = rows.some((r) => r.watch && Date.now() - r.d.getTime() > 36 * 3600000);
+  return `資料 ${fmtStamp(newest)}${stale ? ' ⚠' : ''}`;
+}
+
 function renderDomains(focus) {
   const cards = DOMAINS.map((d) => {
     const rows = (CARD_ROWS[d] || [d]).map((k) => state.cards.find((x) => x.領域 === k)).filter(Boolean);
@@ -465,6 +493,7 @@ function renderDomains(focus) {
       onclick: (ev) => { if (ev.target.closest('a,button')) return; setFilter(d); $('focus-h').scrollIntoView({ behavior: 'smooth', block: 'start' }); },
       onkeydown: (ev) => { if ((ev.key === 'Enter' || ev.key === ' ') && ev.target === ev.currentTarget) { ev.preventDefault(); setFilter(d); } } },
       el('div', { class: 'd-head' }, el('h2', {}, d)),
+      el('div', { class: 'd-sub' }, CONFIG.chiefs[d].name, el('span', { class: 'd-long' }, ` · ${CONFIG.chiefs[d].charter}`)),
       auto?.stats
         ? el('div', { class: 'd-stats' }, ...auto.stats.map((x) => el('div', { class: 'd-stat' }, el('div', { class: `d-num ${x.tone || ''}` }, x.v), el('div', { class: 'd-k' }, x.k))))
         : el('div', { class: 'd-num' }, auto?.num || rows[0]?.數字 || '—'),
@@ -474,6 +503,7 @@ function renderDomains(focus) {
         el('span', { class: 'd-long' }, auto.plan.text), el('span', { class: 'd-short' }, auto.plan.short || '⚠️ 四池偏離')) : null,
       ...notes.map((t) => el('p', { class: 'd-text' }, t)),
       d === '工作' && state.hecho ? el('button', { class: 'act d-ask', type: 'button', title: '複製最近的數字（沒有姓名），打開 Claude', onclick: askHecho }, '問 AI') : null,
+      el('div', { class: 'd-owners' }, el('span', {}, `負責人：${CONFIG.chiefs[d].owners}`), chiefFresh(d) ? el('span', {}, chiefFresh(d)) : null),
       el('div', { class: 'd-foot' },
         el('span', { class: n ? `pill on ${lvl}` : 'pill' }, n ? `${n} 件待處理` : '沒有待處理'),
         // 首頁自己的頁面（例如投資頁）在同一個畫面打開；外部連結開新分頁

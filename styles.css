@@ -60,8 +60,8 @@ h2::before { content: ""; width: 3px; height: 13px; background: var(--acc); bord
 
 /* 今日重點 */
 .focus { border-color: #1c3343; background: linear-gradient(180deg, #08141c, var(--panel) 120px); }
-.focus-head { display: flex; align-items: center; justify-content: space-between; }
-.focus-head h2 { font-size: 15px; }
+.focus-head, .chief .focus-head { display: flex; align-items: center; justify-content: space-between; }
+.focus-head h2, .chief h2 { font-size: 15px; }
 .count { min-width: 26px; height: 22px; padding: 0 8px; border-radius: 11px; background: #0e2a3a; color: var(--acc); font-size: 12px; display: grid; place-items: center; }
 .count:empty { display: none; }
 
@@ -365,3 +365,18 @@ h2::before { content: ""; width: 3px; height: 13px; background: var(--acc); bord
   .wk { gap: 14px; }
   .wk-card { padding: 14px; gap: 8px; }
 }
+
+/* 特助看板與主管標示（2026-11 特助版面）：只改呈現，不改資料 */
+.chief { display: grid; gap: 8px; }
+.ch-line { margin: 0; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+.ch-doms { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.ch-dom { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; font: inherit; min-width: 0; }
+.ch-dom b { font-size: 1.1rem; font-weight: 650; }
+.ch-dom .ch-name { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ch-dom.on { border-color: var(--acc); }
+.ch-dom.warn b { color: var(--amb); }
+.ch-dom.bad b { color: var(--bad); }
+.chip.who { background: transparent; border: 1px solid var(--line); }
+.d-sub { font-size: 12px; color: var(--muted); }
+.d-owners { display: grid; gap: 2px; font-size: 11px; color: var(--muted); line-height: 1.5; overflow-wrap: anywhere; margin-top: 4px; }
+@media (max-width: 599px) { .d-owners { display: none; } .chip.who { display: none; } }
