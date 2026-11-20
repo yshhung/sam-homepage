@@ -34,7 +34,6 @@
     return `${c} ${nm}`;
   }) : t);
   const cw = (t) => withNames(UD.reduce((s, [a, b]) => s.split(a).join(b), String(t == null ? '' : t)));
-  let showAllWatch = false;
   dash.onData(() => {
     NAMES = twNames();
     // brief
@@ -95,8 +94,7 @@
       else {
         // 紅（已觸及）、黃（留意）一律先看；綠（正常）收在「另有 N 項」，點了才展開
         const hot = (x) => x.lvl === 'risk' || x.lvl === 'look';
-        const calm = W.filter((x) => !hot(x));
-        const shown = showAllWatch ? W : W.filter(hot);
+        const shown = W.filter(hot);  // 綠燈（正常）的不顯示
         const secs = [...new Set(shown.map((x) => x.section))];
         const nodes = secs.flatMap((sec) => {
           const rows = shown.filter((x) => x.section === sec);
@@ -109,12 +107,6 @@
           })];
         });
         if (!nodes.length) nodes.push(el('div', 'sd-empty', '沒有需要特別留意的項目'));
-        if (calm.length) {
-          const btn = el('button', 'mk-more', showAllWatch ? '▾ 收起正常的項目' : `▸ 另有 ${calm.length} 項正常`);
-          btn.type = 'button';
-          btn.addEventListener('click', () => { showAllWatch = !showAllWatch; window.dispatchEvent(new Event('resize')); });
-          nodes.push(btn);
-        }
         list.replaceChildren(...nodes);
       }
       const cc = N.filter((x) => x.section === 'Cover Call 參考');
