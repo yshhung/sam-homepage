@@ -341,7 +341,7 @@ h2::before { content: ""; width: 3px; height: 13px; background: var(--acc); bord
 .wk-status-data:empty { display: none; }
 
 /* 終端機風格：英文、數字、標題、標籤、按鈕與時間用等寬字型；中文字退回系統的蘋方／微軟正黑，內文維持好讀 */
-.wk-eyebrow, h2, .wk-sec, .d-num, .d-k, .count, .chip, .btn, .wk-status, .wk-status-data, .f-meta, .wk-foot, .pill, .ib-mini b, .ib-mini span, .ib-head, .f-filter button, .d-stat {
+.wk-eyebrow, h2, .wk-sec, .d-num, .d-k, .count, .chip, .btn, .wk-status, .wk-status-data, .f-meta, .wk-foot, .pill, .ib-mini b, .ib-mini span, .ib-head, .f-filter button, .d-stat, .ch-dom, .d-sub, .d-owners, .d-fresh {
   font-family: var(--mono), "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
 }
 .d-num, .ib-mini b { letter-spacing: -.01em; }
@@ -368,15 +368,25 @@ h2::before { content: ""; width: 3px; height: 13px; background: var(--acc); bord
 
 /* 特助看板與主管標示（2026-11 特助版面）：只改呈現，不改資料 */
 .chief { display: grid; gap: 8px; }
-.ch-line { margin: 0; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+.ch-line { margin: 0; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .ch-doms { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.ch-dom { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; font: inherit; min-width: 0; }
+.ch-dom { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; min-width: 0; }
 .ch-dom b { font-size: 1.1rem; font-weight: 650; }
 .ch-dom .ch-name { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ch-dom.on { border-color: var(--acc); }
+.ch-dom.on { border-color: var(--amb); background: var(--panel2); }
 .ch-dom.warn b { color: var(--amb); }
 .ch-dom.bad b { color: var(--bad); }
-.chip.who { background: transparent; border: 1px solid var(--line); }
+.chip.who, .f-row.bad .chip.who { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+.chip.who .w-short { display: none; }
 .d-sub { font-size: 12px; color: var(--muted); }
-.d-owners { display: grid; gap: 2px; font-size: 11px; color: var(--muted); line-height: 1.5; overflow-wrap: anywhere; margin-top: 4px; }
-@media (max-width: 599px) { .d-owners { display: none; } .chip.who { display: none; } }
+.d-owners, .d-fresh { font-size: 11px; color: var(--muted); line-height: 1.5; overflow-wrap: anywhere; }
+.d-owners { margin-top: 4px; }
+.d-fresh.stale { color: var(--amb); }
+#focus-h { scroll-margin-top: calc(16px + env(safe-area-inset-top)); }
+@media (max-width: 599px) {
+  .d-owners, .d-fresh { display: none; }
+  .d-fresh.stale { display: block; }
+  .chip.who .w-long { display: none; }
+  .chip.who .w-short { display: inline; }
+  .ch-dom { min-height: 44px; align-items: center; }
+}

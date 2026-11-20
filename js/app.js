@@ -13,8 +13,8 @@ import { almanac, lunarDay } from './almanac.js';
 
 const $ = (id) => document.getElementById(id);
 
-// 三張一列：生活、投資、工作。工作＝沁耘（公司：網站、曝光、課程）＋和果（日照中心）＋信件、行程
-const DOMAINS = ['生活', '投資', '工作'];
+// 三張一列：生活、工作、投資（和特助手冊的順序一致）。工作＝沁耘（公司：網站、曝光、課程）＋和果（日照中心）＋信件、行程
+const DOMAINS = ['生活', '工作', '投資'];
 const DOMAIN_OF = { 和果: '工作', 沁耘: '工作', 網站: '工作', 社群: '工作', 課程: '工作', 信件: '工作', 行程: '工作', 投資: '投資', 天氣: '生活', 旅行: '生活' };
 // TickTick 清單 → 卡片（清單定義見「待辦行程分流」技能）
 const LIST_DOMAIN = { '💼公司營運': '工作', '🦄未來拓展': '工作', '🏫社區長照營運': '工作', '🏠我的家庭': '生活', '🏃我的生活': '生活', '📦生活瑣事': '生活' };
@@ -58,7 +58,7 @@ function tickTickEntries(today) {
     (n <= lead ? focus : upcoming).push(e);
   }
   const age = t.updated ? diffDays(today, t.updated.slice(0, 10)) : 99;
-  if (age >= 2) focus.push({ key: 'tt:stale', cat: 'TickTick', domain: '工作', title: `TickTick 待辦 ${age} 天沒同步`, meta: `在 Claude App 改過待辦，或等下一次同步（每天 ${CONFIG.syncTimes.join('、')} 前後）`, level: 'info', sort: 0.85 });
+  if (age >= 2) focus.push({ key: 'tt:stale', cat: 'TickTick', domain: '生活', title: `TickTick 待辦 ${age} 天沒同步`, meta: `在 Claude App 改過待辦，或等下一次同步（每天 ${CONFIG.syncTimes.join('、')} 前後）`, level: 'info', sort: 0.85 });
   return { focus, upcoming };
 }
 
@@ -117,7 +117,7 @@ function autoEntries(today) {
   for (const a of al.entries) {
     out.push({ key: `alert:${a.key}`, cat: a.tag, domain: '工作', title: a.title, meta: [a.text, a.src].filter(Boolean).join(' · '), level: a.lvl === 'risk' ? 'bad' : 'warn', link: a.url || undefined, linkLabel: '看公告', sort: a.lvl === 'risk' ? -1.5 : 0.05 });
   }
-  for (const f of al.stale) out.push({ key: `alert:stale:${f.name}`, cat: '警報', domain: '工作', title: `${f.name.includes('weather') ? '天氣' : '營運'}警報 ${f.hours} 小時沒更新`, meta: '下一次同步或報告會再更新；颱風期間請自己看氣象署公告', level: 'info', sort: 0.8 });
+  for (const f of al.stale) out.push({ key: `alert:stale:${f.name}`, cat: '警報', domain: f.name.includes('weather') ? '生活' : '工作', title: `${f.name.includes('weather') ? '天氣' : '營運'}警報 ${f.hours} 小時沒更新`, meta: '下一次同步或報告會再更新；颱風期間請自己看氣象署公告', level: 'info', sort: 0.8 });
   out.push(...hechoEntries(today));
   out.push(...companyEntries(today));
 
@@ -296,7 +296,7 @@ function render() {
   const shown0 = state.filter === '全部' ? focus : focus.filter((e) => domainOf(e) === state.filter);
   const list = $('focus-list');
   const shownFocus = state.showAllFocus ? shown0 : shown0.slice(0, FOCUS_FIRST);
-  list.replaceChildren(...(shown0.length ? shownFocus.map(focusRow) : [el('li', { class: 'empty' }, '✓ 沒有待處理的事，放心做別的事')]));
+  list.replaceChildren(...(shown0.length ? shownFocus.map(focusRow) : [el('li', { class: 'empty' }, emptyText())]));
   $('focus-count').textContent = shown0.length ? String(shown0.length) : '';
   const focusMore = $('btn-focus-more');
   focusMore.hidden = shown0.length <= FOCUS_FIRST;
@@ -354,12 +354,19 @@ function renderStatus() {
 }
 
 // 只能看：打開原本的地方，或帶到 Claude 處理
+// 「誰在處理」：類別和領域同名時不重複；手機只留一個字
+function whoChip(e) {
+  const d = domainOf(e);
+  if (e.cat === d) return null;
+  return el('span', { class: 'chip who', title: chiefOf(d).name }, el('span', { class: 'w-long' }, d), el('span', { class: 'w-short' }, d.slice(0, 1)));
+}
+
 function focusRow(e) {
   // 預設只看一行（類別＋標題），點一下才展開說明與按鈕
   const open = state.openRows.has(e.key);
   const toggle = () => { if (open) state.openRows.delete(e.key); else state.openRows.add(e.key); render(); };
   const top = el('button', { class: 'f-top', type: 'button', 'aria-expanded': String(open), onclick: toggle },
-    el('span', { class: 'chip' }, e.cat), el('span', { class: 'chip who', title: CONFIG.chiefs[domainOf(e)]?.name || '' }, domainOf(e)), el('span', { class: 'f-title' }, e.title), el('span', { class: 'f-caret', 'aria-hidden': 'true' }, open ? '▾' : '▸'));
+    el('span', { class: 'chip' }, e.cat), whoChip(e), el('span', { class: 'f-title' }, e.title), el('span', { class: 'f-caret', 'aria-hidden': 'true' }, open ? '▾' : '▸'));
   const kids = [top];
   if (open) {
     if (e.meta) kids.push(el('div', { class: 'f-meta' }, e.meta));
@@ -453,47 +460,84 @@ function renderFilter(focus) {
   }, `${d} ${count(d)}`)));
 }
 
+// 設定少了某位主管也不讓畫面壞：用領域名稱當預設
+function chiefOf(d) {
+  return CONFIG.chiefs?.[d] || { name: d, charter: '', owners: '', fresh: [] };
+}
+// 還在讀取、或有資料沒抓到時，不說「沒事」
+function loadNote() {
+  if (!state.syncedAt) return 'loading';
+  return Object.values(state.errors || {}).some(Boolean) ? 'partial' : '';
+}
+function emptyText() {
+  const n = loadNote();
+  return n === 'loading' ? '讀取中…' : n === 'partial' ? '目前沒有待處理的事（部分資料沒抓到，不一定代表沒事）' : '✓ 沒有待處理的事，放心做別的事';
+}
+// 待處理成交也是特助待辦（歸投資主管）；不在下面的清單裡，另有一張卡
+function tradesCount() {
+  return Array.isArray(state.trades?.pending) ? state.trades.pending.filter((x) => x && typeof x === 'object').length : 0;
+}
+function chiefCount(focus, d) {
+  return focus.filter((e) => domainOf(e) === d).length + (d === '投資' ? tradesCount() : 0);
+}
+// 選一位主管：只看他的待辦；選上才捲到清單，取消就留在原地；重畫後把焦點放回同一個控制項（鍵盤不會掉到頁首）
+function pickDomain(d, from, scroll) {
+  setFilter(d);
+  if (from) document.querySelector(`[data-dom="${d}"][data-from="${from}"]`)?.focus({ preventScroll: true });
+  if (scroll && state.filter === d) $('focus-h').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 // 特助看板：最上面一張，把三位主管各自要你處理的件數放在一起；點主管就只看那一位的待辦
 function renderChief(focus) {
-  const worst = focus.find((e) => e.level === 'bad') || focus.find((e) => e.level === 'warn');
+  const trades = tradesCount();
+  const total = focus.length + trades;
+  const note = loadNote();
   const chips = DOMAINS.map((d) => {
     const mine = focus.filter((e) => domainOf(e) === d);
     const lvl = mine.some((e) => e.level === 'bad') ? 'bad' : mine.some((e) => e.level === 'warn') ? 'warn' : '';
     return el('button', { class: `ch-dom${state.filter === d ? ' on' : ''} ${lvl}`, type: 'button', 'aria-pressed': String(state.filter === d),
-      onclick: () => { setFilter(d); $('focus-h').scrollIntoView({ behavior: 'smooth', block: 'start' }); } },
-      el('span', { class: 'ch-name' }, CONFIG.chiefs[d].name), el('b', {}, String(mine.length)));
+      'data-dom': d, 'data-from': 'chief', onclick: () => pickDomain(d, 'chief', true) },
+      el('span', { class: 'ch-name' }, chiefOf(d).name), el('b', {}, String(chiefCount(focus, d))));
   });
-  $('chief').replaceChildren(
-    el('div', { class: 'focus-head' }, el('h2', { id: 'chief-h' }, '特助'),
-      el('span', { class: 'count' }, focus.length ? `今天 ${focus.length} 件待處理` : '今天沒有待處理')),
-    el('p', { class: 'ch-line' }, worst ? `先看：${worst.title}` : '三位主管都沒有要你處理的事'),
-    el('div', { class: 'ch-doms' }, ...chips));
+  // focus 已排好（紅、黃、其他），第一件就是最該先看的
+  const line = note === 'loading' ? '讀取中…'
+    : focus[0] ? `先看：${focus[0].title}`
+      : trades ? `先看：有 ${trades} 筆待處理成交，請回報給 Claude`
+        : note === 'partial' ? '目前沒有待處理的事（部分資料沒抓到，不一定代表沒事）' : '三位主管都沒有要你處理的事';
+  $('chief-count').textContent = note === 'loading' ? '' : total ? `目前 ${total} 件待處理` : '目前沒有待處理';
+  $('chief-line').textContent = line;
+  $('chief-doms').replaceChildren(...chips);
 }
 
-// 某位主管負責的資料，最近一次排程寫入的時間；任何一項（有在監看的）超過 36 小時就標 ⚠
-function chiefFresh(d) {
-  const names = CONFIG.chiefs[d].fresh;
-  const rows = freshnessRows().filter((r) => names.includes(r.name) && r.d);
-  if (!rows.length) return '';
-  const newest = new Date(Math.max(...rows.map((r) => r.d.getTime())));
-  const stale = rows.some((r) => r.watch && Date.now() - r.d.getTime() > 36 * 3600000);
-  return `資料 ${fmtStamp(newest)}${stale ? ' ⚠' : ''}`;
+// 某位主管負責的資料新鮮度：有在監看的項目超過 36 小時就標 ⚠ 並寫出是哪一項；都新就顯示最新時間
+function chiefFresh(d, rows) {
+  const mine = rows.filter((r) => chiefOf(d).fresh.includes(r.name));
+  const dated = mine.filter((r) => r.d);
+  const old = dated.filter((r) => r.watch && Date.now() - r.d.getTime() > 36 * 3600000).sort((x, y) => x.d - y.d)[0];
+  const missing = state.syncedAt && state.store?.mode !== 'demo' ? mine.filter((r) => r.watch && !r.d).map((r) => r.name) : [];
+  if (!dated.length && !missing.length) return null;
+  const newest = dated.length ? new Date(Math.max(...dated.map((r) => r.d.getTime()))) : null;
+  const text = old ? `資料 ${old.name} ${fmtStamp(old.d)} ⚠` : newest ? `資料 ${fmtStamp(newest)}` : '';
+  const miss = missing.length ? `（${missing.join('、')} 沒有資料）` : '';
+  return { text: `${text}${miss}`.trim(), stale: Boolean(old) || missing.length > 0 };
 }
 
 function renderDomains(focus) {
+  const freshRows = freshnessRows();
   const cards = DOMAINS.map((d) => {
     const rows = (CARD_ROWS[d] || [d]).map((k) => state.cards.find((x) => x.領域 === k)).filter(Boolean);
     const notes = rows.map((r) => r.說明).filter((t) => t && !t.startsWith('在這裡寫一句'));
-    const n = focus.filter((e) => domainOf(e) === d).length;
+    const n = chiefCount(focus, d);
+    const fresh = chiefFresh(d, freshRows);
     const auto = autoCard(d);
     const link = auto?.link || CONFIG.detailLinks[d];
     const mine = focus.filter((e) => domainOf(e) === d);
     const lvl = mine.some((e) => e.level === 'bad') ? 'bad' : mine.some((e) => e.level === 'warn') ? 'warn' : '';
     return el('article', { class: `domain${state.filter === d ? ' sel' : ''}`, tabindex: '0', role: 'button', 'aria-pressed': String(state.filter === d),
-      onclick: (ev) => { if (ev.target.closest('a,button')) return; setFilter(d); $('focus-h').scrollIntoView({ behavior: 'smooth', block: 'start' }); },
-      onkeydown: (ev) => { if ((ev.key === 'Enter' || ev.key === ' ') && ev.target === ev.currentTarget) { ev.preventDefault(); setFilter(d); } } },
+      'data-dom': d, 'data-from': 'card', onclick: (ev) => { if (ev.target.closest('a,button')) return; pickDomain(d, '', true); },
+      onkeydown: (ev) => { if ((ev.key === 'Enter' || ev.key === ' ') && ev.target === ev.currentTarget) { ev.preventDefault(); pickDomain(d, 'card', false); } } },
       el('div', { class: 'd-head' }, el('h2', {}, d)),
-      el('div', { class: 'd-sub' }, CONFIG.chiefs[d].name, el('span', { class: 'd-long' }, ` · ${CONFIG.chiefs[d].charter}`)),
+      el('div', { class: 'd-sub' }, chiefOf(d).name, chiefOf(d).charter ? el('span', { class: 'd-long' }, ` · ${chiefOf(d).charter}`) : null),
       auto?.stats
         ? el('div', { class: 'd-stats' }, ...auto.stats.map((x) => el('div', { class: 'd-stat' }, el('div', { class: `d-num ${x.tone || ''}` }, x.v), el('div', { class: 'd-k' }, x.k))))
         : el('div', { class: 'd-num' }, auto?.num || rows[0]?.數字 || '—'),
@@ -503,7 +547,8 @@ function renderDomains(focus) {
         el('span', { class: 'd-long' }, auto.plan.text), el('span', { class: 'd-short' }, auto.plan.short || '⚠️ 四池偏離')) : null,
       ...notes.map((t) => el('p', { class: 'd-text' }, t)),
       d === '工作' && state.hecho ? el('button', { class: 'act d-ask', type: 'button', title: '複製最近的數字（沒有姓名），打開 Claude', onclick: askHecho }, '問 AI') : null,
-      el('div', { class: 'd-owners' }, el('span', {}, `負責人：${CONFIG.chiefs[d].owners}`), chiefFresh(d) ? el('span', {}, chiefFresh(d)) : null),
+      chiefOf(d).owners ? el('div', { class: 'd-owners' }, `負責人：${chiefOf(d).owners}`) : null,
+      fresh ? el('div', { class: `d-fresh${fresh.stale ? ' stale' : ''}` }, el('span', { class: 'd-long' }, fresh.text), fresh.stale ? el('span', { class: 'd-short' }, '⚠ 資料舊') : null) : null,
       el('div', { class: 'd-foot' },
         el('span', { class: n ? `pill on ${lvl}` : 'pill' }, n ? `${n} 件待處理` : '沒有待處理'),
         // 首頁自己的頁面（例如投資頁）在同一個畫面打開；外部連結開新分頁
