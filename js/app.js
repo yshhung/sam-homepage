@@ -453,11 +453,12 @@ function setFilter(d) {
   render();
 }
 
+// 篩選：點簡報裡的主管或下面的主管卡只看他的待辦；這裡只在篩選中顯示「看全部」
 function renderFilter(focus) {
-  const count = (d) => (d === '全部' ? focus.length : focus.filter((e) => domainOf(e) === d).length);
-  $('focus-filter').replaceChildren(...['全部', ...DOMAINS].map((d) => el('button', {
-    class: `f-chip${state.filter === d ? ' on' : ''}`, type: 'button', 'aria-pressed': String(state.filter === d), onclick: () => setFilter(d),
-  }, `${d} ${count(d)}`)));
+  const d = state.filter;
+  $('focus-filter').replaceChildren(...(d === '全部' ? [] : [el('button', {
+    class: 'f-chip on', type: 'button', 'aria-pressed': 'true', onclick: () => setFilter(d),
+  }, `只看${chiefOf(d).name}（${chiefCount(focus, d)} 件）　✕ 看全部`)]));
 }
 
 // 設定少了某位主管也不讓畫面壞：用領域名稱當預設
