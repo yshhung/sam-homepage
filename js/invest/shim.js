@@ -58,3 +58,8 @@
     t = setTimeout(run, 120);
   });
 })();
+
+// 舊版頁面程式用的取色小工具（原本在 page0.js，併進來少載一個檔）
+(() => {
+window.CV = (n) => { let p = window.__cvp; if (!p) { p = window.__cvp = document.createElement('span'); p.style.display = 'none'; (document.querySelector('.sd') || document.body).append(p); } p.style.color = `var(${n})`; return getComputedStyle(p).color; };
+})();
