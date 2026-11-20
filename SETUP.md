@@ -32,7 +32,7 @@ clientId: '貼上「應用程式 (用戶端) 識別碼」',
 tenantId: '貼上「目錄 (租用戶) 識別碼」',
 ```
 
-`config.js` 裡其他設定（登入以外）：`syncTimes`（首頁顯示的同步時間，排程時間以它為準）、`holidayCalendars`（Outlook 國定假日行事曆名稱）、`inboxPath`（信箱分流檔路徑）、`mail`（信件待處理的天數與關鍵字規則）、`detailLinks`（卡片的「詳細」連結）。各項用途見 `docs/FEATURES.md`。
+`config.js` 裡其他設定（登入以外）：`syncTimes`（首頁顯示的同步時間，排程時間以它為準）、`chiefs`（特助版面：生活、工作、投資三位主管的名稱、總則、負責人文字、各自負責哪些資料的新鮮度；只放名稱，內容抄自雲端特助手冊）、`holidayCalendars`（Outlook 國定假日行事曆名稱）、`inboxPath`（信箱分流檔路徑）、`mail`（信件待處理的天數與關鍵字規則）、`detailLinks`（卡片的「詳細」連結）。各項用途見 `docs/FEATURES.md`。
 
 ## 步驟三：在辦公室電腦測試
 

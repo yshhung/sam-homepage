@@ -24,7 +24,7 @@
   <main class="wk" id="app">
     <header class="wk-head">
       <div class="wk-head-l">
-        <div class="wk-eyebrow">Sam's Homepage</div>
+        <div class="wk-eyebrow">Sam's Homepage · 特助看板</div>
         <h1 class="wk-title" id="greeting">—</h1>
       </div>
       <div class="wk-head-r">
@@ -49,9 +49,15 @@
 
     <section class="wk-card datebar" id="cal" aria-label="日期"></section>
 
+    <section class="wk-card chief" id="chief" aria-labelledby="chief-h">
+      <div class="focus-head"><h2 id="chief-h">特助</h2><span class="count" id="chief-count"></span></div>
+      <p class="ch-line" id="chief-line">讀取中…</p>
+      <div class="ch-doms" id="chief-doms"></div>
+    </section>
+
     <section class="wk-card focus" aria-labelledby="focus-h">
       <div class="focus-head">
-        <h2 id="focus-h">待處理</h2>
+        <h2 id="focus-h">特助待辦</h2>
         <span class="count" id="focus-count"></span>
       </div>
       <div class="ib-panel" id="inbox-panel" hidden>
