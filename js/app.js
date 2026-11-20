@@ -125,7 +125,9 @@ function autoEntries(today) {
   const inv = investView(state.invest, today, s.投資變動門檻);
   for (const a of inv?.alerts || []) out.push({ key: `invest:${a.type}`, cat: '投資', domain: '投資', title: a.title, meta: a.meta, level: a.level, sort: a.type === 'day' ? 0.4 : 0.88 });
   // 投資計畫書的觸發警報：觸發中就一直列著，條件解除自動消失
+  const remKeys = new Set((planView(state.invest, today)?.reminders || []).map((a) => a.key));
   for (const a of planView(state.invest, today)?.alerts || []) {
+    if (remKeys.has(a.key)) continue;  // 價格提醒與重賣 Call 觀察放今日重點，不重複放待處理
     out.push({ key: `plan:${a.key}`, cat: '投資', domain: '投資', title: a.isNew ? `🆕 ${a.title}` : a.title, meta: a.meta, level: a.lvl === 'risk' ? 'bad' : 'warn', sort: a.lvl === 'risk' ? 0.3 : 0.45 });
   }
 
@@ -408,7 +410,8 @@ function renderPinned(today) {
 const DAY_FIRST = 8;
 function renderDay(today) {
   const al = alertsView(state.alerts, today).entries;
-  const v = dayView({ events: state.events, tasks: state.ticktick?.tasks || [], alerts: al }, today, timeStr());
+  const inv = (planView(state.invest, today)?.reminders || []).map((a) => ({ tag: '投資', label: '投資', title: a.title, text: a.meta, lvl: a.lvl }));
+  const v = dayView({ events: state.events, tasks: state.ticktick?.tasks || [], alerts: [...al, ...inv] }, today, timeStr());
   $('day-fam').replaceChildren(...al.filter((a) => a.tag === '家屬提醒').map((a) => el('div', { class: 'fam' },
     el('div', { class: 'fam-h' }, el('span', { class: 'chip' }, '提醒家屬'), el('b', {}, a.title)),
     a.text ? el('div', { class: 'fam-s' }, a.text) : null,
