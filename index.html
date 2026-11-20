@@ -52,8 +52,11 @@
     <section class="wk-card chief" id="chief" aria-labelledby="chief-h">
       <div class="focus-head"><h2 id="chief-h">特助</h2><span class="count" id="chief-count"></span></div>
       <p class="ch-line" id="chief-line">讀取中…</p>
-      <div class="ch-doms" id="chief-doms"></div>
+      <ul class="ch-brief" id="chief-brief"></ul>
     </section>
+
+    <!-- 三位主管：每位主管就是一張領域卡（件數、資料、負責人都在卡片上）；點卡片只看他的待辦 -->
+    <section class="wk-domains" id="domains" aria-label="三位主管"></section>
 
     <section class="wk-card focus" aria-labelledby="focus-h">
       <div class="focus-head">
@@ -90,8 +93,6 @@
       <button class="link-btn" id="btn-day-more" type="button" hidden></button>
     </section>
 
-    <div class="wk-sec">領域</div>
-    <section class="wk-domains" id="domains"></section>
 
     <div class="wk-sec" id="news-sec" hidden>新聞</div>
     <section class="wk-card news" id="news" aria-label="新聞" hidden>

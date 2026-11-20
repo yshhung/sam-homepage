@@ -487,26 +487,30 @@ function pickDomain(d, from, scroll) {
   if (scroll && state.filter === d) $('focus-h').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-// 特助看板：最上面一張，把三位主管各自要你處理的件數放在一起；點主管就只看那一位的待辦
+// 特助簡報：最上面一張，用幾行話交代今天的狀況（整體件數、先看哪一件、三位主管各自最該先看的一件）；
+// 主管的件數、資料與負責人在下面三張卡上，點簡報裡的主管或卡片，只看他的待辦
 function renderChief(focus) {
   const trades = tradesCount();
   const total = focus.length + trades;
   const note = loadNote();
-  const chips = DOMAINS.map((d) => {
-    const mine = focus.filter((e) => domainOf(e) === d);
-    const lvl = mine.some((e) => e.level === 'bad') ? 'bad' : mine.some((e) => e.level === 'warn') ? 'warn' : '';
-    return el('button', { class: `ch-dom${state.filter === d ? ' on' : ''} ${lvl}`, type: 'button', 'aria-pressed': String(state.filter === d),
-      'data-dom': d, 'data-from': 'chief', onclick: () => pickDomain(d, 'chief', true) },
-      el('span', { class: 'ch-name' }, chiefOf(d).name), el('b', {}, String(chiefCount(focus, d))));
-  });
-  // focus 已排好（紅、黃、其他），第一件就是最該先看的
+  const partial = '（部分資料沒抓到，不一定代表沒事）';
   const line = note === 'loading' ? '讀取中…'
-    : focus[0] ? `先看：${focus[0].title}`
-      : trades ? `先看：有 ${trades} 筆待處理成交，請回報給 Claude`
-        : note === 'partial' ? '目前沒有待處理的事（部分資料沒抓到，不一定代表沒事）' : '三位主管都沒有要你處理的事';
+    : total === 0 ? (note === 'partial' ? `目前沒有待處理的事${partial}` : '三位主管都沒有要你處理的事，放心做別的事')
+      : `目前有 ${total} 件待處理${DOMAINS.map((d) => `，${d} ${chiefCount(focus, d)}`).join('')}。${focus[0] ? `先看：${focus[0].title}` : `有 ${trades} 筆待處理成交，請回報給 Claude`}${note === 'partial' ? partial : ''}`;
+  const items = note === 'loading' ? [] : DOMAINS.map((d) => {
+    const mine = focus.filter((e) => domainOf(e) === d);
+    const t = d === '投資' ? trades : 0;
+    const first = mine[0];
+    const text = first ? `${first.title}${mine.length > 1 || t ? `（另 ${mine.length - 1 + t} 件）` : ''}`
+      : t ? `有 ${t} 筆待處理成交，請回報給 Claude` : '沒有待處理';
+    const lvl = mine.some((e) => e.level === 'bad') ? 'bad' : mine.some((e) => e.level === 'warn') ? 'warn' : '';
+    return el('li', {}, el('button', { class: `ch-b ${lvl}${state.filter === d ? ' on' : ''}${first || t ? '' : ' none'}`, type: 'button', 'aria-pressed': String(state.filter === d),
+      'data-dom': d, 'data-from': 'brief', onclick: () => pickDomain(d, 'brief', true) },
+      el('span', { class: 'ch-name' }, chiefOf(d).name), el('span', { class: 'ch-text' }, text)));
+  });
   $('chief-count').textContent = note === 'loading' ? '' : total ? `目前 ${total} 件待處理` : '目前沒有待處理';
   $('chief-line').textContent = line;
-  $('chief-doms').replaceChildren(...chips);
+  $('chief-brief').replaceChildren(...items);
 }
 
 // 某位主管負責的資料新鮮度：有在監看的項目超過 36 小時就標 ⚠ 並寫出是哪一項；都新就顯示最新時間
