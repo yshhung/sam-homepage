@@ -341,7 +341,7 @@ h2::before { content: ""; width: 3px; height: 13px; background: var(--acc); bord
 .wk-status-data:empty { display: none; }
 
 /* 終端機風格：英文、數字、標題、標籤、按鈕與時間用等寬字型；中文字退回系統的蘋方／微軟正黑，內文維持好讀 */
-.wk-eyebrow, h2, .wk-sec, .d-num, .d-k, .count, .chip, .btn, .wk-status, .wk-status-data, .f-meta, .wk-foot, .pill, .ib-mini b, .ib-mini span, .ib-head, .f-filter button, .d-stat, .ch-b, .d-sub, .d-owners, .d-fresh {
+.wk-eyebrow, h2, h3, .wk-sec, .d-num, .d-k, .count, .chip, .btn, .wk-status, .wk-status-data, .f-meta, .wk-foot, .pill, .ib-mini b, .ib-mini span, .ib-head, .f-filter button, .d-stat, .ch-b, .d-sub, .d-owners, .d-fresh {
   font-family: var(--mono), "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
 }
 .d-num, .ib-mini b { letter-spacing: -.01em; }
@@ -392,3 +392,9 @@ h2::before { content: ""; width: 3px; height: 13px; background: var(--acc); bord
   .chip.who .w-short { display: inline; }
   .ch-b { min-height: 44px; align-items: center; }
 }
+
+/* 特助簡報與待辦合成一張 */
+.ch-list-head { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+.ch-list-head h3 { margin: 0; font-size: 13px; color: var(--muted); font-weight: 600; }
+.ch-list-head .count:empty { display: none; }
+.chief .ib-panel { margin-top: 4px; }

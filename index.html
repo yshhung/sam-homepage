@@ -49,31 +49,26 @@
 
     <section class="wk-card datebar" id="cal" aria-label="日期"></section>
 
-    <section class="wk-card chief" id="chief" aria-labelledby="chief-h">
+    <!-- 特助：簡報（幾句話交代今天）＋待辦清單合成一張；三位主管的卡片在它下面 -->
+    <section class="wk-card chief focus" id="chief" aria-labelledby="chief-h">
       <div class="focus-head"><h2 id="chief-h">特助</h2><span class="count" id="chief-count"></span></div>
       <p class="ch-line" id="chief-line">讀取中…</p>
       <ul class="ch-brief" id="chief-brief"></ul>
-    </section>
-
-    <!-- 三位主管：每位主管就是一張領域卡（件數、資料、負責人都在卡片上）；點卡片只看他的待辦 -->
-    <section class="wk-domains" id="domains" aria-label="三位主管"></section>
-
-    <section class="wk-card focus" aria-labelledby="focus-h">
-      <div class="focus-head">
-        <h2 id="focus-h">特助待辦</h2>
-        <span class="count" id="focus-count"></span>
-      </div>
       <div class="ib-panel" id="inbox-panel" hidden>
         <div class="ib-head"><span>信箱</span><span class="f-meta" id="inbox-meta"></span></div>
         <div class="ib-warn" id="inbox-warn" hidden></div>
         <div class="ib-boxes" id="inbox-boxes"></div>
       </div>
+      <div class="ch-list-head"><h3 id="focus-h">待辦</h3><span class="count" id="focus-count"></span></div>
       <div class="f-filter" id="focus-filter"></div>
       <ul class="focus-list" id="focus-list"></ul>
       <button class="link-btn" id="btn-focus-more" type="button" hidden></button>
       <button class="link-btn" id="btn-upcoming" type="button" hidden></button>
       <ul class="focus-list upcoming" id="upcoming-list" hidden></ul>
     </section>
+
+    <!-- 三位主管：每位主管就是一張領域卡（件數、資料、負責人都在卡片上）；點卡片只看他的待辦 -->
+    <section class="wk-domains" id="domains" aria-label="三位主管"></section>
 
     <section class="wk-card trades" id="trades" aria-labelledby="trades-h" hidden>
       <div class="focus-head">
