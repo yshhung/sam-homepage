@@ -17,7 +17,11 @@
 觀察 watch（2026-11-19 補）：只提醒、不下單。codes 的目前沒有賣出中的 Cover Call，而且「當天反彈（漲 ≥1%）或連漲 ≥2 天、
   靠近月線／季線／近 60 日前高（3% 內）、IV Rank ≥ 50」任一成立、又沒有「大跌（當天 ≤ -3%）或恐慌殺盤（VIX ≥ 30 且當天下跌）」才列入警報。
   月線＝20 日均線、季線＝60 日均線；日線來自 fetch_market 的 market['bars']，沒有就只用持股檔的現價與前收判斷、並註明缺哪些資料；
-  IV Rank 沒有資料來源（market['iv_rank'] 有才用），一律註明「IV Rank 無資料」。
+  IV Rank 沒有資料來源（market['iv_rank'] 有才用），沒有就寫「IV Rank 查不到」，不猜。
+  警報內容固定有：代號、現價、當天漲跌、IV Rank、規則 spec 裡講到履約價或到期的句子（目標履約價與到期日）。
+  規則的 requires 以「無」開頭＝沒有前提；其他文字程式無法判斷，原文附在內容裡請 Sam 自己確認。
+  requires 或 spec 提到「買回」（例如 PLTR 12/18 210C 還沒平倉）時，就算已經有賣出中的 Call 也照樣提醒，並註明須先買回那一張。
+暫停 pause（2026-11-20 補）：start～end 之間算進 invest.json 的 plan['pause']，投資頁頂端顯示一行「暫停中」與 pause 清單第一點。
 """
 import calendar
 from datetime import date
@@ -166,6 +170,38 @@ def _short_call_on(holdings, code):
     return False
 
 
+def _short_calls_on(holdings, code):
+    """持股檔裡這檔股票賣出中的 Call 合約名稱（例如「PLTR 12/18/2026 210.00 C」）。"""
+    out = []
+    for h in holdings:
+        occ = h.get('occ') or ''
+        if h.get('kind') == 'option' and h.get('shares', 0) < 0 and len(occ) > 15 and occ[-9] == 'C' and occ[:-15] == code:
+            out.append(h.get('code') or occ)
+    return out
+
+
+def _spec_targets(spec):
+    """spec 裡講到履約價或到期日的句子（用「；」分段）；都沒有就回傳整段 spec。"""
+    segs = [x.strip() for x in (spec or '').replace(';', '；').split('；') if x.strip()]
+    pick = [x for x in segs if '履約價' in x or '到期' in x]
+    return '；'.join(pick or segs)
+
+
+def pause_status(rules, today):
+    """rules.json 的 pause：今天落在 start～end 之間的第一條（active 不是 false）。回傳 None 或 {label,start,end,resume,first,items}。"""
+    for r in rules or []:
+        if r.get('kind') != 'pause' or r.get('active') is False:
+            continue
+        if r.get('start') and today < r['start']:
+            continue
+        if r.get('end') and today > r['end']:
+            continue
+        items = [x for x in (r.get('pause') or []) if x]
+        return {'label': r.get('label') or '暫停新增投資', 'start': r.get('start'), 'end': r.get('end'), 'resume': r.get('resume'),
+                'first': items[0] if items else '', 'items': items}
+    return None
+
+
 def _fmt_md(d):
     return f'{d.month}/{d.day}'
 
@@ -234,8 +270,11 @@ def watch_alerts(holdings, rules, market, today):
             continue
         if r.get('until') and today > r['until']:
             continue
+        req = str(r.get('requires') or '').strip()
+        must_close = '買回' in req or '買回' in str(r.get('spec') or '')
         for code in r.get('codes') or []:
-            if _short_call_on(holdings, code):
+            open_calls = _short_calls_on(holdings, code)
+            if open_calls and not must_close:
                 continue  # 已經有 Cover Call，不用再提醒
             h = _stock(holdings, code)
             bars = (market.get('bars') or {}).get(code)
@@ -264,16 +303,21 @@ def watch_alerts(holdings, rules, market, today):
                 hit.append(f'IV Rank {ivr:.0f}（≥{IVR_MIN}）')
             if not hit:
                 continue
-            if ivr is None:
-                notes.append('IV Rank 無資料')
+            notes.append(f'IV Rank {ivr:.0f}' if ivr is not None else 'IV Rank 查不到')
+            if open_calls:
+                notes.append(f"100 股已被 {'、'.join(open_calls)} 擔保，要先買回才能賣新的 Call，不可同時持有兩張（避免裸賣）")
+            if req and not req.startswith('無'):
+                notes.append(f'前提：{req}（程式無法判斷，請自行確認）')
             if not bars:
                 notes.append('日線抓不到：連漲、月線、季線、前高沒有判斷，只用當天漲跌')
             elif st['ma60'] is None:
                 notes.append('日線不足 60 根：季線與前高沒有判斷')
+            facts = f"現價 ${close:,.2f}（當天 {day * 100:+.1f}%）"
             out[f"wt:{r.get('key') or 'watch'}:{code}"] = {
                 'level': 1, 'lvl': 'warn', 'date': (bars[-1][0] if bars else h.get('price_date') if h else None),
                 'title': f"{code} 可以考慮重賣 Cover Call（{'、'.join(hit)}）",
-                'meta': '；'.join([x for x in [r.get('spec') or '賣 1 口 Cover Call（以 100 股擔保）', '只提醒、不下單，由 Sam 決定'] + notes if x])}
+                'meta': '；'.join([x for x in [f"{facts}；{notes[0]}", '目標：' + _spec_targets(r.get('spec') or '賣 1 口 Cover Call（以 100 股擔保）'),
+                                    '只提醒、不下單，由 Sam 決定'] + notes[1:] if x])}
     return out
 
 
@@ -393,6 +437,7 @@ def build(holdings, plans, rules, fx, today, state, market=None, evaluate_alerts
     rv = review_compare(rules, pools)
     if rv:
         plan['extras']['review'] = rv
+    plan['pause'] = pause_status(rules, today)
     if evaluate_alerts and market is not None:
         asof = {'spx': (market.get('spx') or (None, None))[1],
                 'tw': max([h.get('price_date') or '' for h in holdings if h.get('currency') == 'TWD' and h['code'] not in CASH_CODES] or ['']),
@@ -543,8 +588,8 @@ def selftest(check):
           and price_alerts([h for h in hw if h.get('kind') != 'option'], [rpa], '2026-11-19') == {})
     rw = {'key': 'wt', 'kind': 'watch', 'codes': ['YYY'], 'spec': '賣 1 口 Cover Call（以 100 股擔保）'}
     w1 = watch_alerts(hw, [rw], {}, '2026-11-19')
-    check('watch：當天漲 ≥1% 就列入；沒有日線時註明缺什麼、IV Rank 無資料、只提醒不下單',
-          list(w1) == ['wt:wt:YYY'] and '當天反彈' in w1['wt:wt:YYY']['title'] and 'IV Rank 無資料' in w1['wt:wt:YYY']['meta']
+    check('watch：當天漲 ≥1% 就列入；沒有日線時註明缺什麼、IV Rank 查不到、只提醒不下單',
+          list(w1) == ['wt:wt:YYY'] and '當天反彈' in w1['wt:wt:YYY']['title'] and 'IV Rank 查不到' in w1['wt:wt:YYY']['meta']
           and '日線抓不到' in w1['wt:wt:YYY']['meta'] and '只提醒、不下單' in w1['wt:wt:YYY']['meta'])
     check('watch：已經有賣出中的 Cover Call 就不提醒（XXX 有 12/18 Call）', watch_alerts(hw, [dict(rw, codes=['XXX'])], {}, '2026-11-19') == {})
     hw_drop = [dict(h, price=96.0) if h['code'] == 'YYY' else h for h in hw]
@@ -561,7 +606,7 @@ def selftest(check):
     hw_fall = [dict(h, price=falling[-1][1], prev_price=falling[-2][1]) if h['code'] == 'YYY' else h for h in hw]
     check('watch：一路下跌、離月線季線前高都遠、沒有 IV Rank，就沒有條件成立', watch_alerts(hw_fall, [rw], {'bars': {'YYY': falling}}, '2026-11-19') == {})
     wi = watch_alerts(hw_fall, [rw], {'bars': {'YYY': falling}, 'iv_rank': {'YYY': 62}}, '2026-11-19')['wt:wt:YYY']
-    check('watch：有 IV Rank ≥ 50 就成立，且不再寫「IV Rank 無資料」', 'IV Rank 62' in wi['title'] and 'IV Rank 無資料' not in wi['meta'])
+    check('watch：有 IV Rank ≥ 50 就成立，且不再寫「IV Rank 查不到」', 'IV Rank 62' in wi['title'] and 'IV Rank 查不到' not in wi['meta'])
     check('watch：active=false 不提醒', watch_alerts(hw, [dict(rw, active=False)], {}, '2026-11-19') == {})
     rules_pw = [rpa, rw]
     mk0 = {'spx': (100.0, '2026-11-18', 100.0)}
@@ -573,3 +618,31 @@ def selftest(check):
     bw3 = build(hw, [], rules_pw, 30, '2026-11-24', stw, mk0, True)
     check('build：檢查點前一天（市場資料沒變）也會出現、標 new', 'pc:xxx_watch' in {a['key'] for a in bw3['alerts']} and next(a for a in bw3['alerts'] if a['key'] == 'pc:xxx_watch')['new'])
     check('evaluate 沒帶 today 不判斷 price_alert 與 watch（相容舊呼叫）', not any(k[:3] in ('pa:', 'pc:', 'wt:') for k in evaluate(hw, [], rules_pw, 30, mk0, [], 100000)))
+    # ---- 2026-11-20：watch 內容固定有現價、漲跌、IV Rank、目標；210C 須先買回；pause ----
+    hq = [{'code': 'PPP', 'currency': 'USD', 'shares': 160, 'price': 155.0, 'prev_price': 150.0, 'price_date': '2026-11-19'},
+          {'code': 'PPP 12/18/2026 210.00 C', 'occ': 'PPP261218C00210000', 'kind': 'option', 'currency': 'USD', 'shares': -100, 'price': 0.8}]
+    rq = {'key': 'ppp_resell', 'kind': 'watch', 'codes': ['PPP'], 'requires': '無（現在就開始追蹤）；有 210C 要先買回',
+          'spec': '賣 1 口 Cover Call：到期 30～45 天、delta 0.15～0.25；履約價不低於 $180；依 playbook timing'}
+    wq = watch_alerts(hq, [rq], {}, '2026-11-20')
+    a = wq.get('wt:ppp_resell:PPP', {})
+    check('watch：meta 有現價與當天漲跌、IV Rank 查不到、目標（履約價與到期）句子',
+          '現價 $155.00（當天 +3.3%）' in a.get('meta', '') and 'IV Rank 查不到' in a.get('meta', '') and '履約價不低於 $180' in a.get('meta', '')
+          and '到期 30～45 天' in a.get('meta', '') and 'playbook timing' not in a.get('meta', ''))
+    check('watch：規則提到買回、還有賣出中的 210C 時照樣提醒並註明要先買回（不裸賣）',
+          '要先買回' in a.get('meta', '') and 'PPP 12/18/2026 210.00 C' in a.get('meta', ''))
+    check('watch：requires 以「無」開頭＝沒有前提，不附前提說明', '前提：' not in a.get('meta', ''))
+    rr2 = dict(rq, requires='NVDA 財報後才賣', spec='賣 1 口 Cover Call')
+    check('watch：requires 有別的前提文字時原文附上、註明程式無法判斷', '前提：NVDA 財報後才賣' in watch_alerts([hq[0]], [rr2], {}, '2026-11-20')['wt:ppp_resell:PPP']['meta'])
+    rn = dict(rq, requires='', spec='賣 1 口 Cover Call')
+    check('watch：沒提到買回的規則，已有賣出中的 Call 就不提醒', watch_alerts(hq, [rn], {}, '2026-11-20') == {})
+    wi2 = watch_alerts([hq[0]], [rn], {'iv_rank': {'PPP': 61}}, '2026-11-20')['wt:ppp_resell:PPP']
+    check('watch：有 IV Rank 資料就寫數字、也算條件成立', 'IV Rank 61' in wi2['meta'] and 'IV Rank 61（≥50）' in wi2['title'])
+    rp = {'key': 'hp', 'kind': 'pause', 'label': '旅遊月暫停', 'start': '2026-11-11', 'end': '2026-12-31', 'resume': '2027-01-01', 'pause': ['不新增波段倉', '不賣 Put']}
+    ps = pause_status([rp], '2026-11-20')
+    check('pause：期間內回傳標題、結束日、恢復日、第一點', ps and ps['label'] == '旅遊月暫停' and ps['end'] == '2026-12-31' and ps['resume'] == '2027-01-01' and ps['first'] == '不新增波段倉')
+    check('pause：還沒開始、已經結束、active=false 都不顯示',
+          pause_status([rp], '2026-11-10') is None and pause_status([rp], '2027-01-01') is None and pause_status([dict(rp, active=False)], '2026-11-20') is None)
+    st9 = {}
+    pb = build(hq, [], [rp], 30, '2026-11-20', st9)
+    check('pause：進 plan，早晚報與首頁讀 invest.json 的 plan.pause', pb['pause']['first'] == '不新增波段倉')
+

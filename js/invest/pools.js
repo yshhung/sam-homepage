@@ -2,6 +2,14 @@
 import { planView } from '../sources.js';
 import { dateStr, el, shortDate } from '../util.js';
 
+export function renderPause(invest) {
+  const box = document.getElementById('inv-pause');
+  if (!box) return;
+  const v = planView(invest, dateStr());
+  box.hidden = !v?.pause;
+  if (v?.pause) box.textContent = v.pause.text;
+}
+
 export function renderPools(invest) {
   const box = document.getElementById('pools');
   const v = planView(invest, dateStr());

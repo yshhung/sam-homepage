@@ -264,6 +264,8 @@ body { -webkit-text-size-adjust: 100%; overflow-x: hidden; }
 .pa.bad { border-left-color: var(--down); }
 .pa-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 14px; }
 .pa .chip { font-size: 11px; color: var(--mut); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }
+.inv-pause { margin: 0 0 10px; padding: 8px 12px; border: 1px solid var(--amb); border-left-width: 3px; border-radius: 10px; background: var(--panel2); font-size: 13px; line-height: 1.5; color: var(--amb); }
+.inv-pause[hidden] { display: none; }
 .pa.acked { opacity: .6; border-left-color: var(--line); background: transparent; }
 .pa.acked b { font-weight: 500; color: var(--mut); }
 .pools-highs { margin-top: 12px; display: grid; gap: 2px; }

@@ -369,7 +369,9 @@ export function demoInvest() {
         { key: 'swing', label: '波段／待處理', pct: 0.1, target: 0.08, band: 0.03, dev: 0.02, out: false },
         { key: 'cash', label: '現金', pct: 0.13, target: 0.12, band: 0.03, dev: 0.01, out: false },
       ],
-      alerts: [{ key: 'dd:DEMO', lvl: 'warn', title: '示範股 從 52 週高點 -26.0%', meta: '觸發兩步驟檢查', new: true, raised: dateStr(), since: dateStr() }],
+      alerts: [{ key: 'dd:DEMO', lvl: 'warn', title: '示範股 從 52 週高點 -26.0%', meta: '觸發兩步驟檢查', new: true, raised: dateStr(), since: dateStr() },
+        { key: 'wt:demo:DEMO', lvl: 'warn', title: 'DEMO 可以考慮重賣 Cover Call（當天反彈 +2.0%）', meta: '現價 $100.00（當天 +2.0%）；IV Rank 查不到；目標：履約價 $110；只提醒、不下單，由 Sam 決定', raised: dateStr(), since: dateStr() }],
+      pause: { label: '示範：暫停新增投資', start: addDays(dateStr(), -5), end: addDays(dateStr(), 30), resume: addDays(dateStr(), 31), first: '不新增波段倉、題材倉', items: ['不新增波段倉、題材倉'] },
       extras: { lotto: { limitUsd: 500, usedUsd: 0, leftUsd: 500, year: Number(dateStr().slice(0, 4)) }, usdAccum: { usd: null, threshold: 3000, ready: false },
         nextReview: `${dateStr().slice(0, 4)}-12-31`, sellPlan: { code: '示範', sold: 0, total: 60, batchesDone: 0, batches: 3, nextPrice: 100, deadline: '2027-06-30' } },
     },
@@ -429,6 +431,12 @@ export function planView(inv, today) {
   // 已知悉的警報：投資頁照樣列（灰色），首頁待處理與投資卡的警報數都不算
   const alerts = all.filter((a) => !a.acked);
   const acked = all.filter((a) => a.acked);
+  // 價格提醒（pa:）、檢查點（pc:）、重賣 Cover Call 觀察（wt:）是「今天要留意的事」：首頁放今日重點，不放待處理
+  const isReminder = (a) => /^(wt|pa|pc):/.test(a.key || '');
+  const reminders = alerts.filter(isReminder);
+  const pz = p.pause;
+  const pause = pz ? { text: `暫停中：${pz.label}${pz.end ? `（到 ${shortDate(pz.end)}${pz.resume ? `，${shortDate(pz.resume)} 恢復` : ''}）` : ''}${pz.first ? `・${pz.first}` : ''}`,
+    items: pz.items || [] } : null;
   const ex = p.extras || {};
   const stats = [];
   if (ex.lotto) stats.push({ k: `樂透額度 ${ex.lotto.year}`, v: `US$${ex.lotto.leftUsd}`, s: `已用 US$${ex.lotto.usedUsd}／${ex.lotto.limitUsd}` });
@@ -457,7 +465,7 @@ export function planView(inv, today) {
   if (alerts.length) parts.push(`${alerts.length} 個警報觸發中`);
   const summary = parts.length ? { text: `⚠️ 四池：${parts.join('、')}`, warn: true, short: alerts.length ? `⚠️ ${alerts.length} 警報` : '⚠️ 四池偏離' }
     : { text: acked.length ? `四池都在區間內，${acked.length} 個已知悉的警報` : '四池都在區間內，沒有警報', warn: false };
-  return { pools, alerts, acked, highs, stats, note, summary };
+  return { pools, alerts, acked, reminders, pause, highs, stats, note, summary };
 }
 
 // ---------- 天氣與營運警報 ----------
@@ -520,7 +528,7 @@ export function dayView({ events = [], tasks = [], alerts = [] }, today, nowHM) 
     else if (t.due === today) items.push({ group: 2, time: '全天', title: t.title, meta: list, tone: 'info', kind: 'task' });
   }
   // 家屬提醒（tag「家屬提醒」）另外在狀態下面顯示，不放進時間軸；但仍算在「要留意」的件數裡
-  for (const a of alerts) if (a.tag !== '家屬提醒') items.push({ group: 1, time: '警報', title: a.title, meta: a.text || '', tone: a.lvl === 'risk' ? 'bad' : 'warn', kind: 'alert', link: a.url || '' });
+  for (const a of alerts) if (a.tag !== '家屬提醒') items.push({ group: 1, time: a.label || '警報', title: a.title, meta: a.text || '', tone: a.lvl === 'risk' ? 'bad' : 'warn', kind: 'alert', link: a.url || '' });
   const order = (x) => x.group * 10 + (x.tone === 'bad' ? 0 : 1);
   items.sort((a, b) => a.group - b.group || (a.group === 0 ? a.sortKey.localeCompare(b.sortKey) : a.group === 3 ? a.sortKey.localeCompare(b.sortKey) : order(a) - order(b)));
   const timed = items.filter((x) => x.group === 0);
