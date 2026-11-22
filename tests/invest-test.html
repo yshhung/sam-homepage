@@ -9,7 +9,7 @@
 <h1>投資頁資料轉換測試（假資料）</h1>
 <ul id="out"></ul>
 <script type="module">
-import { applyPrices, applyWatch, buildDatasets, fxRows, historyRows, lastUpdateRows, mergeMarket } from '../js/invest/data.js';
+import { applyPrices, applyWatch, buildDatasets, fxRows, historyRows, lastUpdateRows, mergeChanges, mergeMarket } from '../js/invest/data.js';
 
 const out = document.getElementById('out');
 let failed = 0;
@@ -50,6 +50,16 @@ check('最後更新', lastUpdateRows({ updated: '2026-01-05 07:30' })[0].at === 
 
 const ds = buildDatasets({ holdings, state, invest: { fx: 30, updated: '2026-01-05 07:30' }, history: [], changes: null });
 check('資料表名稱跟舊儀表板一樣，缺的給空陣列', Array.isArray(ds.changes) && ds.changes.length === 0 && ds.holdings.length === 4 && 'cathay_bal' in ds && 'mk_tiles' in ds);
+
+// 異動紀錄分檔：封存檔＋近期檔接成一份（假資料）
+const arcRows = [{ id: 1, date: '2025-01-02', action: '入金', code: 'CASH', qty: 1, price: 100 }, { id: 2, date: '2025-02-03', action: '買進', code: 'AAA', qty: 10, price: 5 }];
+const curRows = [{ id: 3, date: '2026-11-01', action: '賣出', code: 'AAA', qty: 5, price: 6 }];
+const mc = mergeChanges(curRows, arcRows);
+check('異動紀錄：封存在前、近期在後，筆數相加', mc.length === 3 && mc.map((r) => r.id).join(',') === '1,2,3', JSON.stringify(mc.map((r) => r.id)));
+check('異動紀錄：沒有封存檔就只用 changes.json', mergeChanges(curRows, null).length === 1 && mergeChanges(curRows, undefined)[0].id === 3);
+check('異動紀錄：同一個 id 兩邊都有，以 changes.json 為準、不重複', (() => { const r = mergeChanges([{ id: 2, date: '2025-02-03', action: '買進', code: 'AAA', qty: 11, price: 5 }, ...curRows], arcRows); return r.length === 3 && r.find((x) => x.id === 2).qty === 11; })());
+check('異動紀錄：兩個檔都沒有給空陣列', mergeChanges(null, null).length === 0);
+check('buildDatasets 會把封存檔接進 changes', buildDatasets({ holdings, state, changes: curRows, changes_archive: arcRows }).changes.length === 3);
 
 const now = Date.parse('2026-01-05T09:00:00+08:00');
 const legacy = { mk_tiles: [{ group: '美股收盤', name: 'X', at: '2026-01-02T08:50:00+08:00' }, { group: '台股收盤', name: 'Y', at: '2026-01-02T17:15:00+08:00' }],
