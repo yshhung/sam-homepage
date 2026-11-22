@@ -89,6 +89,17 @@ export function mergeMarket(sources, now = Date.now()) {
   };
 }
 
+// 異動紀錄分兩個檔（2026-11 起）：changes.json 只留近期，舊的搬進 changes_archive.json。
+// 投資頁的資產趨勢、單日最佳／最差、嘉信報酬要完整歷史，所以兩個檔接起來當一份用；
+// id 不重編，同一個 id 兩邊都有時以 changes.json 為準（避免搬檔途中重複算）。封存檔不存在就只用 changes.json。
+export function mergeChanges(current, archive) {
+  const cur = Array.isArray(current) ? current.filter((r) => r && typeof r === 'object') : [];
+  const old = Array.isArray(archive) ? archive.filter((r) => r && typeof r === 'object') : [];
+  if (!old.length) return cur;
+  const seen = new Set(cur.map((r) => String(r.id)));
+  return [...old.filter((r) => !seen.has(String(r.id))), ...cur];
+}
+
 // 全部組起來：名稱跟舊儀表板的資料表一樣
 export function buildDatasets(f) {
   const arr = (v) => (Array.isArray(v) ? v : []);
@@ -102,7 +113,7 @@ export function buildDatasets(f) {
     fx: fxRows(f.invest, f.state),
     lastupdate: lastUpdateRows(f.invest),
     history: historyRows(f.history),
-    changes: arr(f.changes), plans: arr(f.plans), options: arr(f.options), watchlist: applyWatch(arr(f.watchlist), f.state),
+    changes: mergeChanges(f.changes, f.changes_archive), plans: arr(f.plans), options: arr(f.options), watchlist: applyWatch(arr(f.watchlist), f.state),
     events: arr(f.events), sectors: arr(f.sectors), goals: arr(f.goals), rules: arr(f.rules),
     realized: arr(f.realized), schwab_flows: arr(f.schwab_flows),
     cathay_bal: arr(f.cathay_bal), schwab_bal: arr(f.schwab_bal), fx_hist: arr(f.fx_hist),

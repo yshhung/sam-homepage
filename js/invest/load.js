@@ -5,7 +5,7 @@ import { renderPause, renderPools } from './pools.js';
 
 const BASE = '投資資料';
 const FILES = {
-  holdings: 'holdings.json', state: 'state.json', changes: 'changes.json', plans: 'plans.json', options: 'options.json',
+  holdings: 'holdings.json', state: 'state.json', changes: 'changes.json', changes_archive: 'changes_archive.json', plans: 'plans.json', options: 'options.json',
   watchlist: 'watchlist.json', events: 'events.json', sectors: 'sectors.json', goals: 'goals.json', rules: 'rules.json',
   realized: 'realized.json', schwab_flows: 'schwab_flows.json', config: 'page_config.json',
   mk_tiles: '市場/mk_tiles.json', mk_notes: '市場/mk_notes.json', fin_news: '市場/fin_news.json',
