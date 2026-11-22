@@ -195,10 +195,11 @@
 <div class="mk-pane" id="pane-trades" hidden>
   <section class="sd-card" id="changes">
     <h2>交易紀錄</h2>
-    <p class="sd-note">你回報的買賣與選擇權操作，加上嘉信匯出的交易紀錄（2022/12 起的買賣、選擇權、入金、分割與合併；配息與股息再投資不列），以及國泰對帳單（2024/11 起的全部買賣，含定期定額、手續費與交易稅）；依日期由新到舊。嘉信檔約每半年到一年上傳一次，最近一次 2026/10/22</p>
+    <p class="sd-note">你回報的買賣與選擇權操作，加上嘉信匯出的交易紀錄（2022/12 起的買賣、選擇權、入金、分割與合併；配息與股息再投資不列），以及國泰對帳單（2024/11 起的全部買賣，含定期定額、手續費與交易稅）；依日期由新到舊，預設只列近 90 天，較早的按表格下面的「顯示全部」。嘉信檔約每半年到一年上傳一次，最近一次 2026/10/22</p>
     <div class="sd-scroll"><table class="sd-table" data-source="changes" data-row-key="id">
       <thead><tr><th data-field="id">#</th><th class="l" data-field="date">日期</th><th class="l" data-field="code">標的</th><th class="l" data-field="action">動作</th><th data-field="qty">數量</th><th data-field="price">價格</th><th class="l" data-field="note">備註</th></tr></thead>
       <tbody id="ch-body"></tbody></table></div>
+    <button type="button" class="mk-more" id="ch-more" hidden></button>
   </section>
 </div>
 <div class="mk-pane" id="pane-market" hidden>

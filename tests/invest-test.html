@@ -9,7 +9,7 @@
 <h1>投資頁資料轉換測試（假資料）</h1>
 <ul id="out"></ul>
 <script type="module">
-import { applyPrices, applyWatch, buildDatasets, fxRows, historyRows, lastUpdateRows, mergeChanges, mergeMarket } from '../js/invest/data.js';
+import { applyPrices, applyWatch, buildDatasets, changesView, fxRows, historyRows, lastUpdateRows, mergeChanges, mergeMarket } from '../js/invest/data.js';
 
 const out = document.getElementById('out');
 let failed = 0;
@@ -60,6 +60,15 @@ check('異動紀錄：沒有封存檔就只用 changes.json', mergeChanges(curRo
 check('異動紀錄：同一個 id 兩邊都有，以 changes.json 為準、不重複', (() => { const r = mergeChanges([{ id: 2, date: '2025-02-03', action: '買進', code: 'AAA', qty: 11, price: 5 }, ...curRows], arcRows); return r.length === 3 && r.find((x) => x.id === 2).qty === 11; })());
 check('異動紀錄：兩個檔都沒有給空陣列', mergeChanges(null, null).length === 0);
 check('buildDatasets 會把封存檔接進 changes', buildDatasets({ holdings, state, changes: curRows, changes_archive: arcRows }).changes.length === 3);
+
+// 交易紀錄表：預設近 90 天、按「顯示全部」列完整（假資料）
+const cvRows = [{ id: 1, date: '2026-01-02', code: 'AAA', action: '買進' }, { id: 2, date: '2026-08-24', code: 'BBB', action: '賣出' },
+  { id: 3, date: '2026-08-25', code: 'CCC', action: '買進' }, { id: 4, date: '2026-11-20', code: 'DDD', action: '買進' }, { id: 5, date: '2026-11-20', code: 'EEE', action: '賣出' }];
+const cv = changesView(cvRows, '2026-11-23');
+check('交易紀錄：預設只列近 90 天（含第 90 天那天）', cv.rows.map((r) => r.id).join(',') === '5,4,3' && cv.hidden === 2 && cv.total === 5, JSON.stringify(cv));
+check('交易紀錄：顯示全部時全部列出、新到舊', changesView(cvRows, '2026-11-23', true).rows.map((r) => r.id).join(',') === '5,4,3,2,1');
+check('交易紀錄：近 90 天都沒有時是空的、不報錯', changesView([{ id: 1, date: '2025-01-01' }], '2026-11-23').rows.length === 0);
+check('交易紀錄：沒有資料給空的', changesView(null, '2026-11-23').total === 0);
 
 const now = Date.parse('2026-01-05T09:00:00+08:00');
 const legacy = { mk_tiles: [{ group: '美股收盤', name: 'X', at: '2026-01-02T08:50:00+08:00' }, { group: '台股收盤', name: 'Y', at: '2026-01-02T17:15:00+08:00' }],
