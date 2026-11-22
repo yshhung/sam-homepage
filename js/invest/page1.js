@@ -864,10 +864,24 @@ function fillTable(bodyId, noteId, list, fmtPx, fmtV) {
   document.getElementById(noteId).textContent = list.length ? '價格日期：' + dates.join('、') + '　共 ' + list.filter(r => !isC(r)).length + ' 檔' : '—';
 }
 
+let showAllChanges = false;
 function fillChanges() {
   const body = document.getElementById('ch-body'); body.textContent = '';
-  const c = rows('changes'); if (!c) return;
-  c.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || Number(b.id) - Number(a.id)).forEach(r => {
+  const more = document.getElementById('ch-more');
+  const c = rows('changes'); if (!c) { if (more) more.hidden = true; return; }
+  // 預設只列近 90 天（兩個檔接起來後的完整歷史還在，按「顯示全部」才列出）
+  const todayTP = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
+  const v = window.changesView ? window.changesView(c, todayTP, showAllChanges) : { rows: c.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || Number(b.id) - Number(a.id)), total: c.length, hidden: 0 };
+  if (more) {
+    more.hidden = v.total === 0 || (!showAllChanges && v.hidden === 0);
+    more.textContent = showAllChanges ? '▴ 只看近 90 天' : `▾ 顯示全部（另有 ${v.hidden} 筆較早的紀錄，共 ${v.total} 筆）`;
+    more.onclick = () => { showAllChanges = !showAllChanges; fillChanges(); };
+  }
+  if (!v.rows.length) {
+    const tr = document.createElement('tr'); const td = document.createElement('td'); td.colSpan = 7; td.className = 'l';
+    td.textContent = '近 90 天沒有交易紀錄'; tr.appendChild(td); body.appendChild(tr); return;
+  }
+  v.rows.forEach(r => {
     const tr = document.createElement('tr'); tr.dataset.key = String(r.id);
     [[String(r.id)], [r.date, 'l'], [r.code, 'l'], [r.action, 'l'], [num(Number(r.qty), Number(r.qty) % 1 ? 4 : 0)], [num(Number(r.price), 2)], [r.note || '', 'l nm']]
       .forEach(([t, cl]) => { const td = document.createElement('td'); td.textContent = t; if (cl) td.className = cl; tr.appendChild(td); });

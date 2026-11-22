@@ -100,6 +100,19 @@ export function mergeChanges(current, archive) {
   return [...old.filter((r) => !seen.has(String(r.id))), ...cur];
 }
 
+// 交易紀錄表：預設只列近 90 天（2026-11-22 Sam 定，投資總則第七節第 4 題），按「顯示全部」才列完整歷史。
+// 只影響這張表；資產趨勢、單日最佳／最差、嘉信報酬照舊用完整的 changes。
+// today 是台北日期字串 YYYY-MM-DD；回傳 { rows（新到舊）, total, hidden }。
+export const CHANGES_RECENT_DAYS = 90;
+export function changesView(rows, today, showAll = false, days = CHANGES_RECENT_DAYS) {
+  const all = (Array.isArray(rows) ? rows : []).filter((r) => r && typeof r === 'object')
+    .slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || Number(b.id) - Number(a.id));
+  const t = Date.parse(`${today}T00:00:00Z`);
+  const cut = Number.isFinite(t) ? new Date(t - days * 86400000).toISOString().slice(0, 10) : '';
+  const shown = showAll || !cut ? all : all.filter((r) => String(r.date || '') >= cut);
+  return { rows: shown, total: all.length, hidden: all.length - shown.length, cut };
+}
+
 // 全部組起來：名稱跟舊儀表板的資料表一樣
 export function buildDatasets(f) {
   const arr = (v) => (Array.isArray(v) ? v : []);

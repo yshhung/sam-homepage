@@ -1,6 +1,8 @@
 // 投資頁：登入後從 OneDrive「投資資料」讀檔（只讀），交給舊版儀表板程式畫出來
 import { getAccount, graph, GraphError, initAuth, isConfigured, login } from '../auth.js';
-import { buildDatasets } from './data.js';
+import { buildDatasets, changesView } from './data.js';
+
+window.changesView = changesView; // 交易紀錄表用（page1.js 不是模組，不能直接 import）
 import { renderPause, renderPools } from './pools.js';
 
 const BASE = '投資資料';
