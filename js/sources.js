@@ -355,6 +355,20 @@ export function getInvest() {
   return oneDriveJson(CONFIG.investPath);
 }
 
+// 示範用：下一個季檢討日（1、4、7、10 月的第一個週日；與 tools/invest_plan.py 的 next_review 同一規則）
+function demoNextReview(today) {
+  const y = Number(today.slice(0, 4));
+  for (const yy of [y, y + 1]) {
+    for (const mm of [1, 4, 7, 10]) {
+      const d = new Date(Date.UTC(yy, mm - 1, 1));
+      d.setUTCDate(1 + ((7 - d.getUTCDay()) % 7));
+      const iso = d.toISOString().slice(0, 10);
+      if (iso >= today) return iso;
+    }
+  }
+  return null;
+}
+
 export function demoInvest() {
   // 明顯是假的數字
   return {
@@ -373,7 +387,7 @@ export function demoInvest() {
         { key: 'wt:demo:DEMO', lvl: 'warn', title: 'DEMO 可以考慮重賣 Cover Call（當天反彈 +2.0%）', meta: '現價 $100.00（當天 +2.0%）；IV Rank 查不到；目標：履約價 $110；只提醒、不下單，由 Sam 決定', raised: dateStr(), since: dateStr() }],
       pause: { label: '示範：暫停新增投資', start: addDays(dateStr(), -5), end: addDays(dateStr(), 30), resume: addDays(dateStr(), 31), first: '不新增波段倉、題材倉', items: ['不新增波段倉、題材倉'] },
       extras: { lotto: { limitUsd: 500, usedUsd: 0, leftUsd: 500, year: Number(dateStr().slice(0, 4)) }, usdAccum: { usd: null, threshold: 3000, ready: false },
-        nextReview: `${dateStr().slice(0, 4)}-12-31`, sellPlan: { code: '示範', sold: 0, total: 60, batchesDone: 0, batches: 3, nextPrice: 100, deadline: '2027-06-30' } },
+        nextReview: demoNextReview(dateStr()), sellPlan: { code: '示範', sold: 0, total: 60, batchesDone: 0, batches: 3, nextPrice: 100, deadline: '2027-06-30' } },
     },
   };
 }
@@ -453,7 +467,7 @@ export function planView(inv, today) {
   }
   if (ex.review) {
     const r = ex.review;
-    stats.push({ k: '信念池 vs 上次檢查', v: `${pp(r.now)}`, s: `${shortDate(r.date)} 檢查時 ${pp(r.conviction)}・${r.down ? '比上次低，照進度' : '沒有比上次低'}`, tone: r.down ? 'go' : '' });
+    stats.push({ k: '信念池 vs 上次季檢討', v: `${pp(r.now)}`, s: `${shortDate(r.date)} 季檢討時 ${pp(r.conviction)}・${r.down ? '比上次低，照進度' : '沒有比上次低'}`, tone: r.down ? 'go' : '' });
   }
   const highs = Object.entries(p.highs || {}).map(([code, h]) => ({ code, text: `52 週高 ${h.high52 < 20 ? h.high52.toFixed(2) : Math.round(h.high52 * 100) / 100}${h.highDate ? `（${shortDate(h.highDate)}）` : ''}・收 ${h.close < 20 ? h.close.toFixed(2) : Math.round(h.close * 100) / 100}（${pp(h.dd)}）` }));
   const age = p.evaluated ? diffDays(today, p.evaluated) : null;

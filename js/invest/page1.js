@@ -682,12 +682,21 @@ function drawPlans(pos) {
     } else { tr.style.height = 'auto'; row.appendChild(tr); }
     const note = document.createElement('div'); note.className = 'sd-pnote';
     const txt = (p.action || '') + (p.status_note ? '（' + p.status_note + '）' : '') + (p.decided ? '｜定案 ' + String(p.decided).slice(5).replace('-', '/') : '');
+    const tx = document.createElement('span'); tx.className = 'tx';
     if (r && marks.length) {
       const near = marks.reduce((x, y) => Math.abs(y.value / r.price - 1) < Math.abs(x.value / r.price - 1) ? y : x);
       const d = near.value / r.price - 1;
       const bb = document.createElement('b'); bb.textContent = '最近：' + near.label + ' ' + (d > 0 ? '還差 +' : '還差 ') + d3.format('.1%')(d);
-      note.appendChild(bb); note.appendChild(document.createTextNode('　' + txt));
-    } else note.textContent = txt;
+      note.appendChild(bb); tx.textContent = '　' + txt;
+    } else tx.textContent = txt;
+    note.appendChild(tx);
+    // 說明太長時預設只露兩行，按「展開」才看全部（手機上不會被長段落撐開）
+    if (txt.length > 70) {
+      tx.classList.add('clamp');
+      const tg = document.createElement('button'); tg.type = 'button'; tg.className = 'tg'; tg.textContent = '展開';
+      tg.addEventListener('click', () => { const folded = tx.classList.toggle('clamp'); tg.textContent = folded ? '展開' : '收起'; });
+      note.appendChild(tg);
+    }
     row.appendChild(note);
     list.appendChild(row);
   });
