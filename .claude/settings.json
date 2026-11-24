@@ -11,7 +11,9 @@
       "mcp__Microsoft_365__outlook_email_search",
       "mcp__Microsoft_365__outlook_modify_labels",
       "mcp__Microsoft_365__outlook_batch_modify_labels",
-      "mcp__Microsoft_365__outlook_create_label"
+      "mcp__Microsoft_365__outlook_create_label",
+      "mcp__Microsoft_365__sharepoint_upload_file",
+      "mcp__Microsoft_365__sharepoint_update_file"
     ]
   }
 }
