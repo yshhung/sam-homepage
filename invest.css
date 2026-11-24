@@ -107,6 +107,8 @@ body { -webkit-text-size-adjust: 100%; overflow-x: hidden; }
 .sd-px{position:absolute;top:17px;width:14px;height:14px;border-radius:50%;background:var(--fg);border:3px solid var(--bg);transform:translateX(-7px);box-shadow:0 0 0 1px var(--fg)}
 .sd-pnote{grid-column:2;font-size:11px;color:var(--mut)}
 .sd-pnote b{color:var(--amb);font-weight:500}
+.sd-pnote .tx.clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.sd-pnote .tg{background:none;border:0;padding:0 0 0 4px;margin:0;color:var(--amb);font:inherit;cursor:pointer}
 .k-stop{background:var(--down)}.k-add{background:var(--acc)}.k-target{background:var(--up)}.k-order{background:var(--amb)}.k-strike{background:var(--vio)}.k-warn{background:var(--amb)}
 .sd-leg2{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--mut);margin-bottom:4px}
 .sd-leg2 i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
