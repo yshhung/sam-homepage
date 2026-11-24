@@ -446,7 +446,7 @@ export function planView(inv, today) {
     stats.push({ k: '美金累積', v: u.usd === null || u.usd === undefined ? '未回報' : `US$${Math.round(u.usd).toLocaleString('en-US')}`,
       s: u.ready ? `已達 US$${th}，可以電匯嘉信` : `滿 US$${th} 電匯嘉信${u.asOf ? `（${shortDate(u.asOf)}）` : ''}`, tone: u.ready ? 'go' : '' });
   }
-  if (ex.nextReview) stats.push({ k: '下次半年檢查', v: shortDate(ex.nextReview), s: `剩 ${diffDays(ex.nextReview, today)} 天` });
+  if (ex.nextReview) stats.push({ k: '下次季檢討', v: shortDate(ex.nextReview), s: `剩 ${diffDays(ex.nextReview, today)} 天` });
   if (ex.sellPlan) {
     const s = ex.sellPlan;
     stats.push({ k: `${s.code} 賣出進度`, v: `${s.sold}／${s.total} 股`, s: s.nextPrice ? `第 ${s.batchesDone + 1} 批 $${s.nextPrice}・底線 ${shortDate(s.deadline)}` : '已賣完' });

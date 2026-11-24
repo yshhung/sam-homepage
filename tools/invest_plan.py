@@ -4,7 +4,7 @@
 與「投資資料/plans.json」（每檔的 pool、PLTR 的 sell_plan），算出：
   pools   四池目前比例、目標、偏離、是否超出容許區間（每次跑都算）
   alerts  觸發中的警報（只有 07:30 每日同步帶 --alerts 才重新判斷；其他報告沿用上次結果）
-  extras  樂透額度餘額、美金累積、下次半年檢查日、PLTR 賣出進度
+  extras  樂透額度餘額、美金累積、下次季檢討日、PLTR 賣出進度
 結果放進 invest.json 與 state.json 的 "plan"；state.json 的 "plan_state" 記每個警報目前的級別，
 用來判斷「第一次觸發」或「升級到下一級」（new: true，早報只推播這些）。
 一律用收盤價；52 週高點也用收盤高點（忽略單日尖刺，見 invest_sync.yahoo_year）。
@@ -24,7 +24,7 @@
 暫停 pause（2026-11-20 補）：start～end 之間算進 invest.json 的 plan['pause']，投資頁頂端顯示一行「暫停中」與 pause 清單第一點。
 """
 import calendar
-from datetime import date
+from datetime import date, timedelta
 
 CASH_CODES = {'CASH', 'TWCASH'}
 POOLS = [('broad', '大盤'), ('conviction', '信念'), ('swing', '波段／待處理'), ('cash', '現金')]
@@ -90,18 +90,20 @@ def compute_pools(holdings, plans, rules, fx, today=None):
     return out, total
 
 
-def next_review(today, months=(6, 12)):
-    y, m = int(today[:4]), int(today[5:7])
+def next_review(today, months=(1, 4, 7, 10)):
+    """季檢討日：每年 1、4、7、10 月的第一個週日（2026-11-24 Sam 定，取代原本 6、12 月底的半年檢查）。"""
+    y = int(today[:4])
     for yy in (y, y + 1):
         for mm in sorted(months):
-            d = date(yy, mm, calendar.monthrange(yy, mm)[1]).isoformat()
+            first = date(yy, mm, 1)
+            d = (first + timedelta(days=(6 - first.weekday()) % 7)).isoformat()
             if d >= today:
                 return d
     return None
 
 
 def review_compare(rules, pools):
-    """半年檢查的信念池比例要比上次低：rules.json 的 schedule/review 有 history:[{date,conviction}] 就比較。"""
+    """季檢討的信念池比例要比上次低：rules.json 的 schedule/review 有 history:[{date,conviction}] 就比較。"""
     sch = _rule(rules, 'schedule', 'review')
     hist = (sch or {}).get('history') or []
     now = next((p['pct'] for p in pools if p['key'] == 'conviction'), None)
@@ -124,7 +126,7 @@ def compute_extras(holdings, plans, rules, today):
         ex['usdAccum'] = {'usd': acc, 'asOf': fxr.get('usd_accum_date'), 'threshold': fxr.get('transfer_usd'),
                           'ready': acc is not None and fxr.get('transfer_usd') is not None and acc >= fxr['transfer_usd']}
     sch = _rule(rules, 'schedule', 'review')
-    ex['nextReview'] = next_review(today, tuple(sch.get('months', (6, 12))) if sch else (6, 12))
+    ex['nextReview'] = next_review(today, tuple(sch.get('months', (1, 4, 7, 10))) if sch else (1, 4, 7, 10))
     for p in plans or []:
         sp = p.get('sell_plan')
         if not sp:
@@ -491,7 +493,8 @@ def selftest(check):
     en = evaluate(hn, pn, rules, 30, {'year': {'2308': (100, '2026-01-05', 200)}}, [], 100000)
     check('台股警報標題加中文名稱', en.get('dd:2308', {}).get('title', '').startswith('2308 台達電 從 52 週高點'))
     check('樂透額度跨年歸零', compute_extras(hs, plans, rules, '2027-01-02')['lotto']['leftUsd'] == 500 and ex['lotto']['leftUsd'] == 400)
-    check('下次半年檢查', next_review('2026-11-07') == '2026-12-31' and next_review('2027-01-02') == '2027-06-30')
+    check('下次季檢討（1、4、7、10 月第一個週日）', next_review('2026-11-07') == '2027-01-03' and next_review('2027-01-03') == '2027-01-03' and next_review('2027-01-04') == '2027-04-04' and next_review('2027-10-10') == '2028-01-02')
+    check('季檢討：舊 rules.json 的 months [6,12] 仍可算（第一個週日）', next_review('2026-11-07', (6, 12)) == '2026-12-06')
     mk = {'spx': (69.0, '2026-01-05', 100.0), 'vix': (31.0, '2026-01-05'), 'year': {'BBB': (7.4, '2026-01-05', 10.0), 'AAA': (1, '2026-01-05', 10)}}
     st = {}
     p1 = build(hs, plans, rules, 30, '2026-01-06', st, mk, True)
@@ -514,7 +517,7 @@ def selftest(check):
     check('沒抄到規則檔就沿用上次', build(hs, None, None, 30, '2026-01-09', st) == st['plan'])
     hs.append({'code': 'BBB 2/20/2026 8.00 P', 'occ': 'BBB260220P00008000', 'kind': 'option', 'currency': 'USD', 'shares': -100, 'price': 0.1})
     check('Sell Put 擔保額從美金扣掉', put_collateral_usd(hs) == 800)
-    # ---- 已知悉（ack）、遲滯、過渡目標、依 pool 的上限、半年檢查比較 ----
+    # ---- 已知悉（ack）、遲滯、過渡目標、依 pool 的上限、季檢討比較 ----
     plans_a = [dict(p) for p in plans]
     plans_a[1]['ack'] = {'cap': '2026-01-06', 'dd': '2026-01-06', 'note': '已掛單'}
     al = apply_ack(p1['alerts'], plans_a)
@@ -559,10 +562,10 @@ def selftest(check):
     rp = [{'key': 'c', 'kind': 'cap', 'each': True, 'pool': 'conviction', 'example_codes': ['BBB'], 'cap': 0.25}]
     ev = evaluate(hp, [{'code': 'ZZZ', 'pool': 'conviction'}, {'code': 'AAA', 'pool': 'broad'}], rp, 30, {}, [], 31000)
     check('上限依 pool：plans.json 新增的信念股自動納入、其他池不算', 'cap:ZZZ' in ev and 'cap:AAA' not in ev)
-    # 半年檢查比較
+    # 季檢討比較
     rv = review_compare([{'key': 'review', 'kind': 'schedule', 'history': [{'date': '2026-06-30', 'conviction': 0.5}, {'date': '2026-12-31', 'conviction': 0.45}]}],
                         [{'key': 'conviction', 'pct': 0.44}])
-    check('半年檢查：跟最近一次比，下降才算 down', rv['conviction'] == 0.45 and rv['down'] and not review_compare([{'key': 'review', 'kind': 'schedule', 'history': [{'date': 'x', 'conviction': 0.4}]}], [{'key': 'conviction', 'pct': 0.44}])['down'])
+    check('季檢討：跟最近一次比，下降才算 down', rv['conviction'] == 0.45 and rv['down'] and not review_compare([{'key': 'review', 'kind': 'schedule', 'history': [{'date': 'x', 'conviction': 0.4}]}], [{'key': 'conviction', 'pct': 0.44}])['down'])
     pe = build(hs, plans, rules, 30, '2026-01-11', {}, mk, True, evaluated_by='早報')
     check('evaluated_by 記下是同步或早報判斷的', pe['evaluatedBy'] == '早報' and pe['highs']['BBB']['high52'] == 10.0)
     # ---- 價格提醒 price_alert 與觀察 watch（2026-11-19；全部是假代號、假價格）----
