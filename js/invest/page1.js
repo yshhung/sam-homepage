@@ -618,6 +618,16 @@ function drawGoalStatus() {
 }
 document.getElementById('goal-status-link').addEventListener('click', () => { const t = document.getElementById('tab-plans'); if (t) t.click(); const el = document.getElementById('goals'); if (el) setTimeout(() => el.scrollIntoView({behavior: 'smooth', block: 'start'}), 50); });
 
+// 說明太長時預設只露兩行，旁邊放「展開／收起」（手機上不會被長段落撐開）
+function foldText(parent, el, txt, max = 70) {
+  el.textContent = txt; el.classList.add('fx'); parent.appendChild(el);
+  if (txt.length <= max) return;
+  el.classList.add('clamp');
+  const tg = document.createElement('button'); tg.type = 'button'; tg.className = 'tg'; tg.textContent = '展開';
+  tg.addEventListener('click', () => { const folded = el.classList.toggle('clamp'); tg.textContent = folded ? '展開' : '收起'; });
+  parent.appendChild(tg);
+}
+
 function drawSectors() {
   const svg = d3.select('#sector-svg'), box = svg.node().parentNode, tip = box.querySelector('.sd-tip');
   svg.selectAll('*').remove();
@@ -687,16 +697,8 @@ function drawPlans(pos) {
       const near = marks.reduce((x, y) => Math.abs(y.value / r.price - 1) < Math.abs(x.value / r.price - 1) ? y : x);
       const d = near.value / r.price - 1;
       const bb = document.createElement('b'); bb.textContent = '最近：' + near.label + ' ' + (d > 0 ? '還差 +' : '還差 ') + d3.format('.1%')(d);
-      note.appendChild(bb); tx.textContent = '　' + txt;
-    } else tx.textContent = txt;
-    note.appendChild(tx);
-    // 說明太長時預設只露兩行，按「展開」才看全部（手機上不會被長段落撐開）
-    if (txt.length > 70) {
-      tx.classList.add('clamp');
-      const tg = document.createElement('button'); tg.type = 'button'; tg.className = 'tg'; tg.textContent = '展開';
-      tg.addEventListener('click', () => { const folded = tx.classList.toggle('clamp'); tg.textContent = folded ? '展開' : '收起'; });
-      note.appendChild(tg);
-    }
+      note.appendChild(bb); foldText(note, tx, '　' + txt);
+    } else foldText(note, tx, txt);
     row.appendChild(note);
     list.appendChild(row);
   });
@@ -732,8 +734,8 @@ function drawDeadlines() {
     const it = document.createElement('div'); it.className = 'sd-dl' + (x.days < 0 ? ' over' : x.days <= 7 ? ' soon' : '');
     const n = document.createElement('div'); n.className = 'n'; n.textContent = x.days < 0 ? '已過' : x.days; if (x.days >= 0) { const sm = document.createElement('small'); sm.textContent = '天'; n.appendChild(sm); }
     const t = document.createElement('div'); const b = document.createElement('b'); b.textContent = x.code + '　' + x.title; t.append(b, document.createTextNode('　' + x.date.slice(5).replace('-', '/')));
-    const s2 = document.createElement('div'); s2.textContent = x.sub;
-    it.append(n, t, s2); list.appendChild(it);
+    const s2 = document.createElement('div'); const sw = document.createElement('div'); foldText(sw, s2, x.sub || '');
+    it.append(n, t, sw); list.appendChild(it);
   });
 }
 
@@ -752,14 +754,14 @@ function drawRules() {
       v.textContent = d3.format('.1%')(r.share); const sm = document.createElement('small'); sm.textContent = '上限 ' + d3.format('.0%')(r.cap) + (over ? '・超過' : ''); v.appendChild(sm);
       const bar = document.createElement('div'); bar.className = 'bar'; const i = document.createElement('i'); i.style.width = Math.min(100, r.share / r.cap * 100) + '%'; bar.appendChild(i);
       if (r.cap_final !== null) { const em = document.createElement('em'); em.style.left = Math.min(100, r.cap_final / r.cap * 100) + '%'; bar.appendChild(em); }
-      p.textContent = 'NT$' + wan(r.value_twd) + (r.note ? '｜' + r.note : '');
-      d.append(k, v, bar, p);
+      const pw = document.createElement('div'); foldText(pw, p, 'NT$' + wan(r.value_twd) + (r.note ? '｜' + r.note : ''));
+      d.append(k, v, bar, pw);
     } else if (r.kind === 'count') {
       const used = r.month === ym ? r.used : 0;
       v.textContent = used + ' / ' + r.limit; const sm = document.createElement('small'); sm.textContent = ym.replace('-', '/') + (r.month === ym ? '' : '（新月份歸零）'); v.appendChild(sm);
-      p.textContent = r.note; d.append(k, v, p);
+      const pw = document.createElement('div'); foldText(pw, p, r.note || ''); d.append(k, v, pw);
     } else {
-      v.textContent = r.amount_twd ? nt(r.amount_twd) : 'NT$0'; p.textContent = r.note; d.append(k, v, p);
+      v.textContent = r.amount_twd ? nt(r.amount_twd) : 'NT$0'; const pw = document.createElement('div'); foldText(pw, p, r.note || ''); d.append(k, v, pw);
     }
     list.appendChild(d);
   });
