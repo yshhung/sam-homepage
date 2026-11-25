@@ -570,7 +570,7 @@ function drawGoals() {
     const wrap = document.createElement('div'); wrap.className = 'sd-tiers';
     tiers.forEach(t => wrap.appendChild(tierCard(t, true)));
     box.appendChild(wrap);
-    foldOld(box, old, '舊的 10 年千萬進度線（詳細）');
+    foldOld(box, old, '舊進度線');
   }
 }
 
@@ -580,7 +580,8 @@ function drawGoalStatus() {
   const G = rows('goal_pace'), RG = rows('goals'); if (!G || !G.length) { note.textContent = '—'; return; }
   const g = RG && RG[0];
   const tiers = retireTiers();
-  note.textContent = tiers ? '對照 40～45 歲半退休三級現金流的進度線（今天應有）；舊的 10 年千萬進度與補進度建議收在下面' : '對照 10 年 ' + (g ? wan0(Number(g.target_twd)) : '千萬') + ' 計畫的進度線（年化約 ' + d3.format('.1%')(G[0].rate) + '）；超前／落後月數＝照進度要再過多久才會到現在的金額';
+  note.hidden = !!tiers;  // 三級模式不放說明副標（2026-11-25 Sam 的 UI 規範：零教學文字）
+  note.textContent = tiers ? '' : '對照 10 年 ' + (g ? wan0(Number(g.target_twd)) : '千萬') + ' 計畫的進度線（年化約 ' + d3.format('.1%')(G[0].rate) + '）；超前／落後月數＝照進度要再過多久才會到現在的金額';
   const mo = m => { const a = Math.abs(m); return a >= 12 ? d3.format('.1f')(a / 12) + ' 年' : d3.format('.1f')(a) + ' 個月'; };
   G.forEach(x => {
     const d = document.createElement('div');
@@ -615,7 +616,7 @@ function drawGoalStatus() {
     const wrap = document.createElement('div'); wrap.className = 'sd-tiers';
     tiers.forEach(t => wrap.appendChild(tierCard(t, false)));
     list.appendChild(wrap);
-    foldOld(list, oldRows, '舊的 10 年千萬進度與補進度建議（詳細）');
+    foldOld(list, oldRows, '舊進度線');
   }
 }
 document.getElementById('goal-status-link').addEventListener('click', () => { const t = document.getElementById('tab-plans'); if (t) t.click(); const el = document.getElementById('goals'); if (el) setTimeout(() => el.scrollIntoView({behavior: 'smooth', block: 'start'}), 50); });
