@@ -60,7 +60,7 @@ function banner(text, button) {
 }
 
 async function start() {
-  if (!isConfigured()) { banner('還沒設定 Microsoft 登入，投資頁需要登入才能看。'); return; }
+  if (!isConfigured()) { banner('未設定登入'); return; }
   try {
     await initAuth();
   } catch (e) {
@@ -71,8 +71,9 @@ async function start() {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.textContent = '登入';
+    btn.className = 'btn primary';
     btn.addEventListener('click', () => login());
-    banner('請先登入，才能讀你 OneDrive 裡的投資資料。', btn);
+    banner('未登入', btn);
     return;
   }
   try {

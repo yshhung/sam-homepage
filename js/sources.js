@@ -616,7 +616,7 @@ export function lifeView(life, ticktick, today) {
   for (const t of trips) {
     const n = diffDays(t.start, today);
     if (t.status === 'planning' && n >= 0 && n <= 21) {
-      alerts.push({ type: `plan:${t.start}`, title: `${t.name}（${shortDate(t.start)}）還沒確定`, meta: t.note || '訂好後告訴 Claude，首頁會改成確定的倒數', level: 'info', link: t.url });
+      alerts.push({ type: `plan:${t.start}`, title: `${t.name}（${shortDate(t.start)}）還沒確定`, meta: t.note || '', level: 'info', link: t.url });
     } else if (t.status !== 'planning' && n >= 0 && n <= 7) {
       alerts.push({ type: `trip:${t.start}`, title: n === 0 ? `今天出發：${t.name}` : `${n} 天後出發：${t.name}`, meta: t.note || t.place || '', level: n <= 1 ? 'warn' : 'info', link: t.url });
     }

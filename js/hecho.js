@@ -41,7 +41,7 @@ function render({ exported, days, months }) {
   const dd = days.slice(-14);
   lineChart($('chart-day'), [{ cls: 'l1', points: dd.map((r) => ({ date: r.date, value: r.expected ?? null })) }, { cls: 'l2', points: dd.map((r) => ({ date: r.date, value: r.present ?? null })) }], { fromZero: true });
   const age = exported ? Math.floor((Date.now() - new Date(exported.replace(' ', 'T')).getTime()) / 86400000) : null;
-  $('foot').textContent = `${age >= 2 ? `⚠️ 已 ${age} 天沒更新（YunCare 要開著才會更新）　` : ''}${exported ? `YunCare 匯出於 ${exported.slice(5)}　` : ''}只有人數，沒有姓名；細節請在電腦的 YunCare 看`;
+  $('foot').textContent = `${age >= 2 ? `⚠️ 已 ${age} 天沒更新　` : ''}${exported ? `YunCare 匯出 ${exported.slice(5)}` : ''}`;
 }
 
 function status(cls, text) {
@@ -55,12 +55,12 @@ function banner(text, button) {
 }
 
 async function start() {
-  if (!isConfigured()) { render(demoHechoDetail()); status('demo', '示範模式'); banner('示範模式：還沒設定 Microsoft 登入，下面是示範數字。'); return; }
+  if (!isConfigured()) { render(demoHechoDetail()); status('demo', '示範模式'); banner('示範資料'); return; }
   try { await initAuth(); } catch (e) { status('bad', '登入失敗'); banner(`登入失敗：${e.message}`); return; }
   if (!getAccount()) {
     render(demoHechoDetail());
     status('demo', '示範模式');
-    banner('示範模式：下面是示範數字，登入後才會看到和果真實的統計。', el('button', { class: 'btn', type: 'button', onclick: () => login() }, '登入'));
+    banner('示範資料', el('button', { class: 'btn primary', type: 'button', onclick: () => login() }, '登入'));
     return;
   }
   status('loading', '讀取中');

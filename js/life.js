@@ -56,14 +56,14 @@ function render(travels, life, tasks, today) {
     el('div', { class: 'cp-note' }, `${shortDate(trip.start)}${trip.end && trip.end !== trip.start ? ` – ${shortDate(trip.end)}` : ''}${trip.place ? ` · ${trip.place}` : ''}${trip.status === 'planning' ? ' · 規劃中' : ''}`),
     trip.note ? el('div', { class: 'cp-note' }, trip.note) : null,
     trip.url ? el('a', { href: trip.url, target: '_blank', rel: 'noopener' }, '打開行程 ↗') : null)]
-    : [el('p', { class: 'cp-note' }, '目前沒有確定的旅行。確定之後告訴 Claude，這裡會出現。')]));
+    : [el('p', { class: 'cp-note' }, '沒有確定的旅行')]));
 
   const shown = tasks.slice(0, 8);
   $('todo-note').textContent = overdue ? `${overdue} 件逾期` : tasks.length > shown.length ? `最近 ${shown.length} 件，共 ${tasks.length} 件` : '';
   $('todo').replaceChildren(...(shown.length ? shown.map((t) => el('li', { class: `f-row ${t.due < today ? 'bad' : t.due === today ? 'warn' : 'info'}` },
     el('div', { class: 'f-top' }, el('span', { class: 'chip' }, t.list.replace(/^\p{Extended_Pictographic}️?/u, '')), el('span', { class: 'f-title' }, t.title)),
     el('div', { class: 'f-meta' }, `${relDay(t.due, today)} · ${shortDate(t.due)}${t.time ? ` ${t.time}` : ''}`))) : [el('li', { class: 'empty' }, '✓ 生活待辦都處理好了')]));
-  $('foot').textContent = travels?.updated ? `足跡更新於 ${String(travels.updated).slice(0, 10)}　要新增去過的地方，告訴 Claude 就好` : '';
+  $('foot').textContent = travels?.updated ? `足跡更新 ${String(travels.updated).slice(0, 10)}` : '';
 }
 
 function status(cls, text) {
@@ -85,21 +85,21 @@ async function start() {
   if (!isConfigured()) {
     await show(demoTravels(), demoLife(), demoTickTick());
     status('demo', '示範模式');
-    banner('示範模式：還沒設定 Microsoft 登入，下面是示範資料。');
+    banner('示範資料');
     return;
   }
   try { await initAuth(); } catch (e) { status('bad', '登入失敗'); banner(`登入失敗：${e.message}`); return; }
   if (!getAccount()) {
     await show(demoTravels(), demoLife(), demoTickTick());
     status('demo', '未登入');
-    banner('未登入，下面是示範資料。登入後才會顯示你 OneDrive 裡的足跡與待辦。', el('button', { class: 'btn', type: 'button', onclick: () => login() }, '登入'));
+    banner('示範資料', el('button', { class: 'btn primary', type: 'button', onclick: () => login() }, '登入'));
     return;
   }
   status('loading', '讀取中');
   try {
     const [travels, life, tt] = await Promise.all([oneDriveJson(CONFIG.travelsPath), oneDriveJson(CONFIG.lifePath), getTickTick()]);
     await show(travels || { places: [] }, life, tt);
-    if (!travels) banner('OneDrive 的「Sam Homepage/travels.json」還沒有。告訴 Claude 你去過哪些地方，就會建立。');
+    if (!travels) banner('沒有足跡檔（travels.json）');
     status('live', '已讀取');
   } catch (e) {
     console.error(e);
