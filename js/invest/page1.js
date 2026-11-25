@@ -499,7 +499,11 @@ function foldOld(parent, nodes, label) {
 function tierCard(t, full) {
   const d = document.createElement('div'); d.className = 'sd-tier';
   const on = Math.abs(t.diff) < t.pace * 0.005;
-  const h = document.createElement('div'); h.className = 'k'; h.textContent = t.label + (t.desc ? '・' + t.desc : '');
+  // 用一個數字定義這一級（退休後每月現金流），描述只留第一個短句；完整描述放 title（2026-11-25 Sam：該有的解釋用最少的數字與字）
+  const short = String(t.desc || '').split(/[，,（(]/)[0];
+  const h = document.createElement('div'); h.className = 'k';
+  h.textContent = [t.label, Number(t.monthly) > 0 ? '每月 ' + d3.format(',.1~f')(Number(t.monthly) / 1e4) + ' 萬' : '', short].filter(Boolean).join('・');
+  if (t.desc) h.title = t.desc;
   const st = document.createElement('div'); st.className = 'st ' + (on ? '' : t.diff >= 0 ? 'up' : 'down');
   // 主字用百分比；「落後幾個月」會讓越容易的目標看起來落後越多（線越平、補同樣差距要越久），2026-11-25 Sam 定改掉
   st.textContent = on ? '符合進度' : (t.diff >= 0 ? '超前 ' : '落後 ') + d3.format('.1%')(Math.abs(t.diffPct));
