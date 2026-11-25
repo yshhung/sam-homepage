@@ -15,6 +15,8 @@ body { -webkit-text-size-adjust: 100%; overflow-x: hidden; }
 .sd-upbox { grid-template-columns: 1fr !important; }
 .inv-banner { margin: 0 0 14px; padding: 10px 14px; border: 1px solid #1e2126; border-radius: 12px; color: #f5b942; font-size: 14px; }
 .inv-banner button { margin-left: 8px; background: #111316; border: 1px solid #1e2126; border-radius: 8px; padding: 4px 10px; color: #e6edf3; cursor: pointer; }
+.inv-banner button.primary { background: #38bdf8; border-color: #38bdf8; color: #00141f; font-weight: 600; padding: 6px 16px; }
+.inv-banner button.primary:hover { filter: brightness(1.1); }
 .dash-skeleton { color: #5b6b7c; }
 #dash-root{--dash-gutter:0;background:#000}
 .sd{--sans:"Inter","SF Pro Display","PingFang TC","Noto Sans TC","Microsoft JhengHei","Segoe UI",system-ui,-apple-system,sans-serif;--bg:#000;--panel:#0b0c0e;--panel2:#111316;--line:#1e2126;--fg:#e6edf3;--mut:#8696a7;--dim:#5b6b7c;--up:#2fd47a;--down:#ff5c5c;--acc:#38bdf8;--amb:#f5b942;--vio:#a78bfa;

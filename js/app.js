@@ -117,7 +117,7 @@ function autoEntries(today) {
   for (const a of al.entries) {
     out.push({ key: `alert:${a.key}`, cat: a.tag, domain: '工作', title: a.title, meta: [a.text, a.src].filter(Boolean).join(' · '), level: a.lvl === 'risk' ? 'bad' : 'warn', link: a.url || undefined, linkLabel: '看公告', sort: a.lvl === 'risk' ? -1.5 : 0.05 });
   }
-  for (const f of al.stale) out.push({ key: `alert:stale:${f.name}`, cat: '警報', domain: f.name.includes('weather') ? '生活' : '工作', title: `${f.name.includes('weather') ? '天氣' : '營運'}警報 ${f.hours} 小時沒更新`, meta: '下一次同步或報告會再更新；颱風期間請自己看氣象署公告', level: 'info', sort: 0.8 });
+  for (const f of al.stale) out.push({ key: `alert:stale:${f.name}`, cat: '警報', domain: f.name.includes('weather') ? '生活' : '工作', title: `${f.name.includes('weather') ? '天氣' : '營運'}警報 ${f.hours} 小時沒更新`, meta: '', level: 'info', sort: 0.8 });
   out.push(...hechoEntries(today));
   out.push(...companyEntries(today));
 
@@ -144,7 +144,7 @@ function companyEntries(today) {
   const out = [];
   const ck = (type, cat, title, meta, level, sort) => ({ key: `company:${type}`, cat, title, meta, level, sort });
   const age = c.updated ? diffDays(today, c.updated.slice(0, 10)) : 99;
-  if (age >= 3) out.push(ck('stale', '沁耘', `網站與社群數字 ${age} 天沒更新`, '每天 07:30 的雲端同步會更新；連續沒更新請到排程頁看那一次的執行紀錄', 'info', 0.8));
+  if (age >= 3) out.push(ck('stale', '沁耘', `網站與社群數字 ${age} 天沒更新`, '', 'info', 0.8));
   const w = c.website || {};
   const s = c.social || {};
   if (w.posts14d === 0) out.push(ck('web', '網站', '網站兩週沒有新文章', `${w.domain || '網站'}：近 14 天瀏覽 ${w.views14d ?? '—'} 次`, 'info', 0.75));
@@ -234,7 +234,7 @@ function hechoEntries(today) {
   const hk = (type, title, meta, level, sort) => ({ key: `hecho:${type}`, cat: '和果', title, meta, level, sort });
 
   if (age <= 3) {
-    if (L.incidents > 0) out.push(hk('incident', `和果${label}有 ${L.incidents} 件異常事件`, '請看交班紀錄的特殊事項', 'bad', -1));
+    if (L.incidents > 0) out.push(hk('incident', `和果${label}有 ${L.incidents} 件異常事件`, '見交班紀錄', 'bad', -1));
     // 實到是空的：多半是 WorkLog 還沒點名，不當成出席率異常
     if (L.expected && !L.present) {
       out.push(hk('unfilled', `和果${label}還沒點名`, `應到 ${L.expected} 人，WorkLog 出勤表還是「○」，請同仁改成「V」`, 'info', 0.35));
@@ -338,15 +338,18 @@ function renderStatus() {
 
   const acc = getAccount();
   $('btn-account').textContent = acc ? '帳號 ▾' : '登入';
+  // 沒登入：「登入」是唯一主按鈕，讀取／同步停用（UI 規範：用狀態代替說明）
+  const demo = state.store?.mode === 'demo';
+  $('btn-account').classList.toggle('primary', !acc);
+  $('btn-sync').classList.toggle('primary', !demo);
+  $('btn-sync').disabled = demo;
+  $('btn-refresh').disabled = demo || !!state.loading;
   if (!acc) $('acc-menu').hidden = true;
   $('btn-account').hidden = !isConfigured();
 
   const banner = $('banner');
   if (state.store?.mode === 'demo') {
-    banner.hidden = false;
-    banner.textContent = isConfigured()
-      ? '還沒登入：現在顯示示範資料。按右上角「登入」看你自己的資料。'
-      : '示範模式：還沒設定 Microsoft 登入。設定步驟請見 SETUP.md。';
+    banner.hidden = true;  // 右上角「示範模式」狀態點＋高亮的「登入」就夠，不放說明橫幅
   } else if (errs.length) {
     banner.hidden = false;
     banner.textContent = errs.join('；');
@@ -494,16 +497,16 @@ function renderChief(focus) {
   const trades = tradesCount();
   const total = focus.length + trades;
   const note = loadNote();
-  const partial = '（部分資料沒抓到，不一定代表沒事）';
+  const partial = '（⚠ 部分資料沒抓到）';
   const line = note === 'loading' ? '讀取中…'
-    : total === 0 ? (note === 'partial' ? `目前沒有待處理的事${partial}` : '三位主管都沒有要你處理的事，放心做別的事')
-      : `目前有 ${total} 件待處理${DOMAINS.map((d) => `，${d} ${chiefCount(focus, d)}`).join('')}。${focus[0] ? `先看：${focus[0].title}` : `有 ${trades} 筆待處理成交，請回報給 Claude`}${note === 'partial' ? partial : ''}`;
+    : total === 0 ? (note === 'partial' ? `目前沒有待處理的事${partial}` : '沒有待處理')
+      : `目前有 ${total} 件待處理${DOMAINS.map((d) => `，${d} ${chiefCount(focus, d)}`).join('')}。${focus[0] ? `先看：${focus[0].title}` : `有 ${trades} 筆待處理成交`}${note === 'partial' ? partial : ''}`;
   const items = note === 'loading' ? [] : DOMAINS.map((d) => {
     const mine = focus.filter((e) => domainOf(e) === d);
     const t = d === '投資' ? trades : 0;
     const first = mine[0];
     const text = first ? `${first.title}${mine.length > 1 || t ? `（另 ${mine.length - 1 + t} 件）` : ''}`
-      : t ? `有 ${t} 筆待處理成交，請回報給 Claude` : '沒有待處理';
+      : t ? `有 ${t} 筆待處理成交` : '沒有待處理';
     const lvl = mine.some((e) => e.level === 'bad') ? 'bad' : mine.some((e) => e.level === 'warn') ? 'warn' : '';
     return el('li', {}, el('button', { class: `ch-b ${lvl}${state.filter === d ? ' on' : ''}${first || t ? '' : ' none'}`, type: 'button', 'aria-pressed': String(state.filter === d),
       'data-dom': d, 'data-from': 'brief', onclick: () => pickDomain(d, 'brief', true) },
@@ -542,7 +545,7 @@ function renderDomains(focus) {
       'data-dom': d, 'data-from': 'card', onclick: (ev) => { if (ev.target.closest('a,button')) return; pickDomain(d, '', true); },
       onkeydown: (ev) => { if ((ev.key === 'Enter' || ev.key === ' ') && ev.target === ev.currentTarget) { ev.preventDefault(); pickDomain(d, 'card', false); } } },
       el('div', { class: 'd-head' }, el('h2', {}, d)),
-      el('div', { class: 'd-sub' }, chiefOf(d).name, chiefOf(d).charter ? el('span', { class: 'd-long' }, ` · ${chiefOf(d).charter}`) : null),
+      el('div', { class: 'd-sub', title: chiefOf(d).owners ? `負責人：${chiefOf(d).owners}` : '' }, chiefOf(d).name, chiefOf(d).charter ? el('span', { class: 'd-long' }, ` · ${chiefOf(d).charter}`) : null),
       auto?.stats
         ? el('div', { class: 'd-stats' }, ...auto.stats.map((x) => el('div', { class: 'd-stat' }, el('div', { class: `d-num ${x.tone || ''}` }, x.v), el('div', { class: 'd-k' }, x.k))))
         : el('div', { class: 'd-num' }, auto?.num || rows[0]?.數字 || '—'),
@@ -552,7 +555,8 @@ function renderDomains(focus) {
         el('span', { class: 'd-long' }, auto.plan.text), el('span', { class: 'd-short' }, auto.plan.short || '⚠️ 四池偏離')) : null,
       ...notes.map((t) => el('p', { class: 'd-text' }, t)),
       d === '工作' && state.hecho ? el('button', { class: 'act d-ask', type: 'button', title: '複製最近的數字（沒有姓名），打開 Claude', onclick: askHecho }, '問 AI') : null,
-      chiefOf(d).owners ? el('div', { class: 'd-owners' }, `負責人：${chiefOf(d).owners}`) : null,
+      // 負責人放滑鼠停留提示（UI 規範：不在畫面放說明文字）
+
       fresh ? el('div', { class: `d-fresh${fresh.stale ? ' stale' : ''}` }, el('span', { class: 'd-long' }, fresh.text), fresh.stale ? el('span', { class: 'd-short' }, '⚠ 資料舊') : null) : null,
       el('div', { class: 'd-foot' },
         el('span', { class: n ? `pill on ${lvl}` : 'pill' }, n ? `${n} 件待處理` : '沒有待處理'),
@@ -576,7 +580,7 @@ function renderTrades() {
   if (!list.length) return;
   const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
   $('trades-count').textContent = String(list.length);
-  $('trades-note').textContent = '信件偵測到的成交，還沒記進持股；請回報給 Claude，確認後才會寫入。';
+  $('trades-note').hidden = true;
   $('trades-list').replaceChildren(...list.map((x) => {
     const qty = num(x.qty), price = num(x.price);
     const d = String(x.date || '');
@@ -608,7 +612,7 @@ function freshnessRows() {
 const fmtStamp = (d) => `${dateStr(d).slice(5).replace('-', '/')} ${timeStr(d)}`;
 function freshnessLine() {
   const parts = freshnessRows().filter((r) => r.d).map((r) => `${r.name} ${fmtStamp(r.d)}${r.watch && Date.now() - r.d.getTime() > 36 * 3600000 ? ' ⚠' : ''}`);
-  return parts.length ? `資料更新時間（排程寫入，不是首頁讀取的時間）：${parts.join(' · ')}` : '';
+  return parts.length ? `資料更新：${parts.join(' · ')}` : '';
 }
 // 所有資料裡最新的一次寫入時間（右上角「資料更新」）
 function latestDataStamp() {
@@ -726,7 +730,7 @@ function askSync() {
     '2. 「每日同步 Haiku」：加註「全做，含成交提醒 Part T」。',
     '3. 「信箱分流」。',
     '觸發完告訴我，並在它們跑完後回報各排程的結果；我會再按首頁的「讀取」按鈕重新讀取。',
-  ].join('\n'), '已複製請求，到 Claude 貼上；跑完再按「讀取」');
+  ].join('\n'), '已複製');
 }
 
 const UA = navigator.userAgent;
@@ -735,9 +739,9 @@ const IS_ANDROID = /Android/.test(UA);
 const CLAUDE_WEB = 'https://claude.ai/new';
 
 // 複製要在按下的當下就開始（iPhone 規定），不能等打開 Claude 之後
-function copyAndOpenClaude(text, doneMsg = '已複製，到 Claude 貼上就好') {
+function copyAndOpenClaude(text, doneMsg = '已複製') {
   const copied = navigator.clipboard ? navigator.clipboard.writeText(text).then(() => true, () => false) : Promise.resolve(false);
-  copied.then((ok) => toast(ok ? doneMsg : '無法複製，請手動告訴 Claude'));
+  copied.then((ok) => toast(ok ? doneMsg : '複製失敗'));
   openClaude();
 }
 
@@ -752,7 +756,7 @@ function openClaude() {
     // iPhone 主畫面 App 裡的一般連結會開在小瀏覽器；claude:// 會直接叫出 Claude App。
     // 1.5 秒後畫面還在（沒裝 App）才改開網頁
     const fallback = setTimeout(() => {
-      if (document.visibilityState === 'visible' && !window.open(CLAUDE_WEB, '_blank', 'noopener')) toast('請打開 Claude App 貼上');
+      if (document.visibilityState === 'visible' && !window.open(CLAUDE_WEB, '_blank', 'noopener')) toast('到 Claude 貼上');
     }, 1500);
     document.addEventListener('visibilitychange', () => clearTimeout(fallback), { once: true });
     location.href = 'claude://claude.ai/new';
@@ -763,7 +767,12 @@ function openClaude() {
 }
 
 $('btn-refresh').addEventListener('click', () => refresh());
-$('btn-sync').addEventListener('click', () => askSync());
+$('btn-sync').addEventListener('click', () => {
+  askSync();
+  const b = $('btn-sync');
+  b.disabled = true; b.textContent = '已複製';
+  setTimeout(() => { b.textContent = '同步'; b.disabled = state.store?.mode === 'demo'; }, 2500);
+});
 $('btn-upcoming').addEventListener('click', () => { state.showUpcoming = !state.showUpcoming; render(); });
 $('btn-focus-more').addEventListener('click', () => { state.showAllFocus = !state.showAllFocus; render(); });
 $('btn-day-more').addEventListener('click', () => { state.showAllDay = !state.showAllDay; render(); });

@@ -641,7 +641,7 @@ function drawSectors() {
   const M = rows('sector_mix'), S = rows('sectors'), C = rows('concentration');
   const note = document.getElementById('sector-note');
   const asOf = S ? [...new Set(S.filter(s => s.kind === 'etf' && s.as_of).map(s => s.code + ' ' + String(s.as_of).slice(5).replace('-', '/')))] : [];
-  note.textContent = '不含嘉信現金；ETF 依成分產業拆分' + (asOf.length ? '（成分資料日：' + asOf.join('、') + '）' : '') + '；黃色為 AI／半導體相關部分，滑過看組成';
+  note.textContent = '不含嘉信現金；ETF 依成分產業拆分' + (asOf.length ? '（成分資料日：' + asOf.join('、') + '）' : '') + '；黃色＝AI／半導體';
   const conc = document.getElementById('conc'); conc.textContent = '';
   if (C) C.forEach(c => {
     const d = document.createElement('div'); if (c.key === 'ai' || c.key === 'tsmc') d.className = 'ai';

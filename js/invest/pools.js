@@ -37,6 +37,6 @@ export function renderPools(invest) {
   document.getElementById('pools-stats').replaceChildren(...stats);
   const hb = document.getElementById('pools-highs');
   hb.hidden = !highs.length;
-  hb.replaceChildren(...(highs.length ? [el('div', { class: 'k' }, '信念股 52 週收盤高點（已忽略單日尖刺，請肉眼核對）'), ...highs] : []));
+  hb.replaceChildren(...(highs.length ? [el('div', { class: 'k' }, '信念股 52 週收盤高點'), ...highs] : []));
   document.getElementById('pools-note').textContent = v.note;
 }

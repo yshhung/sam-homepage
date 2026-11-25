@@ -53,10 +53,10 @@ function banner(text, button) {
 
 async function start() {
   const demo = (text, button) => { render(demoCompanyHistory(), demoCompany()); status('demo', '示範模式'); banner(text, button); };
-  if (!isConfigured()) { demo('示範模式：還沒設定 Microsoft 登入，下面是示範數字。'); return; }
+  if (!isConfigured()) { demo('示範資料'); return; }
   try { await initAuth(); } catch (e) { status('bad', '登入失敗'); banner(`登入失敗：${e.message}`); return; }
   if (!getAccount()) {
-    demo('示範模式：下面是示範數字，登入後才會看到沁耘真實的網站與社群數字。', el('button', { class: 'btn', type: 'button', onclick: () => login() }, '登入'));
+    demo('示範資料', el('button', { class: 'btn primary', type: 'button', onclick: () => login() }, '登入'));
     return;
   }
   status('loading', '讀取中');

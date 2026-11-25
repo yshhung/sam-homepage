@@ -50,7 +50,7 @@ function drawTrendStats() {
   } else {
     const pick = (rows, k) => (rows || []).find((x) => x.k === k);
     [['cathay_stats', ct, 'y1', 'TW 近一年'], ['cathay_stats', ct, 'all', 'TW 全期間'], ['sch_stats', sc, 'twr1y', 'US 近一年'], ['sch_stats', sc, 'twrall', 'US 全期間']].forEach(([src, rows, k, lab]) => { const x = pick(rows, k); if (x) put(src, x, lab); });
-    note.textContent = '報酬率都已扣掉資金進出（時間加權），2024/10/22 起；點 TW 或 US 看完整統計';
+    note.textContent = '時間加權報酬（已扣資金進出），2024/10/22 起';
   }
 }
 window.drawTrendStats = drawTrendStats;

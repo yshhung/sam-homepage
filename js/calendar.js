@@ -75,8 +75,8 @@ async function start() {
   if (isConfigured()) {
     try { await initAuth(); } catch (e) { status('bad', '登入失敗'); banner(`登入失敗：${e.message}`); }
     if (getAccount()) S.live = true;
-    else banner('請先登入，才能看你的 Outlook 行程；現在顯示示範資料。', el('button', { class: 'btn', type: 'button', onclick: () => login() }, '登入'));
-  } else banner('示範模式：還沒設定 Microsoft 登入。');
+    else banner('示範資料', el('button', { class: 'btn primary', type: 'button', onclick: () => login() }, '登入'));
+  } else banner('示範資料');
   await go(S.month);
 }
 
