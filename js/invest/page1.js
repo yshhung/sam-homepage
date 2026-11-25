@@ -491,7 +491,6 @@ dash.calc('rule_usage', {
 const wan = v => d3.format(',.3f')(v / 1e6) + 'M';
 const wan0 = v => d3.format(',.2~f')(v / 1e6) + 'M';
 const retireTiers = () => { const RG = rows('goals'), G = rows('goal_pace'); const tot = G && G.find(x => x.scope === 'total'); return RG && RG[0] && tot && window.retirePace ? window.retirePace(RG[0], tot.current) : null; };
-const moTxt = m => { const a = Math.abs(m); return a >= 12 ? d3.format('.1f')(a / 12) + ' 年' : d3.format('.1f')(a) + ' 個月'; };
 // 老 10 年千萬進度線收進「詳細」
 function foldOld(parent, nodes, label) {
   const dt = document.createElement('details'); dt.className = 'sd-old';
@@ -502,11 +501,14 @@ function tierCard(t, full) {
   const on = Math.abs(t.diff) < t.pace * 0.005;
   const h = document.createElement('div'); h.className = 'k'; h.textContent = t.label + (t.desc ? '・' + t.desc : '');
   const st = document.createElement('div'); st.className = 'st ' + (on ? '' : t.diff >= 0 ? 'up' : 'down');
-  st.textContent = on ? '符合進度' : (t.diff >= 0 ? '超前 ' : '落後 ') + moTxt(t.aheadMonths);
-  const sm = document.createElement('small'); sm.textContent = (t.diff >= 0 ? '+' : '−') + wan(Math.abs(t.diff)) + '（' + d3.format('+.1%')(t.diffPct) + '）'; st.appendChild(sm);
+  // 主字用百分比；「落後幾個月」會讓越容易的目標看起來落後越多（線越平、補同樣差距要越久），2026-11-25 Sam 定改掉
+  st.textContent = on ? '符合進度' : (t.diff >= 0 ? '超前 ' : '落後 ') + d3.format('.1%')(Math.abs(t.diffPct));
+  const sm = document.createElement('small'); sm.textContent = (t.diff >= 0 ? '+' : '−') + wan(Math.abs(t.diff)); st.appendChild(sm);
   const p = document.createElement('p'); const b1 = document.createElement('b'); b1.textContent = wan(t.current); const b2 = document.createElement('b'); b2.textContent = wan(t.pace);
   p.append('現在 ', b1, '　今天應有 ', b2);
-  d.append(h, st, p);
+  const pr = document.createElement('p');
+  if (t.rateNow !== null && t.rateNow !== undefined) { const b3 = document.createElement('b'); b3.textContent = d3.format('.1%')(t.rateNow); pr.append('從現在起需年化 ', b3, '（原 ' + d3.format('.1%')(t.rate) + '）'); }
+  d.append(h, st, p, pr);
   if (full) {
     const p2 = document.createElement('p'); p2.textContent = '每月 ' + nt(t.monthly) + '（4% 法則，今天的錢 ' + wan0(t.needToday) + '）・45 歲需 ' + wan0(t.need45) + '・年化需 ' + d3.format('.1%')(t.rate); d.appendChild(p2);
     t.cps.forEach(c => { const q = document.createElement('p'); q.textContent = c.age + ' 歲（' + c.month.replace('-', '/') + '）' + (c.role ? c.role + '：' : '需 ') + wan0(c.need) + '，照這條進度線到時約 ' + wan0(c.pace); d.appendChild(q); });

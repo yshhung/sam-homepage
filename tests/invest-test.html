@@ -8,6 +8,7 @@
 <body>
 <h1>投資頁資料轉換測試（假資料）</h1>
 <ul id="out"></ul>
+<script src="../js/invest/retire.js"></script>
 <script type="module">
 import { applyPrices, applyWatch, buildDatasets, changesView, fxRows, historyRows, lastUpdateRows, mergeChanges, mergeMarket } from '../js/invest/data.js';
 
@@ -86,6 +87,16 @@ const m2 = mergeMarket([{ mk_tiles: [{ group: '舊群組', name: 'Q', at: '2025-
 check('10 天沒更新的群組不再顯示', !m2.mk_tiles.some((r) => r.group === '舊群組') && m2.mk_tiles.some((r) => r.group === '美股收盤'));
 const wl = applyWatch([{ code: 'CCC', price: 1, price_date: '2026-01-01' }, { code: 'DDD', price: null }], { watch: { CCC: [3, 2, '2026-01-05'] } });
 check('追蹤清單套上最新價格', wl[0].price === 3 && wl[0].prev_price === 2 && wl[1].price === null);
+
+// 目標狀態三級（假資料）：從現在起需要的年化報酬率
+const rg = { start_date: '2026-01-01', start_total_twd: 1000000, annual_contrib_twd: 100000,
+  retire: { annual_contrib_twd: 100000, tiers: [{ key: 'a', need_at_45_twd: 3000000 }, { key: 'b', need_at_45_twd: 6000000 }], checkpoints: [{ age: 45, month: '2036-01' }] } };
+const rp = window.retirePace(rg, 900000, Date.parse('2026-02-01T00:00:00+08:00'));
+check('三級：從現在起需年化有算出來', rp.every((t) => typeof t.rateNow === 'number'), JSON.stringify(rp.map((t) => t.rateNow)));
+check('三級：落後時從現在起需要的年化比原本高', rp.every((t) => t.rateNow > t.rate));
+check('三級：越容易的目標，從現在起需要的年化越低', rp[0].rateNow < rp[1].rateNow);
+check('三級：超前時從現在起需要的年化比原本低', window.retirePace(rg, 1300000, Date.parse('2026-02-01T00:00:00+08:00')).every((t) => t.rateNow < t.rate));
+check('三級：已過 45 歲檢查點就不算', window.retirePace(rg, 900000, Date.parse('2036-06-01T00:00:00+08:00')).every((t) => t.rateNow === null));
 
 document.title = failed ? `FAIL ${failed}` : 'PASS';
 </script>

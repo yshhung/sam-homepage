@@ -18,6 +18,8 @@
     return rt.tiers.map((tier) => {
       const need45 = Number(tier.need_at_45_twd);
       const r = solve((x) => fv(p0, c, x, y45), need45);
+      // 從今天起要多少年化報酬率，才能用現在的資產＋每年投入在 45 歲到 need45（比「落後幾個月」好懂：越容易的目標數字越小）
+      const rateNow = y45 - yrs > 0.01 && totalTwd > 0 ? solve((x) => fv(totalTwd, c, x, y45 - yrs), need45) : null;
       const pace = fv(p0, c, r, yrs);
       let lo = -30, hi = 80; for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (fv(p0, c, r, m) < totalTwd) lo = m; else hi = m; }
       const cps = (rt.checkpoints || []).map((cp) => ({
@@ -25,10 +27,11 @@
         pace: fv(p0, c, r, (ym(cp.month) - t0) / YR),
         role: cp.must === tier.key ? '必達' : cp.stretch === tier.key ? '挑戰' : '',
       }));
-      return { key: tier.key, label: tier.label, desc: tier.desc, monthly: tier.monthly_twd, needToday: tier.need_today_twd, need45, rate: r,
+      return { key: tier.key, label: tier.label, desc: tier.desc, monthly: tier.monthly_twd, needToday: tier.need_today_twd, need45, rate: r, rateNow,
         current: totalTwd, pace, diff: totalTwd - pace, diffPct: (totalTwd - pace) / pace, aheadMonths: (hi - yrs) * 12, cps };
     });
   }
   if (typeof window !== 'undefined') window.retirePace = retirePace;
+  if (typeof globalThis !== 'undefined') globalThis.retirePace = retirePace;
   if (typeof module !== 'undefined') module.exports = { retirePace };
 })();
